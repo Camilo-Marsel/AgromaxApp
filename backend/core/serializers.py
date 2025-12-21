@@ -2,8 +2,9 @@
 
 from rest_framework import serializers
 from django.contrib.auth import authenticate
+from django.core.exceptions import ValidationError
 from .models import (
-    Usuario, Rol, TipoContrato, Trabajador,
+    Usuario, Rol, TipoContrato, Finca, Lote, Trabajador,
     UnidadMedida, Labor, ListaPrecios, VariablesNomina,
     Quincena, RegistroLabor, Nomina, DetalleNomina,
     Prestamo, CuotaPrestamo, AuditoriaLog
@@ -92,6 +93,49 @@ class UsuarioCreateSerializer(serializers.ModelSerializer):
 
 
 # ============================================================================
+# FINCAS Y LOTES
+# ============================================================================
+
+class LoteSerializer(serializers.ModelSerializer):
+    finca_nombre = serializers.CharField(source='finca.nombre', read_only=True)
+    unidad_medida_display = serializers.CharField(source='get_unidad_medida_display', read_only=True)
+    
+    class Meta:
+        model = Lote
+        fields = [
+            'id', 'finca', 'finca_nombre', 'nombre', 'medida',
+            'unidad_medida', 'unidad_medida_display', 'activo',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+
+class FincaSerializer(serializers.ModelSerializer):
+    lotes = LoteSerializer(many=True, read_only=True)
+    total_lotes = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Finca
+        fields = [
+            'id', 'nombre', 'ubicacion', 'activa',
+            'lotes', 'total_lotes',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def get_total_lotes(self, obj):
+        return obj.lotes.count()
+
+
+class FincaSimpleSerializer(serializers.ModelSerializer):
+    """Serializer simple sin lotes para uso en otras entidades"""
+    
+    class Meta:
+        model = Finca
+        fields = ['id', 'nombre', 'ubicacion', 'activa']
+
+
+# ============================================================================
 # TRABAJADORES
 # ============================================================================
 
@@ -106,23 +150,37 @@ class TipoContratoSerializer(serializers.ModelSerializer):
         ]
 
 
+class TrabajadorSimpleSerializer(serializers.ModelSerializer):
+    """Serializer simple para incluir información mínima del trabajador"""
+    nombre_completo = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = Trabajador
+        fields = ['id', 'nombres', 'apellidos', 'nombre_completo', 'numero_documento']
+        read_only_fields = fields
+
+
 class TrabajadorListSerializer(serializers.ModelSerializer):
     """Serializer para listado (sin info bancaria completa)"""
     tipo_contrato_info = TipoContratoSerializer(source='tipo_contrato', read_only=True)
+    finca_info = FincaSimpleSerializer(source='finca', read_only=True)
     nombre_completo = serializers.CharField(read_only=True)
     cuenta_oculta = serializers.CharField(read_only=True)
     tipo_documento_display = serializers.CharField(source='get_tipo_documento_display', read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    tipo_cuenta_display = serializers.CharField(source='get_tipo_cuenta_bancaria_display', read_only=True)
     
     class Meta:
         model = Trabajador
         fields = [
             'id', 'nombres', 'apellidos', 'nombre_completo',
             'tipo_documento', 'tipo_documento_display', 'numero_documento',
+            'es_administrativo', 'salario_quincenal',
             'fecha_nacimiento', 'telefono', 'correo',
             'tipo_contrato', 'tipo_contrato_info',
+            'finca', 'finca_info',
             'fecha_ingreso', 'fecha_retiro', 'estado', 'estado_display',
-            'cuenta_oculta', 'banco',
+            'cuenta_oculta', 'banco', 'tipo_cuenta_bancaria', 'tipo_cuenta_display',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
@@ -131,9 +189,11 @@ class TrabajadorListSerializer(serializers.ModelSerializer):
 class TrabajadorDetailSerializer(serializers.ModelSerializer):
     """Serializer para detalle (con info bancaria para SUPER_ADMIN)"""
     tipo_contrato_info = TipoContratoSerializer(source='tipo_contrato', read_only=True)
+    finca_info = FincaSimpleSerializer(source='finca', read_only=True)
     nombre_completo = serializers.CharField(read_only=True)
     tipo_documento_display = serializers.CharField(source='get_tipo_documento_display', read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    tipo_cuenta_display = serializers.CharField(source='get_tipo_cuenta_bancaria_display', read_only=True)
     
     class Meta:
         model = Trabajador
@@ -141,10 +201,12 @@ class TrabajadorDetailSerializer(serializers.ModelSerializer):
             'id', 'nombres', 'apellidos', 'nombre_completo',
             'tipo_documento', 'tipo_documento_display', 'numero_documento',
             'lugar_expedicion_documento', 'fecha_nacimiento',
-            'telefono', 'direccion', 'correo', 'eps',
+            'telefono', 'direccion', 'correo', 'eps', 'arl',
             'tipo_contrato', 'tipo_contrato_info',
+            'finca', 'finca_info',
+            'es_administrativo', 'salario_quincenal',
             'fecha_ingreso', 'fecha_retiro', 'estado', 'estado_display',
-            'numero_cuenta_bancaria', 'banco',
+            'numero_cuenta_bancaria', 'banco', 'tipo_cuenta_bancaria', 'tipo_cuenta_display',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
@@ -169,10 +231,21 @@ class TrabajadorCreateUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'nombres', 'apellidos', 'tipo_documento', 'numero_documento',
             'lugar_expedicion_documento', 'fecha_nacimiento',
-            'telefono', 'direccion', 'correo', 'eps',
-            'tipo_contrato', 'fecha_ingreso', 'fecha_retiro', 'estado',
-            'numero_cuenta_bancaria', 'banco'
+            'telefono', 'direccion', 'correo', 'eps', 'arl',
+            'tipo_contrato', 'finca',
+            'es_administrativo', 'salario_quincenal',
+            'fecha_ingreso', 'fecha_retiro', 'estado',
+            'numero_cuenta_bancaria', 'banco', 'tipo_cuenta_bancaria'
         ]
+
+    def validate(self, data):
+        # Validar que si es administrativo, tenga salario
+        if data.get('es_administrativo') and not data.get('salario_quincenal'):
+            raise serializers.ValidationError({
+                'salario_quincenal': 'El salario quincenal es requerido para trabajadores administrativos'
+            })
+        
+        return data
     
     def validate_numero_documento(self, value):
         """Validar que el documento sea único"""
@@ -354,6 +427,20 @@ class RegistroLaborSerializer(serializers.ModelSerializer):
             'updated_at', 'updated_by', 'updated_by_info'
         ]
         read_only_fields = ['created_at', 'created_by', 'updated_at', 'updated_by']
+    
+    def validate(self, attrs):
+        """Validación adicional en el serializer"""
+        # Crear una instancia temporal para ejecutar clean()
+        instance = RegistroLabor(**attrs)
+        if self.instance:
+            instance.pk = self.instance.pk
+        
+        try:
+            instance.clean()
+        except ValidationError as e:
+            raise serializers.ValidationError(e.message_dict if hasattr(e, 'message_dict') else str(e))
+        
+        return attrs
 
 
 class RegistroLaborCreateUpdateSerializer(serializers.ModelSerializer):
@@ -416,6 +503,8 @@ class NominaSerializer(serializers.ModelSerializer):
             'total_devengado', 'total_deducciones', 'total_neto',
             'estado', 'estado_display',
             'fecha_calculo', 'fecha_aprobacion', 'fecha_pago',
+            'devengos_adicionales', 'descripcion_devengos_adicionales',
+            'deducciones_adicionales', 'descripcion_deducciones_adicionales',
             'observaciones', 'detalles',
             'created_at', 'created_by', 'created_by_info',
             'updated_at'
@@ -445,7 +534,7 @@ class CuotaPrestamoSerializer(serializers.ModelSerializer):
 
 
 class PrestamoSerializer(serializers.ModelSerializer):
-    trabajador_info = TrabajadorListSerializer(source='trabajador', read_only=True)
+    trabajador_info = TrabajadorSimpleSerializer(source='trabajador', read_only=True)
     cuotas = CuotaPrestamoSerializer(many=True, read_only=True)
     tipo_pago_display = serializers.CharField(source='get_tipo_pago_display', read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
@@ -459,52 +548,65 @@ class PrestamoSerializer(serializers.ModelSerializer):
             'tipo_pago', 'tipo_pago_display',
             'numero_cuotas', 'valor_cuota', 'saldo_pendiente',
             'estado', 'estado_display', 'observaciones',
-            'cuotas', 'created_at', 'created_by', 'created_by_info'
+            'cuotas', 'created_at', 'created_by', 'created_by_info',
+            'updated_at'
         ]
-        read_only_fields = ['saldo_pendiente', 'created_at', 'created_by']
+        read_only_fields = ['valor_cuota', 'saldo_pendiente', 'created_at', 'created_by', 'updated_at']
 
 
 class PrestamoCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Prestamo
         fields = [
-            'trabajador', 'monto_total', 'fecha_prestamo',
-            'tipo_pago', 'numero_cuotas', 'observaciones'
+            'trabajador', 'monto_total', 'tipo_pago',
+            'numero_cuotas', 'fecha_prestamo', 'observaciones'
         ]
     
     def validate(self, data):
-        """Validar lógica de préstamos"""
-        tipo_pago = data.get('tipo_pago')
-        numero_cuotas = data.get('numero_cuotas')
-        monto_total = data.get('monto_total')
+        # Validar monto máximo
+        if data.get('monto_total') and data['monto_total'] > 3000000:
+            raise serializers.ValidationError({
+                'monto_total': 'El monto máximo permitido es $3,000,000'
+            })
         
-        if tipo_pago == Prestamo.TIPO_PAGO_CHOICES[1][0]:  # CUOTAS
-            if not numero_cuotas or numero_cuotas < 1:
-                raise serializers.ValidationError(
-                    "Debe especificar el número de cuotas para préstamos a cuotas"
-                )
+        # Validar que si es CUOTAS, tenga número de cuotas
+        if data.get('tipo_pago') == 'CUOTAS' and not data.get('numero_cuotas'):
+            raise serializers.ValidationError({
+                'numero_cuotas': 'Debe especificar el número de cuotas'
+            })
+        
+        # Validar que el trabajador no tenga préstamos activos
+        trabajador = data.get('trabajador')
+        if trabajador and Prestamo.objects.filter(trabajador=trabajador, estado='ACTIVO').exists():
+            raise serializers.ValidationError({
+                'trabajador': 'El trabajador ya tiene un préstamo activo'
+            })
         
         return data
     
     def create(self, validated_data):
-        """Crear préstamo y sus cuotas si aplica"""
+        """Crear préstamo y cuotas si corresponde"""
         tipo_pago = validated_data['tipo_pago']
         monto_total = validated_data['monto_total']
-        numero_cuotas = validated_data.get('numero_cuotas')
-        
-        # Calcular valor de cuota si es a cuotas
-        if tipo_pago == 'CUOTAS' and numero_cuotas:
-            validated_data['valor_cuota'] = monto_total / numero_cuotas
-        
-        # Inicializar saldo pendiente
-        validated_data['saldo_pendiente'] = monto_total
-        
-        # Crear préstamo
-        prestamo = super().create(validated_data)
-        
-        # Crear cuotas si es a cuotas
+        numero_cuotas = validated_data.get('numero_cuotas', 1)
+
+        # Calcular valor de cuota
+        if tipo_pago == 'UNICO':
+            valor_cuota = monto_total
+            numero_cuotas = 1
+        else:
+            valor_cuota = (monto_total / numero_cuotas).quantize(Decimal('0.01'))
+
+        # Crear préstamo con saldo pendiente
+        prestamo = Prestamo.objects.create(
+            **validated_data,
+            valor_cuota=valor_cuota,
+            saldo_pendiente=monto_total,
+            estado='ACTIVO'
+        )
+
+        # Crear cuotas si es tipo CUOTAS
         if tipo_pago == 'CUOTAS':
-            valor_cuota = prestamo.valor_cuota
             for i in range(1, numero_cuotas + 1):
                 CuotaPrestamo.objects.create(
                     prestamo=prestamo,
@@ -512,7 +614,7 @@ class PrestamoCreateSerializer(serializers.ModelSerializer):
                     valor_cuota=valor_cuota,
                     estado='PENDIENTE'
                 )
-        
+
         return prestamo
 
 

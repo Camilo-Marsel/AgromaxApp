@@ -3,7 +3,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
-    Usuario, Rol, TipoContrato, Trabajador,
+    Usuario, Rol, TipoContrato, Finca, Lote, Trabajador,
     UnidadMedida, Labor, ListaPrecios, VariablesNomina,
     Quincena, RegistroLabor, Nomina, DetalleNomina,
     Prestamo, CuotaPrestamo, AuditoriaLog
@@ -35,6 +35,19 @@ class UsuarioAdmin(BaseUserAdmin):
 # ============================================================================
 # TRABAJADORES Y CONTRATOS
 # ============================================================================
+
+@admin.register(Finca)
+class FincaAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'ubicacion', 'activa', 'created_at']
+    list_filter = ['activa']
+    search_fields = ['nombre', 'ubicacion']
+
+
+@admin.register(Lote)
+class LoteAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'finca', 'medida', 'unidad_medida', 'activo']
+    list_filter = ['finca', 'activo', 'unidad_medida']
+    search_fields = ['nombre', 'finca__nombre']
 
 @admin.register(TipoContrato)
 class TipoContratoAdmin(admin.ModelAdmin):

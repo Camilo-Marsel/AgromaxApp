@@ -63,7 +63,10 @@ api.interceptors.response.use(
 
 export default api;
 
-// Servicios de autenticación
+// ============================================================================
+// SERVICIOS DE AUTENTICACIÓN
+// ============================================================================
+
 export const authService = {
   login: async (username, password) => {
     const response = await axios.post(`${API_URL}/auth/login/`, {
@@ -77,9 +80,17 @@ export const authService = {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
   },
+
+  getCurrentUser: async () => {
+    const response = await api.get('/auth/me/');
+    return response.data;
+  }
 };
 
-// Health check
+// ============================================================================
+// SERVICIOS GENERALES
+// ============================================================================
+
 export const healthCheck = async () => {
   const response = await api.get('/health/');
   return response.data;

@@ -7,11 +7,12 @@ from .models import Trabajador, Labor, RegistroLabor, Nomina, Prestamo
 class TrabajadorFilter(filters.FilterSet):
     estado = filters.ChoiceFilter(choices=Trabajador.ESTADO_CHOICES)
     tipo_contrato = filters.NumberFilter(field_name='tipo_contrato__id')
+    finca = filters.NumberFilter(field_name='finca__id')  # NUEVO
     search = filters.CharFilter(method='filter_search')
     
     class Meta:
         model = Trabajador
-        fields = ['estado', 'tipo_contrato']
+        fields = ['estado', 'tipo_contrato', 'finca']
     
     def filter_search(self, queryset, name, value):
         return queryset.filter(
@@ -19,7 +20,16 @@ class TrabajadorFilter(filters.FilterSet):
             models.Q(apellidos__icontains=value) |
             models.Q(numero_documento__icontains=value)
         )
-
+    
+class NominaFilter(filters.FilterSet):
+    quincena = filters.NumberFilter(field_name='quincena__id')
+    trabajador = filters.NumberFilter(field_name='trabajador__id')
+    finca = filters.NumberFilter(field_name='trabajador__finca__id')  # NUEVO
+    estado = filters.ChoiceFilter(choices=Nomina.ESTADO_CHOICES)
+    
+    class Meta:
+        model = Nomina
+        fields = ['quincena', 'trabajador', 'finca', 'estado']
 
 class LaborFilter(filters.FilterSet):
     activa = filters.BooleanFilter()

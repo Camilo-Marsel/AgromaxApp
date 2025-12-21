@@ -1,90 +1,200 @@
 // frontend/src/pages/Dashboard.jsx
 
 import { useContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
-import { healthCheck } from '../services/api';
+import quincenaService from '../services/quincenaService';
+import trabajadorService from '../services/trabajadorService';
 import toast from 'react-hot-toast';
+import { Calendar, Users, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import LoadingSpinner from '../components/Common/LoadingSpinner';
 
 export default function Dashboard() {
-  const { user, logout } = useContext(AuthContext);
-  const [apiStatus, setApiStatus] = useState('Verificando...');
+  const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
+  const [loading, setLoading] = useState(true);
+  const [quincenaActual, setQuincenaActual] = useState(null);
+  const [estadisticas, setEstadisticas] = useState(null);
+  const [trabajadoresActivos, setTrabajadoresActivos] = useState(0);
 
   useEffect(() => {
-    // Verificar conexión con API
-    const checkAPI = async () => {
-      try {
-        const data = await healthCheck();
-        setApiStatus(data.message);
-        toast.success('Conexión con API exitosa');
-      } catch (error) {
-        setApiStatus('Error al conectar con API');
-        toast.error('Error al conectar con API');
-      }
-    };
-
-    checkAPI();
+    loadData();
   }, []);
 
+  const loadData = async () => {
+    try {
+      setLoading(true);
+
+      // Crear/obtener quincena actual
+      const quincenaData = await quincenaService.crearActual();
+      const quincena = quincenaData.data || quincenaData;
+      setQuincenaActual(quincena);
+
+      // Obtener estadísticas de la quincena
+      const stats = await quincenaService.getEstadisticas(quincena.id);
+      setEstadisticas(stats);
+
+      // Obtener trabajadores activos
+      const trabajadores = await trabajadorService.getAll({ estado: 'ACTIVO' });
+      const trabajadoresArray = trabajadores.results || trabajadores;
+      setTrabajadoresActivos(Array.isArray(trabajadoresArray) ? trabajadoresArray.length : 0);
+
+    } catch (error) {
+      console.error('Error al cargar datos:', error);
+      toast.error('Error al cargar información del dashboard');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-bold">Gestión Finca Platanera</h1>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-800">
+          Bienvenido, {user?.username}
+        </h1>
+        <p className="text-gray-600">
+          Sistema de Gestión de Finca Platanera
+        </p>
+      </div>
+
+      {/* Quincena Actual */}
+      {quincenaActual && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <Calendar className="w-6 h-6 text-blue-600" />
+            <div>
+              <h3 className="font-semibold text-blue-900">Quincena Actual</h3>
+              <p className="text-sm text-blue-700">
+                {quincenaActual.año} - Mes {quincenaActual.mes} - Quincena {quincenaActual.numero}
+              </p>
+              <p className="text-sm text-blue-600">
+                {new Date(quincenaActual.fecha_inicio).toLocaleDateString()} al{' '}
+                {new Date(quincenaActual.fecha_fin).toLocaleDateString()}
+              </p>
             </div>
-            <div className="flex items-center">
+          </div>
+        </div>
+      )}
+
+      {/* Tarjetas de Estadísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Trabajadores Activos */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Trabajadores Activos</p>
+              <p className="text-3xl font-bold text-gray-900">{trabajadoresActivos}</p>
+            </div>
+            <Users className="w-12 h-12 text-blue-500" />
+          </div>
+        </div>
+
+        {/* Con Registros */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Con Registros</p>
+              <p className="text-3xl font-bold text-green-600">
+                {estadisticas?.trabajadores_con_registros || 0}
+              </p>
+            </div>
+            <CheckCircle className="w-12 h-12 text-green-500" />
+          </div>
+        </div>
+
+        {/* Sin Registros */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Sin Registros</p>
+              <p className="text-3xl font-bold text-red-600">
+                {estadisticas?.trabajadores_sin_registros || 0}
+              </p>
+            </div>
+            <AlertCircle className="w-12 h-12 text-red-500" />
+          </div>
+        </div>
+
+        {/* Total Registros */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Total Registros</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {estadisticas?.total_registros || 0}
+              </p>
+            </div>
+            <Clock className="w-12 h-12 text-purple-500" />
+          </div>
+        </div>
+      </div>
+
+      {/* Alertas */}
+      {estadisticas && estadisticas.trabajadores_sin_registros > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-yellow-900">
+                Trabajadores sin registros
+              </h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                Hay {estadisticas.trabajadores_sin_registros} trabajadores sin registros
+                en la quincena actual. Es importante registrar las labores diarias.
+              </p>
               <button
-                onClick={logout}
-                className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
+                onClick={() => navigate('/registros')}
+                className="mt-3 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-sm"
               >
-                Cerrar Sesión
+                Ir a Registro de Labores
               </button>
             </div>
           </div>
         </div>
-      </nav>
+      )}
 
-      {/* Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-2xl font-bold mb-4">Dashboard</h2>
-            
-            <div className="space-y-4">
-              <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                <p className="text-green-800">
-                  <strong>Estado API:</strong> {apiStatus}
-                </p>
-              </div>
+      {/* Accesos Rápidos */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <button
+          onClick={() => navigate('/registros')}
+          className="bg-white border-2 border-gray-200 rounded-lg p-6 hover:border-blue-500 hover:shadow-md transition-all text-left"
+        >
+          <h3 className="font-semibold text-lg mb-2">📝 Registrar Labores</h3>
+          <p className="text-sm text-gray-600">
+            Ingresar las labores realizadas por los trabajadores
+          </p>
+        </button>
 
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                <p className="text-blue-800">
-                  ¡Bienvenido! El sistema está configurado correctamente.
-                </p>
-              </div>
+        <button
+          onClick={() => navigate('/trabajadores')}
+          className="bg-white border-2 border-gray-200 rounded-lg p-6 hover:border-blue-500 hover:shadow-md transition-all text-left"
+        >
+          <h3 className="font-semibold text-lg mb-2">👥 Trabajadores</h3>
+          <p className="text-sm text-gray-600">
+            Gestionar información de trabajadores
+          </p>
+        </button>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                <div className="p-6 bg-white border rounded-lg shadow-sm">
-                  <h3 className="font-semibold text-lg mb-2">Trabajadores</h3>
-                  <p className="text-gray-600">Próximamente...</p>
-                </div>
-                
-                <div className="p-6 bg-white border rounded-lg shadow-sm">
-                  <h3 className="font-semibold text-lg mb-2">Nómina</h3>
-                  <p className="text-gray-600">Próximamente...</p>
-                </div>
-                
-                <div className="p-6 bg-white border rounded-lg shadow-sm">
-                  <h3 className="font-semibold text-lg mb-2">Reportes</h3>
-                  <p className="text-gray-600">Próximamente...</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
+        <button
+          onClick={() => navigate('/nomina')}
+          className="bg-white border-2 border-gray-200 rounded-lg p-6 hover:border-blue-500 hover:shadow-md transition-all text-left"
+        >
+          <h3 className="font-semibold text-lg mb-2">💰 Nómina</h3>
+          <p className="text-sm text-gray-600">
+            Calcular y gestionar nómina quincenal
+          </p>
+        </button>
+      </div>
     </div>
   );
 }

@@ -34,6 +34,58 @@ class Rol(models.Model):
         return self.get_nombre_display()
 
 
+class Finca(models.Model):
+    """Fincas donde trabajan los empleados"""
+    nombre = models.CharField(max_length=100, unique=True)
+    ubicacion = models.CharField(max_length=200, blank=True, null=True)
+    activa = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'fincas'
+        verbose_name = 'Finca'
+        verbose_name_plural = 'Fincas'
+        ordering = ['nombre']
+    
+    def __str__(self):
+        return self.nombre
+
+
+class Lote(models.Model):
+    """Lotes que pertenecen a una finca"""
+    UNIDAD_MEDIDA_CHOICES = [
+        ('HECTAREA', 'Hectárea'),
+        ('METRO_CUADRADO', 'Metro Cuadrado'),
+    ]
+    
+    finca = models.ForeignKey(
+        Finca,
+        on_delete=models.CASCADE,
+        related_name='lotes'
+    )
+    nombre = models.CharField(max_length=100)
+    medida = models.DecimalField(max_digits=10, decimal_places=2)
+    unidad_medida = models.CharField(
+        max_length=20,
+        choices=UNIDAD_MEDIDA_CHOICES,
+        default='HECTAREA'
+    )
+    activo = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'lotes'
+        verbose_name = 'Lote'
+        verbose_name_plural = 'Lotes'
+        ordering = ['finca', 'nombre']
+        unique_together = [['finca', 'nombre']]
+    
+    def __str__(self):
+        return f"{self.finca.nombre} - {self.nombre}"
+
+
 class Usuario(AbstractUser):
     """Usuario personalizado del sistema"""
     
@@ -94,8 +146,9 @@ class TipoContrato(models.Model):
 
 
 class Trabajador(models.Model):
-    """Información personal y laboral de cada trabajador"""
+    """Trabajadores de la finca"""
     
+    # Tipos de documento
     TIPO_DOCUMENTO_CHOICES = [
         ('CC', 'Cédula de Ciudadanía'),
         ('TI', 'Tarjeta de Identidad'),
@@ -103,55 +156,93 @@ class Trabajador(models.Model):
         ('PEP', 'Permiso Especial de Permanencia'),
     ]
     
+    # Estados del trabajador
     ESTADO_CHOICES = [
         ('ACTIVO', 'Activo'),
         ('INACTIVO', 'Inactivo'),
         ('RETIRADO', 'Retirado'),
     ]
     
-    # Información Personal
+    # NUEVO: Tipos de cuenta bancaria
+    TIPO_CUENTA_CHOICES = [
+        ('AHORRO', 'Cuenta de Ahorros'),
+        ('CORRIENTE', 'Cuenta Corriente'),
+        ('NEQUI', 'Nequi'),
+        ('DAVIPLATA', 'Daviplata'),
+    ]
+
+    # Indica si el trabajador es administrativo (salario fijo) o de labores (pago por labor)
+    es_administrativo = models.BooleanField(
+        default=False,
+        verbose_name='Es Administrativo',
+        help_text='Si es True, se le paga salario fijo en lugar de por labores'
+    )
+    
+    salario_quincenal = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Salario Quincenal',
+        help_text='Salario fijo quincenal (solo para administrativos)'
+    )
+    
+    # Información personal
     nombres = models.CharField(max_length=100)
     apellidos = models.CharField(max_length=100)
-    tipo_documento = models.CharField(max_length=3, choices=TIPO_DOCUMENTO_CHOICES)
+    tipo_documento = models.CharField(max_length=10, choices=TIPO_DOCUMENTO_CHOICES)
     numero_documento = models.CharField(max_length=20, unique=True)
-    lugar_expedicion_documento = models.CharField(max_length=100, blank=True)
+    lugar_expedicion_documento = models.CharField(max_length=100, blank=True, null=True)
     fecha_nacimiento = models.DateField()
     
     # Contacto
-    telefono = models.CharField(max_length=20, blank=True)
-    direccion = models.TextField(blank=True)
-    correo = models.EmailField(blank=True)
+    telefono = models.CharField(max_length=20, blank=True, null=True)
+    direccion = models.CharField(max_length=200, blank=True, null=True)
+    correo = models.EmailField(blank=True, null=True)
     
-    # Información Laboral
-    eps = models.CharField(max_length=100, blank=True, verbose_name="EPS")
+    # Información laboral
+    eps = models.CharField(max_length=100, blank=True, null=True)
+    arl = models.CharField(max_length=100, blank=True, null=True)  # NUEVO
+    
     tipo_contrato = models.ForeignKey(
         TipoContrato,
         on_delete=models.PROTECT,
         related_name='trabajadores'
     )
+    
+    finca = models.ForeignKey(  # NUEVO
+        Finca,
+        on_delete=models.PROTECT,
+        related_name='trabajadores',
+        null=True  # Temporal para migración
+    )
+    
     fecha_ingreso = models.DateField()
-    fecha_retiro = models.DateField(null=True, blank=True)
+    fecha_retiro = models.DateField(blank=True, null=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='ACTIVO')
     
-    # Información Bancaria (ENCRIPTADA en producción)
-    numero_cuenta_bancaria = models.CharField(
-        max_length=50, 
+    # Información bancaria
+    numero_cuenta_bancaria = models.CharField(max_length=100, blank=True, null=True)
+    banco = models.CharField(max_length=100, blank=True, null=True)
+    tipo_cuenta_bancaria = models.CharField(  # NUEVO
+        max_length=20,
+        choices=TIPO_CUENTA_CHOICES,
         blank=True,
-        help_text="Debe estar encriptado en producción"
+        null=True
     )
-    banco = models.CharField(max_length=100, blank=True)
     
-    # Auditoría
+    # Metadatos
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        verbose_name = "Trabajador"
-        verbose_name_plural = "Trabajadores"
+        db_table = 'trabajadores'
+        verbose_name = 'Trabajador'
+        verbose_name_plural = 'Trabajadores'
         ordering = ['apellidos', 'nombres']
-        
+    
     def __str__(self):
-        return f"{self.apellidos} {self.nombres} - {self.numero_documento}"
+        return self.nombre_completo
     
     @property
     def nombre_completo(self):
@@ -159,11 +250,13 @@ class Trabajador(models.Model):
     
     @property
     def cuenta_oculta(self):
-        """Retorna últimos 4 dígitos de la cuenta para digitadores"""
+        """Retorna número de cuenta parcialmente oculto"""
         if not self.numero_cuenta_bancaria:
-            return "N/A"
-        return f"****{self.numero_cuenta_bancaria[-4:]}"
-
+            return 'N/A'
+        cuenta = str(self.numero_cuenta_bancaria)
+        if len(cuenta) <= 4:
+            return cuenta
+        return f"***{cuenta[-4:]}"
 
 # ============================================================================
 # CATÁLOGOS DE LABORES
@@ -410,15 +503,66 @@ class RegistroLabor(models.Model):
     )
     
     class Meta:
-        verbose_name = "Registro de Labor"
-        verbose_name_plural = "Registros de Labores"
+        db_table = 'registros_labor'
+        verbose_name = 'Registro de Labor'
+        verbose_name_plural = 'Registros de Labor'
         ordering = ['-fecha', 'trabajador']
-        indexes = [
-            models.Index(fields=['trabajador', 'quincena', 'fecha']),
-        ]
-        
+        # REMOVER: unique_together = [['trabajador', 'fecha', 'quincena']]
+        # Ya no hay restricción única, la validación será en clean()
+    
     def __str__(self):
         return f"{self.trabajador.nombre_completo} - {self.labor.nombre} - {self.fecha}"
+    
+    def clean(self):
+        """Validaciones personalizadas"""
+        from django.core.exceptions import ValidationError
+        
+        # Validar que no sea domingo
+        if self.fecha.weekday() == 6:  # 6 = domingo
+            raise ValidationError('No se pueden registrar labores en domingo')
+        
+        # Validar que la fecha esté dentro de la quincena
+        if not (self.quincena.fecha_inicio <= self.fecha <= self.quincena.fecha_fin):
+            raise ValidationError('La fecha debe estar dentro de la quincena')
+        
+        # Validar duplicados: NO permitir múltiples labores el mismo día
+        # EXCEPCIÓN: "Control" SÍ puede coexistir con otras labores
+        registros_mismo_dia = RegistroLabor.objects.filter(
+            trabajador=self.trabajador,
+            fecha=self.fecha,
+            quincena=self.quincena
+        )
+        
+        # Si estamos editando, excluir el registro actual
+        if self.pk:
+            registros_mismo_dia = registros_mismo_dia.exclude(pk=self.pk)
+        
+        if registros_mismo_dia.exists():
+            # Obtener las labores existentes ese día
+            labores_existentes = registros_mismo_dia.values_list('labor__nombre', flat=True)
+            labor_actual = self.labor.nombre
+            
+            # Caso 1: Si ya existe "Control", solo permitir agregar otra "Control"
+            if 'Control' in labores_existentes and labor_actual != 'Control':
+                raise ValidationError(
+                    'Ya existe un registro de Control para este día. '
+                    'Solo puede agregar más registros de Control.'
+                )
+            
+            # Caso 2: Si existe otra labor (no Control), solo permitir agregar "Control"
+            otras_labores = [l for l in labores_existentes if l != 'Control']
+            if otras_labores and labor_actual != 'Control':
+                raise ValidationError(
+                    f'Ya existe un registro de {otras_labores[0]} para este día. '
+                    f'Solo puede agregar Control como labor adicional.'
+                )
+            
+            # Caso 3: Si estamos agregando Control, está permitido siempre
+            # (no se lanza error)
+    
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
 
 # ============================================================================
@@ -473,6 +617,35 @@ class Nomina(models.Model):
         related_name='nominas_creadas'
     )
     updated_at = models.DateTimeField(auto_now=True)
+
+    # Ajustes manuales
+    devengos_adicionales = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        verbose_name='Devengos Adicionales',
+        help_text='Bonos, horas extra, etc.'
+    )
+    
+    descripcion_devengos_adicionales = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Descripción de Devengos Adicionales'
+    )
+    
+    deducciones_adicionales = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        verbose_name='Deducciones Adicionales',
+        help_text='Sanciones, descuentos varios, etc.'
+    )
+    
+    descripcion_deducciones_adicionales = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Descripción de Deducciones Adicionales'
+    )
     
     class Meta:
         verbose_name = "Nómina"
@@ -597,6 +770,7 @@ class Prestamo(models.Model):
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='ACTIVO')
     observaciones = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(
         Usuario,
         on_delete=models.SET_NULL,
