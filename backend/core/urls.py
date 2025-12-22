@@ -25,7 +25,6 @@ router.register(r'variables-nomina', VariablesNominaViewSet, basename='variables
 router.register(r'quincenas', QuincenaViewSet, basename='quincena')
 router.register(r'registros-labor', RegistroLaborViewSet, basename='registro-labor')
 router.register(r'nominas', NominaViewSet, basename='nomina')
-router.register(r'prestamos', PrestamoViewSet, basename='prestamo')
 router.register(r'auditoria', AuditoriaLogViewSet, basename='auditoria')
 
 @api_view(['GET'])
