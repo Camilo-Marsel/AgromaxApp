@@ -298,7 +298,53 @@ export default function NominaList() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Nómina</h1>
-        
+      </div>
+
+      {/* Filtros: Quincena y Finca */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Selector de Quincena */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Quincena
+            </label>
+            <select
+              value={quincenaSeleccionada || ''}
+              onChange={(e) => setQuincenaSeleccionada(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Seleccione una quincena</option>
+              {quincenas.map((quincena) => (
+                <option key={quincena.id} value={quincena.id}>
+                  {getQuincenaDisplay(quincena)} - {quincena.estado_display}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Selector de Finca (Opcional) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Finca (Opcional)
+            </label>
+            <select
+              value={fincaSeleccionada}
+              onChange={(e) => setFincaSeleccionada(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todas las fincas</option>
+              {fincas.map((finca) => (
+                <option key={finca.id} value={finca.id}>
+                  {finca.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Botones de acción */}
+      <div className="flex justify-end">
         <div className="flex gap-2">
           {quincenaSeleccionada && (
             <>
