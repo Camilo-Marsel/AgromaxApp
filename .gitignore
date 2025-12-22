@@ -6,12 +6,15 @@ backend/db.sqlite3
 backend/media/
 backend/staticfiles/
 backend/.env
+backend/.env.*
+!backend/.env.example
 
 # Frontend (Node/React)
 frontend/node_modules/
 frontend/dist/
 frontend/.env
-frontend/.env.local
+frontend/.env.*
+!frontend/.env.example
 
 # IDEs
 .vscode/
