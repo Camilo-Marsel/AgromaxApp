@@ -30,4 +30,4 @@ Thumbs.db
 *.log
 
 # Evitar subir el volcado de datos de producción
-# backend/datos_produccion.json  # TEMPORAL: Comentado para deploy inicial
+backend/datos_produccion.json
