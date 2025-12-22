@@ -24,6 +24,7 @@ import PrestamoForm from './pages/Prestamos/PrestamoForm';
 import PrestamoDetail from './pages/Prestamos/PrestamoDetail';
 import TrabajadorDetail from './pages/Trabajadores/TrabajadorDetail';
 import ConfiguracionVariables from './pages/Configuracion/ConfiguracionVariables';
+import ReportesList from './pages/Reportes/ReportesList';
 
 // Componente para rutas protegidas
 function ProtectedRoute({ children }) {
@@ -294,6 +295,17 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <ConfiguracionVariables />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/reportes"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ReportesList />
                 </MainLayout>
               </ProtectedRoute>
             }

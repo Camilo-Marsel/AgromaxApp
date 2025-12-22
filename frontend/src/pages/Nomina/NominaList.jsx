@@ -15,6 +15,7 @@ export default function NominaList() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
+  const [exportando, setExportando] = useState(false);
   const [quincenas, setQuincenas] = useState([]);
   const [fincas, setFincas] = useState([]);
   const [quincenaSeleccionada, setQuincenaSeleccionada] = useState(null);
@@ -236,14 +237,17 @@ export default function NominaList() {
       toast.error('No hay quincena seleccionada');
       return;
     }
-    
+
     try {
+      setExportando(true);
       // Si hay filtro de finca, pasarlo al exportador
       await nominaService.exportarExcelQuincena(quincenaSeleccionada, fincaSeleccionada);
       toast.success('Excel generado correctamente');
     } catch (error) {
       console.error('Error al exportar Excel:', error);
       toast.error('Error al generar Excel. Verifique que haya nóminas calculadas.');
+    } finally {
+      setExportando(false);
     }
   };
 
