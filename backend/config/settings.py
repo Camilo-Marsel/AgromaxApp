@@ -157,6 +157,13 @@ CORS_ALLOWED_ORIGINS = config(
 
 CORS_ALLOW_CREDENTIALS = True
 
+# CSRF Settings
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://localhost:5173,http://localhost:3000',
+    cast=Csv()
+)
+
 # Security Settings (solo en producción)
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
