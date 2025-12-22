@@ -151,7 +151,7 @@ export default function NominaList() {
       );
       toast.success(result.message);
       setConfirmAprobarMasivo(false);
-      await loadNominas();
+      await loadNominas(quincenaSeleccionada, fincaSeleccionada);
     } catch (error) {
       console.error('Error al aprobar masivo:', error);
       const errorMsg = error.response?.data?.error || 'Error al aprobar nóminas';
@@ -172,7 +172,7 @@ export default function NominaList() {
       toast.success(result.message);
       setConfirmRechazarMasivo(false);
       setMotivoRechazoMasivo('');
-      await loadNominas();
+      await loadNominas(quincenaSeleccionada, fincaSeleccionada);
     } catch (error) {
       console.error('Error al rechazar masivo:', error);
       const errorMsg = error.response?.data?.error || 'Error al rechazar nóminas';
@@ -191,7 +191,7 @@ export default function NominaList() {
       );
       toast.success(result.message);
       setConfirmPagarMasivo(false);
-      await loadNominas();
+      await loadNominas(quincenaSeleccionada, fincaSeleccionada);
     } catch (error) {
       console.error('Error al marcar como pagadas:', error);
       const errorMsg = error.response?.data?.error || 'Error al marcar nóminas como pagadas';
