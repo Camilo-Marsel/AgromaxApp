@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useContext } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import TrabajadoresList from './pages/Trabajadores/TrabajadoresList';
@@ -31,7 +32,14 @@ function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useContext(AuthContext);
 
   if (loading) {
-    return <div>Cargando...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
   }
 
   return isAuthenticated ? children : <Navigate to="/login" />;
@@ -58,8 +66,13 @@ function App() {
       <BrowserRouter>
         <Toaster position="top-right" />
         <Routes>
+          {/* Ruta pública - Landing Page */}
+          <Route path="/" element={<Landing />} />
+          
+          {/* Ruta de Login */}
           <Route path="/login" element={<Login />} />
           
+          {/* Dashboard - Redirige si está autenticado */}
           <Route
             path="/dashboard"
             element={
@@ -70,13 +83,17 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Trabajadores */}
           <Route path="/trabajadores/:id" 
-          element={
+            element={
               <ProtectedRoute>
                 <MainLayout>
                   <TrabajadorDetail />
                 </MainLayout>
-              </ProtectedRoute>} />
+              </ProtectedRoute>
+            } 
+          />
           <Route
             path="/trabajadores"
             element={
@@ -88,6 +105,28 @@ function App() {
             }
           />
           <Route
+            path="/trabajadores/nuevo"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <TrabajadorForm />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trabajadores/:id/editar"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <TrabajadorForm />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Préstamos */}
+          <Route
             path="/prestamos"
             element={
               <ProtectedRoute>
@@ -117,42 +156,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Labores */}
           <Route
             path="/labores"
             element={
               <ProtectedRoute>
                 <MainLayout>
                   <LaboresList />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/prestamos"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <PrestamosList />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/prestamos/nuevo"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <PrestamoForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/prestamos/:id"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <PrestamoDetail />
                 </MainLayout>
               </ProtectedRoute>
             }
@@ -167,7 +178,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/labores/:id/editar"
             element={
@@ -178,7 +188,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/labores/:id/precios"
             element={
@@ -190,6 +199,7 @@ function App() {
             }
           />
 
+          {/* Fincas */}
           <Route
             path="/fincas"
             element={
@@ -200,7 +210,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/fincas/nueva"
             element={
@@ -211,7 +220,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/fincas/:id/editar"
             element={
@@ -222,7 +230,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/fincas/:id/lotes"
             element={
@@ -234,28 +241,7 @@ function App() {
             }
           />
 
-          <Route
-            path="/trabajadores/nuevo"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <TrabajadorForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/trabajadores/:id/editar"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <TrabajadorForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-
+          {/* Registros */}
           <Route
             path="/registros"
             element={
@@ -267,6 +253,7 @@ function App() {
             }
           />
 
+          {/* Nómina */}
           <Route
             path="/nomina"
             element={
@@ -277,7 +264,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/nomina/:id"
             element={
@@ -289,6 +275,7 @@ function App() {
             }
           />
 
+          {/* Configuración */}
           <Route
             path="/configuracion/variables"
             element={
@@ -300,6 +287,7 @@ function App() {
             }
           />
 
+          {/* Reportes */}
           <Route
             path="/reportes"
             element={
@@ -310,8 +298,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
-          <Route path="/" element={<Navigate to="/dashboard" />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
