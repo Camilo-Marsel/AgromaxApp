@@ -161,7 +161,7 @@ class Trabajador(models.Model):
     )
 
     finca = models.ForeignKey(
-        'farm.Finca',
+        'Finca',
         on_delete=models.PROTECT,
         related_name='trabajadores',
         null=True  # Temporal para migración
