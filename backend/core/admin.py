@@ -6,7 +6,8 @@ from .models import (
     Usuario, Rol, TipoContrato, Finca, Lote, Trabajador,
     UnidadMedida, Labor, ListaPrecios, VariablesNomina,
     Quincena, RegistroLabor, Nomina, DetalleNomina,
-    Prestamo, CuotaPrestamo, AuditoriaLog
+    Prestamo, CuotaPrestamo, AuditoriaLog,
+    Contrato, DocumentoContrato
 )
 
 # ============================================================================
@@ -182,4 +183,215 @@ class AuditoriaLogAdmin(admin.ModelAdmin):
         return False
     
     def has_change_permission(self, request, obj=None):
-        return False
+        return False# Código temporal para agregar al final de admin.py
+
+# ============================================================================
+# CONTRATOS
+# ============================================================================
+
+class DocumentoContratoInline(admin.TabularInline):
+    """Inline para documentos de contrato"""
+    model = DocumentoContrato
+    extra = 0
+    fields = ['tipo_documento', 'nombre', 'archivo', 'fecha_documento']
+    readonly_fields = ['created_at', 'created_by']
+
+
+@admin.register(Contrato)
+class ContratoAdmin(admin.ModelAdmin):
+    list_display = [
+        'numero_contrato',
+        'trabajador',
+        'cargo',
+        'tipo_contrato',
+        'fecha_inicio',
+        'fecha_fin',
+        'get_estado_badge',
+        'get_alerta',
+        'salario_pactado'
+    ]
+    list_filter = ['estado', 'tipo_contrato', 'created_at']
+    search_fields = [
+        'numero_contrato',
+        'trabajador__nombres',
+        'trabajador__apellidos',
+        'cargo'
+    ]
+    date_hierarchy = 'fecha_inicio'
+    readonly_fields = [
+        'numero_contrato',
+        'created_at',
+        'updated_at',
+        'created_by',
+        'get_duracion_info',
+        'get_progreso_bar'
+    ]
+
+    fieldsets = (
+        ('Información Básica', {
+            'fields': (
+                'numero_contrato',
+                'trabajador',
+                'tipo_contrato',
+                'cargo',
+                'salario_pactado'
+            )
+        }),
+        ('Fechas', {
+            'fields': (
+                'fecha_inicio',
+                'fecha_fin',
+                'fecha_liquidacion'
+            )
+        }),
+        ('Estado', {
+            'fields': (
+                'estado',
+                'motivo_finalizacion',
+                'observaciones'
+            )
+        }),
+        ('Información Calculada', {
+            'fields': (
+                'get_duracion_info',
+                'get_progreso_bar'
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Auditoría', {
+            'fields': (
+                'created_at',
+                'updated_at',
+                'created_by'
+            ),
+            'classes': ('collapse',)
+        })
+    )
+
+    inlines = [DocumentoContratoInline]
+
+    def get_estado_badge(self, obj):
+        """Badge de color para el estado"""
+        colors = {
+            'ACTIVO': 'green',
+            'FINALIZADO': 'orange',
+            'LIQUIDADO': 'blue',
+            'CANCELADO': 'red'
+        }
+        color = colors.get(obj.estado, 'gray')
+
+        from django.utils.html import format_html
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; border-radius: 3px; font-weight: bold;">{}</span>',
+            color,
+            obj.get_estado_display()
+        )
+    get_estado_badge.short_description = 'Estado'
+
+    def get_alerta(self, obj):
+        """Indicador de alerta (por vencer / vencido)"""
+        if obj.esta_vencido:
+            from django.utils.html import format_html
+            return format_html(
+                '<span style="color: red; font-weight: bold;">🔴 Vencido hace {} días</span>',
+                abs(obj.dias_restantes) if obj.dias_restantes else 0
+            )
+        elif obj.esta_por_vencer:
+            from django.utils.html import format_html
+            return format_html(
+                '<span style="color: orange; font-weight: bold;">⏰ Vence en {} días</span>',
+                obj.dias_restantes
+            )
+        else:
+            return '✓ OK'
+    get_alerta.short_description = 'Alerta'
+
+    def get_duracion_info(self, obj):
+        """Información de duración del contrato"""
+        if not obj.duracion_dias:
+            return 'N/A'
+
+        from django.utils.html import format_html
+        return format_html(
+            '<strong>Duración:</strong> {} meses ({} días)<br>'
+            '<strong>Días restantes:</strong> {}<br>'
+            '<strong>Progreso:</strong> {}%',
+            obj.duracion_meses or 'N/A',
+            obj.duracion_dias,
+            obj.dias_restantes if obj.dias_restantes is not None else 'N/A',
+            obj.progreso_contrato or 0
+        )
+    get_duracion_info.short_description = 'Duración'
+
+    def get_progreso_bar(self, obj):
+        """Barra de progreso visual"""
+        if not obj.progreso_contrato:
+            return 'N/A'
+
+        progreso = obj.progreso_contrato
+        color = 'green' if progreso < 75 else 'orange' if progreso < 90 else 'red'
+
+        from django.utils.html import format_html
+        return format_html(
+            '<div style="width: 200px; background-color: #e0e0e0; border-radius: 5px; overflow: hidden;">'
+            '<div style="width: {}%; background-color: {}; height: 20px; text-align: center; color: white; font-size: 12px; line-height: 20px;">'
+            '{}%'
+            '</div>'
+            '</div>',
+            progreso,
+            color,
+            int(progreso)
+        )
+    get_progreso_bar.short_description = 'Progreso'
+
+    def save_model(self, request, obj, form, change):
+        """Guardar usuario que crea el contrato"""
+        if not change:  # Si es creación
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(DocumentoContrato)
+class DocumentoContratoAdmin(admin.ModelAdmin):
+    list_display = [
+        'contrato',
+        'tipo_documento',
+        'nombre',
+        'fecha_documento',
+        'created_at',
+        'created_by'
+    ]
+    list_filter = ['tipo_documento', 'fecha_documento', 'created_at']
+    search_fields = [
+        'contrato__numero_contrato',
+        'nombre',
+        'descripcion'
+    ]
+    date_hierarchy = 'fecha_documento'
+    readonly_fields = ['created_at', 'created_by']
+
+    fieldsets = (
+        ('Información del Documento', {
+            'fields': (
+                'contrato',
+                'tipo_documento',
+                'nombre',
+                'descripcion',
+                'archivo',
+                'fecha_documento'
+            )
+        }),
+        ('Auditoría', {
+            'fields': (
+                'created_at',
+                'created_by'
+            ),
+            'classes': ('collapse',)
+        })
+    )
+
+    def save_model(self, request, obj, form, change):
+        """Guardar usuario que sube el documento"""
+        if not change:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)

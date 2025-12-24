@@ -17,7 +17,8 @@ from .models import (
     Usuario, Rol, TipoContrato, Finca, Lote, Trabajador,  # Agregar Finca y Lote
     UnidadMedida, Labor, ListaPrecios, VariablesNomina,
     Quincena, RegistroLabor, Nomina, DetalleNomina,
-    Prestamo, CuotaPrestamo, AuditoriaLog
+    Prestamo, CuotaPrestamo, AuditoriaLog,
+    Contrato, DocumentoContrato
 )
 from .serializers import *
 from .permissions import IsSuperAdmin, IsDigitadorOrAbove, ReadOnly
@@ -962,4 +963,240 @@ class VariablesNominaViewSet(viewsets.ModelViewSet):
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )# Código temporal para agregar al final de views.py
+
+# ============================================================================
+# CONTRATOS
+# ============================================================================
+
+class ContratoViewSet(viewsets.ModelViewSet):
+    """ViewSet para gestión de contratos laborales"""
+    queryset = Contrato.objects.select_related('trabajador', 'created_by').all()
+    permission_classes = [IsDigitadorOrAbove]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['numero_contrato', 'trabajador__nombres', 'trabajador__apellidos', 'cargo']
+    filterset_fields = ['estado', 'trabajador', 'tipo_contrato']
+    ordering = ['-fecha_inicio']
+
+    def get_serializer_class(self):
+        """Seleccionar serializer según acción"""
+        if self.action == 'list':
+            return ContratoListSerializer
+        elif self.action in ['create', 'update', 'partial_update']:
+            return ContratoCreateUpdateSerializer
+        elif self.action in ['finalizar', 'liquidar', 'cancelar', 'reactivar']:
+            # Los serializers específicos se usan en cada action
+            return ContratoDetailSerializer
+        return ContratoDetailSerializer
+
+    def get_queryset(self):
+        """Filtros personalizados"""
+        queryset = super().get_queryset()
+
+        # Filtro: Por vencer
+        por_vencer = self.request.query_params.get('por_vencer', None)
+        if por_vencer and por_vencer.lower() == 'true':
+            from datetime import date, timedelta
+            fecha_limite = date.today() + timedelta(days=15)
+            queryset = queryset.filter(
+                estado=Contrato.ACTIVO,
+                fecha_fin__lte=fecha_limite,
+                fecha_fin__gte=date.today()
             )
+
+        # Filtro: Vencidos
+        vencidos = self.request.query_params.get('vencidos', None)
+        if vencidos and vencidos.lower() == 'true':
+            from datetime import date
+            queryset = queryset.filter(
+                estado=Contrato.ACTIVO,
+                fecha_fin__lt=date.today()
+            )
+
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def estadisticas(self, request):
+        """Estadísticas generales de contratos"""
+        from datetime import date, timedelta
+
+        total_contratos = Contrato.objects.count()
+        activos = Contrato.objects.filter(estado=Contrato.ACTIVO).count()
+        finalizados = Contrato.objects.filter(estado=Contrato.FINALIZADO).count()
+        liquidados = Contrato.objects.filter(estado=Contrato.LIQUIDADO).count()
+        cancelados = Contrato.objects.filter(estado=Contrato.CANCELADO).count()
+
+        # Por vencer (≤15 días)
+        fecha_limite = date.today() + timedelta(days=15)
+        por_vencer = Contrato.objects.filter(
+            estado=Contrato.ACTIVO,
+            fecha_fin__lte=fecha_limite,
+            fecha_fin__gte=date.today()
+        ).count()
+
+        # Vencidos
+        vencidos = Contrato.objects.filter(
+            estado=Contrato.ACTIVO,
+            fecha_fin__lt=date.today()
+        ).count()
+
+        return Response({
+            'total_contratos': total_contratos,
+            'activos': activos,
+            'finalizados': finalizados,
+            'liquidados': liquidados,
+            'cancelados': cancelados,
+            'por_vencer': por_vencer,
+            'vencidos': vencidos
+        })
+
+    @action(detail=False, methods=['get'])
+    def alertas(self, request):
+        """Contratos por vencer y vencidos"""
+        from datetime import date, timedelta
+
+        fecha_limite = date.today() + timedelta(days=15)
+
+        # Por vencer
+        por_vencer = Contrato.objects.filter(
+            estado=Contrato.ACTIVO,
+            fecha_fin__lte=fecha_limite,
+            fecha_fin__gte=date.today()
+        ).select_related('trabajador')
+
+        # Vencidos
+        vencidos = Contrato.objects.filter(
+            estado=Contrato.ACTIVO,
+            fecha_fin__lt=date.today()
+        ).select_related('trabajador')
+
+        por_vencer_serializer = ContratoListSerializer(por_vencer, many=True, context={'request': request})
+        vencidos_serializer = ContratoListSerializer(vencidos, many=True, context={'request': request})
+
+        return Response({
+            'por_vencer': por_vencer_serializer.data,
+            'vencidos': vencidos_serializer.data
+        })
+
+    @action(detail=False, methods=['get'], url_path='trabajador/(?P<trabajador_id>[^/.]+)')
+    def por_trabajador(self, request, trabajador_id=None):
+        """Historial de contratos de un trabajador"""
+        contratos = Contrato.objects.filter(
+            trabajador_id=trabajador_id
+        ).select_related('trabajador', 'created_by').order_by('-fecha_inicio')
+
+        serializer = ContratoListSerializer(contratos, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def finalizar(self, request, pk=None):
+        """Finalizar contrato (ACTIVO → FINALIZADO)"""
+        contrato = self.get_object()
+        serializer = ContratoFinalizarSerializer(data=request.data)
+
+        if serializer.is_valid():
+            try:
+                contrato.finalizar_contrato(
+                    motivo=serializer.validated_data['motivo'],
+                    observaciones=serializer.validated_data.get('observaciones', ''),
+                    usuario=request.user
+                )
+
+                detail_serializer = ContratoDetailSerializer(contrato, context={'request': request})
+                return Response(detail_serializer.data)
+
+            except Exception as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def liquidar(self, request, pk=None):
+        """Liquidar contrato (FINALIZADO → LIQUIDADO)"""
+        contrato = self.get_object()
+        serializer = ContratoLiquidarSerializer(data=request.data)
+
+        if serializer.is_valid():
+            try:
+                contrato.liquidar_contrato(
+                    fecha_liquidacion=serializer.validated_data.get('fecha_liquidacion'),
+                    observaciones=serializer.validated_data.get('observaciones', ''),
+                    usuario=request.user
+                )
+
+                detail_serializer = ContratoDetailSerializer(contrato, context={'request': request})
+                return Response(detail_serializer.data)
+
+            except Exception as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def cancelar(self, request, pk=None):
+        """Cancelar contrato (ACTIVO → CANCELADO)"""
+        contrato = self.get_object()
+        serializer = ContratoCancelarSerializer(data=request.data)
+
+        if serializer.is_valid():
+            try:
+                contrato.cancelar_contrato(
+                    motivo=serializer.validated_data['motivo'],
+                    observaciones=serializer.validated_data.get('observaciones', ''),
+                    usuario=request.user
+                )
+
+                detail_serializer = ContratoDetailSerializer(contrato, context={'request': request})
+                return Response(detail_serializer.data)
+
+            except Exception as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def reactivar(self, request, pk=None):
+        """Reactivar contrato (CANCELADO → ACTIVO)"""
+        contrato = self.get_object()
+        serializer = ContratoReactivarSerializer(data=request.data)
+
+        if serializer.is_valid():
+            try:
+                contrato.reactivar_contrato(
+                    observaciones=serializer.validated_data.get('observaciones', ''),
+                    usuario=request.user
+                )
+
+                detail_serializer = ContratoDetailSerializer(contrato, context={'request': request})
+                return Response(detail_serializer.data)
+
+            except Exception as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DocumentoContratoViewSet(viewsets.ModelViewSet):
+    """ViewSet para gestión de documentos de contratos"""
+    queryset = DocumentoContrato.objects.select_related('contrato', 'created_by').all()
+    serializer_class = DocumentoContratoSerializer
+    permission_classes = [IsDigitadorOrAbove]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['contrato', 'tipo_documento']
+    ordering = ['-created_at']
+
+    def perform_create(self, serializer):
+        """Guardar usuario que sube el documento"""
+        serializer.save(created_by=self.request.user)

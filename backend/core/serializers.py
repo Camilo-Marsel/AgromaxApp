@@ -7,7 +7,8 @@ from .models import (
     Usuario, Rol, TipoContrato, Finca, Lote, Trabajador,
     UnidadMedida, Labor, ListaPrecios, VariablesNomina,
     Quincena, RegistroLabor, Nomina, DetalleNomina,
-    Prestamo, CuotaPrestamo, AuditoriaLog
+    Prestamo, CuotaPrestamo, AuditoriaLog,
+    Contrato, DocumentoContrato
 )
 from decimal import Decimal
 
@@ -625,7 +626,7 @@ class PrestamoCreateSerializer(serializers.ModelSerializer):
 class AuditoriaLogSerializer(serializers.ModelSerializer):
     usuario_info = UsuarioSerializer(source='usuario', read_only=True)
     accion_display = serializers.CharField(source='get_accion_display', read_only=True)
-    
+
     class Meta:
         model = AuditoriaLog
         fields = [
@@ -636,3 +637,159 @@ class AuditoriaLogSerializer(serializers.ModelSerializer):
             'ip_address', 'created_at'
         ]
         read_only_fields = ['created_at']
+
+
+# ============================================================================
+# CONTRATOS
+# ============================================================================
+
+class DocumentoContratoSerializer(serializers.ModelSerializer):
+    """Serializer para documentos de contrato"""
+    tipo_documento_display = serializers.CharField(source='get_tipo_documento_display', read_only=True)
+    created_by_info = UsuarioSerializer(source='created_by', read_only=True)
+    archivo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DocumentoContrato
+        fields = [
+            'id', 'contrato', 'tipo_documento', 'tipo_documento_display',
+            'nombre', 'archivo', 'archivo_url', 'descripcion',
+            'fecha_documento', 'created_at', 'created_by', 'created_by_info'
+        ]
+        read_only_fields = ['created_at', 'created_by']
+
+    def get_archivo_url(self, obj):
+        """Obtener URL completa del archivo"""
+        if obj.archivo:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.archivo.url)
+            return obj.archivo.url
+        return None
+
+
+class ContratoListSerializer(serializers.ModelSerializer):
+    """Serializer simplificado para listado de contratos"""
+    trabajador_info = serializers.SerializerMethodField()
+    tipo_contrato_display = serializers.CharField(source='get_tipo_contrato_display', read_only=True)
+    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    motivo_finalizacion_display = serializers.CharField(source='get_motivo_finalizacion_display', read_only=True)
+
+    # Properties calculadas
+    duracion_meses = serializers.IntegerField(read_only=True)
+    duracion_dias = serializers.IntegerField(read_only=True)
+    dias_restantes = serializers.IntegerField(read_only=True)
+    esta_por_vencer = serializers.BooleanField(read_only=True)
+    esta_vencido = serializers.BooleanField(read_only=True)
+    progreso_contrato = serializers.FloatField(read_only=True)
+
+    class Meta:
+        model = Contrato
+        fields = [
+            'id', 'numero_contrato', 'trabajador', 'trabajador_info',
+            'tipo_contrato', 'tipo_contrato_display',
+            'fecha_inicio', 'fecha_fin', 'cargo', 'salario_pactado',
+            'estado', 'estado_display',
+            'motivo_finalizacion', 'motivo_finalizacion_display',
+            'fecha_liquidacion',
+            # Properties calculadas
+            'duracion_meses', 'duracion_dias', 'dias_restantes',
+            'esta_por_vencer', 'esta_vencido', 'progreso_contrato',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['numero_contrato', 'created_at', 'updated_at']
+
+    def get_trabajador_info(self, obj):
+        """Información resumida del trabajador"""
+        return {
+            'id': obj.trabajador.id,
+            'nombre_completo': obj.trabajador.nombre_completo,
+            'numero_documento': obj.trabajador.numero_documento,
+            'finca': obj.trabajador.finca.nombre if obj.trabajador.finca else None
+        }
+
+
+class ContratoDetailSerializer(serializers.ModelSerializer):
+    """Serializer completo para detalle de contrato"""
+    trabajador_info = TrabajadorSerializer(source='trabajador', read_only=True)
+    tipo_contrato_display = serializers.CharField(source='get_tipo_contrato_display', read_only=True)
+    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    motivo_finalizacion_display = serializers.CharField(source='get_motivo_finalizacion_display', read_only=True)
+    created_by_info = UsuarioSerializer(source='created_by', read_only=True)
+    documentos = DocumentoContratoSerializer(many=True, read_only=True)
+
+    # Properties calculadas
+    duracion_meses = serializers.IntegerField(read_only=True)
+    duracion_dias = serializers.IntegerField(read_only=True)
+    dias_restantes = serializers.IntegerField(read_only=True)
+    esta_por_vencer = serializers.BooleanField(read_only=True)
+    esta_vencido = serializers.BooleanField(read_only=True)
+    progreso_contrato = serializers.FloatField(read_only=True)
+
+    class Meta:
+        model = Contrato
+        fields = [
+            'id', 'numero_contrato', 'trabajador', 'trabajador_info',
+            'tipo_contrato', 'tipo_contrato_display',
+            'fecha_inicio', 'fecha_fin', 'cargo', 'salario_pactado',
+            'estado', 'estado_display',
+            'motivo_finalizacion', 'motivo_finalizacion_display',
+            'fecha_liquidacion', 'observaciones',
+            # Properties calculadas
+            'duracion_meses', 'duracion_dias', 'dias_restantes',
+            'esta_por_vencer', 'esta_vencido', 'progreso_contrato',
+            # Documentos
+            'documentos',
+            # Auditoría
+            'created_at', 'updated_at', 'created_by', 'created_by_info'
+        ]
+        read_only_fields = ['numero_contrato', 'created_at', 'updated_at', 'created_by']
+
+
+class ContratoCreateUpdateSerializer(serializers.ModelSerializer):
+    """Serializer para crear/actualizar contratos"""
+
+    class Meta:
+        model = Contrato
+        fields = [
+            'id', 'trabajador', 'tipo_contrato',
+            'fecha_inicio', 'fecha_fin', 'cargo', 'salario_pactado',
+            'estado', 'observaciones'
+        ]
+        read_only_fields = ['id']
+
+    def validate(self, data):
+        """Validaciones adicionales"""
+        # Las validaciones del modelo se ejecutarán automáticamente en save()
+        # Aquí solo agregamos validaciones adicionales si necesario
+        return data
+
+    def create(self, validated_data):
+        """Crear contrato con usuario actual"""
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+        return super().create(validated_data)
+
+
+class ContratoFinalizarSerializer(serializers.Serializer):
+    """Serializer para finalizar un contrato"""
+    motivo = serializers.ChoiceField(choices=Contrato.MOTIVO_FINALIZACION_CHOICES)
+    observaciones = serializers.CharField(required=False, allow_blank=True)
+
+
+class ContratoLiquidarSerializer(serializers.Serializer):
+    """Serializer para liquidar un contrato"""
+    fecha_liquidacion = serializers.DateField(required=False)
+    observaciones = serializers.CharField(required=False, allow_blank=True)
+
+
+class ContratoCancelarSerializer(serializers.Serializer):
+    """Serializer para cancelar un contrato"""
+    motivo = serializers.ChoiceField(choices=Contrato.MOTIVO_FINALIZACION_CHOICES)
+    observaciones = serializers.CharField(required=False, allow_blank=True)
+
+
+class ContratoReactivarSerializer(serializers.Serializer):
+    """Serializer para reactivar un contrato"""
+    observaciones = serializers.CharField(required=False, allow_blank=True)
