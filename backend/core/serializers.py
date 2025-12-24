@@ -711,7 +711,7 @@ class ContratoListSerializer(serializers.ModelSerializer):
 
 class ContratoDetailSerializer(serializers.ModelSerializer):
     """Serializer completo para detalle de contrato"""
-    trabajador_info = TrabajadorSerializer(source='trabajador', read_only=True)
+    trabajador_info = TrabajadorSimpleSerializer(source='trabajador', read_only=True)
     tipo_contrato_display = serializers.CharField(source='get_tipo_contrato_display', read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
     motivo_finalizacion_display = serializers.CharField(source='get_motivo_finalizacion_display', read_only=True)
