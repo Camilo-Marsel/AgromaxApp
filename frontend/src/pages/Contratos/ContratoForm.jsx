@@ -90,10 +90,21 @@ export default function ContratoForm() {
       });
 
       // Filtrar solo trabajadores CON_CONTRATO
-      const trabajadoresConContrato = (data.results || data).filter(
-        (t) => t.tipo_contrato_info?.nombre === 'CON_CONTRATO'
+      // Acepta tanto 'CON_CONTRATO' como 'Con Contrato' por compatibilidad
+      const allTrabajadores = data.results || data;
+
+      // Debug: mostrar tipos de contrato únicos
+      const tiposUnicos = [...new Set(allTrabajadores.map(t => t.tipo_contrato_info?.nombre))];
+      console.log('Tipos de contrato encontrados:', tiposUnicos);
+
+      const trabajadoresConContrato = allTrabajadores.filter(
+        (t) => {
+          const tipoNombre = t.tipo_contrato_info?.nombre;
+          return tipoNombre === 'CON_CONTRATO' || tipoNombre === 'Con Contrato';
+        }
       );
 
+      console.log(`Filtrados: ${trabajadoresConContrato.length} de ${allTrabajadores.length} trabajadores`);
       setTrabajadores(trabajadoresConContrato);
     } catch (error) {
       console.error('Error al cargar trabajadores:', error);
@@ -134,9 +145,8 @@ export default function ContratoForm() {
         return;
       }
 
-      if (
-        selectedTrabajador.tipo_contrato_info?.nombre !== 'CON_CONTRATO'
-      ) {
+      const tipoNombre = selectedTrabajador.tipo_contrato_info?.nombre;
+      if (tipoNombre !== 'CON_CONTRATO' && tipoNombre !== 'Con Contrato') {
         toast.error('El trabajador debe ser de tipo CON_CONTRATO');
         return;
       }
