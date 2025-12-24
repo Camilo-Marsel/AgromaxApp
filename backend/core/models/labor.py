@@ -82,7 +82,7 @@ class ListaPrecios(models.Model):
     fecha_fin_vigencia = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
-        'hr.Usuario',
+        'Usuario',
         on_delete=models.SET_NULL,
         null=True,
         related_name='precios_creados'
@@ -162,7 +162,7 @@ class RegistroLabor(models.Model):
     """Registro diario de labores realizadas por cada trabajador"""
 
     trabajador = models.ForeignKey(
-        'hr.Trabajador',
+        'Trabajador',
         on_delete=models.CASCADE,
         related_name='registros_labor'
     )
@@ -186,14 +186,14 @@ class RegistroLabor(models.Model):
     observaciones = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
-        'hr.Usuario',
+        'Usuario',
         on_delete=models.SET_NULL,
         null=True,
         related_name='registros_creados'
     )
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
-        'hr.Usuario',
+        'Usuario',
         on_delete=models.SET_NULL,
         null=True,
         related_name='registros_actualizados'

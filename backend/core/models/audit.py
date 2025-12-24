@@ -17,7 +17,7 @@ class AuditoriaLog(models.Model):
     ]
 
     usuario = models.ForeignKey(
-        'hr.Usuario',
+        'Usuario',
         on_delete=models.SET_NULL,
         null=True,
         related_name='acciones_auditoria'

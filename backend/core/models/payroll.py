@@ -34,7 +34,7 @@ class VariablesNomina(models.Model):
     descripcion = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
-        'hr.Usuario',
+        'Usuario',
         on_delete=models.SET_NULL,
         null=True,
         related_name='variables_creadas'
@@ -72,12 +72,12 @@ class Nomina(models.Model):
     ]
 
     trabajador = models.ForeignKey(
-        'hr.Trabajador',
+        'Trabajador',
         on_delete=models.CASCADE,
         related_name='nominas'
     )
     quincena = models.ForeignKey(
-        'labor.Quincena',
+        'Quincena',
         on_delete=models.CASCADE,
         related_name='nominas'
     )
@@ -103,7 +103,7 @@ class Nomina(models.Model):
     observaciones = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
-        'hr.Usuario',
+        'Usuario',
         on_delete=models.SET_NULL,
         null=True,
         related_name='nominas_creadas'
@@ -182,7 +182,7 @@ class DetalleNomina(models.Model):
     concepto = models.CharField(max_length=50, choices=CONCEPTO_CHOICES)
     descripcion = models.TextField()
     labor = models.ForeignKey(
-        'labor.Labor',
+        'Labor',
         on_delete=models.SET_NULL,
         null=True,
         blank=True

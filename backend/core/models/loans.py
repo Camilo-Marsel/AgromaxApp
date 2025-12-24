@@ -23,7 +23,7 @@ class Prestamo(models.Model):
     ]
 
     trabajador = models.ForeignKey(
-        'hr.Trabajador',
+        'Trabajador',
         on_delete=models.CASCADE,
         related_name='prestamos'
     )
@@ -54,7 +54,7 @@ class Prestamo(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(
-        'hr.Usuario',
+        'Usuario',
         on_delete=models.SET_NULL,
         null=True,
         related_name='prestamos_creados'
@@ -89,14 +89,14 @@ class CuotaPrestamo(models.Model):
         decimal_places=2
     )
     quincena = models.ForeignKey(
-        'labor.Quincena',
+        'Quincena',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='cuotas_descontadas'
     )
     nomina = models.ForeignKey(
-        'payroll.Nomina',
+        'Nomina',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
