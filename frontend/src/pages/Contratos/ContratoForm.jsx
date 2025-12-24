@@ -91,7 +91,7 @@ export default function ContratoForm() {
 
       // Filtrar solo trabajadores CON_CONTRATO
       const trabajadoresConContrato = (data.results || data).filter(
-        (t) => t.tipo_contrato_info?.codigo === 'CON_CONTRATO'
+        (t) => t.tipo_contrato_info?.nombre === 'CON_CONTRATO'
       );
 
       setTrabajadores(trabajadoresConContrato);
@@ -135,7 +135,7 @@ export default function ContratoForm() {
       }
 
       if (
-        selectedTrabajador.tipo_contrato_info?.codigo !== 'CON_CONTRATO'
+        selectedTrabajador.tipo_contrato_info?.nombre !== 'CON_CONTRATO'
       ) {
         toast.error('El trabajador debe ser de tipo CON_CONTRATO');
         return;

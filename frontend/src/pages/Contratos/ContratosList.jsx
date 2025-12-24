@@ -36,19 +36,38 @@ export default function ContratosList() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [contratosData, statsData] = await Promise.all([
-        contratoService.getAll({
+
+      // Intentar cargar contratos y estadísticas
+      let contratosData = [];
+      let statsData = null;
+
+      try {
+        contratosData = await contratoService.getAll({
           estado: filtroEstado,
           tipo_contrato: filtroTipo,
-        }),
-        contratoService.getEstadisticas(),
-      ]);
+        });
+      } catch (error) {
+        console.error('Error al cargar contratos:', error);
+        toast.error('Error al cargar contratos. Verifica que las migraciones estén aplicadas.');
+      }
 
-      setContratos(contratosData.results || contratosData);
+      try {
+        statsData = await contratoService.getEstadisticas();
+      } catch (error) {
+        console.error('Error al cargar estadísticas:', error);
+        // No mostrar error para estadísticas, solo llenar con ceros
+        statsData = {
+          total_contratos: 0,
+          activos: 0,
+          por_vencer: 0,
+          vencidos: 0,
+        };
+      }
+
+      setContratos(contratosData.results || contratosData || []);
       setEstadisticas(statsData);
     } catch (error) {
-      console.error('Error al cargar contratos:', error);
-      toast.error('Error al cargar contratos');
+      console.error('Error general:', error);
     } finally {
       setLoading(false);
     }
