@@ -24,6 +24,9 @@ import PrestamosList from './pages/Prestamos/PrestamosList';
 import PrestamoForm from './pages/Prestamos/PrestamoForm';
 import PrestamoDetail from './pages/Prestamos/PrestamoDetail';
 import TrabajadorDetail from './pages/Trabajadores/TrabajadorDetail';
+import ContratosList from './pages/Contratos/ContratosList';
+import ContratoDetail from './pages/Contratos/ContratoDetail';
+import ContratoForm from './pages/Contratos/ContratoForm';
 import ConfiguracionVariables from './pages/Configuracion/ConfiguracionVariables';
 import ReportesList from './pages/Reportes/ReportesList';
 
@@ -120,6 +123,48 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <TrabajadorForm />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Contratos */}
+          <Route
+            path="/contratos"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ContratosList />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/contratos/nuevo"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ContratoForm />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/contratos/:id"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ContratoDetail />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/contratos/:id/editar"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ContratoForm />
                 </MainLayout>
               </ProtectedRoute>
             }

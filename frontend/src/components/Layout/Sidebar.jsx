@@ -1,20 +1,20 @@
 // frontend/src/components/Layout/Sidebar.jsx
 
 import { NavLink } from 'react-router-dom';
-import { Home, Users, Briefcase, DollarSign, FileText, Settings, MapPin } from 'lucide-react';
+import { Home, Users, Briefcase, DollarSign, FileText, Settings, MapPin, FileCheck } from 'lucide-react';
 
 export default function Sidebar() {
   const menuItems = [
     { path: '/dashboard', icon: Home, label: 'Dashboard' },
     { path: '/trabajadores', icon: Users, label: 'Trabajadores' },
-    { path: '/fincas', icon: MapPin, label: 'Fincas' },  // NUEVO
+    { path: '/contratos', icon: FileCheck, label: 'Contratos' },
+    { path: '/fincas', icon: MapPin, label: 'Fincas' },
     { path: '/labores', icon: Briefcase, label: 'Labores' },
     { path: '/registros', icon: Briefcase, label: 'Registro Labores' },
     { path: '/nomina', icon: DollarSign, label: 'Nómina' },
     { path: '/reportes', icon: FileText, label: 'Reportes' },
-    { name: 'Préstamos', path: '/prestamos', icon: DollarSign, label: 'Prestamos' },
+    { path: '/prestamos', icon: DollarSign, label: 'Préstamos' },
     { path: '/configuracion/variables', icon: Settings, label: 'Configuración' },
-    
   ];
 
   return (
