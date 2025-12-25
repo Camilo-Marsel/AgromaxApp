@@ -62,10 +62,19 @@ export default function RegistroLabores() {
       const labor = labores.find((l) => l.id === parseInt(laborWatch));
       setLaborSeleccionada(labor);
       
-      // Determinar si es tipo DÍA
+      // Determinar si es tipo DÍA (permite seleccionar múltiples días sin cantidad)
       const laboresTipoDia = [
-        'Día Básico', 'Embarque', 'Resiembra', 'Fumigación', 'Repique',
-        'Permiso Remunerado', 'Ausencia', 'Incapacidad', 'Oficios Varios'
+        'Día Básico',
+        'Embarque',
+        'Resiembra',
+        'Fumigación',
+        'Repique',
+        'Permiso Remunerado',
+        'Permiso No Remunerado',  // Agregado
+        'Ausencia',
+        'Ausencia No Justificada', // Agregado por si tiene nombre completo
+        'Incapacidad',
+        'Oficios Varios'
       ];
       setEsTipoDia(labor && laboresTipoDia.includes(labor.nombre));
       
