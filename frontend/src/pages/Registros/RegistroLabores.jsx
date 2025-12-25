@@ -40,7 +40,7 @@ export default function RegistroLabores() {
   // Confirm dialog
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
 
-  const { register, handleSubmit, reset, watch, setValue } = useForm();
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm();
 
   const trabajadorWatch = watch('trabajador');
   const laborWatch = watch('labor');
@@ -242,12 +242,13 @@ export default function RegistroLabores() {
     try {
       await registroLaborService.delete(id);
       toast.success('Registro eliminado correctamente');
-      
-      // Recargar registros
-      if (trabajadorFiltro && quincenaActual) {
-        await loadRegistrosByTrabajadorQuincena(trabajadorFiltro, quincenaActual.id);
+
+      // Recargar registros - usar el trabajador del filtro O del formulario
+      const trabajadorParaRecargar = trabajadorFiltro || trabajadorWatch;
+      if (trabajadorParaRecargar && quincenaActual) {
+        await loadRegistrosByTrabajadorQuincena(trabajadorParaRecargar, quincenaActual.id);
       }
-      
+
       setConfirmDelete({ isOpen: false, id: null });
     } catch (error) {
       console.error('Error al eliminar registro:', error);
@@ -385,12 +386,22 @@ export default function RegistroLabores() {
                   Cantidad *
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  {...register('cantidad', { required: !esTipoDia })}
+                  type="text"
+                  inputMode="decimal"
+                  {...register('cantidad', {
+                    required: !esTipoDia,
+                    pattern: {
+                      value: /^\d+(\.\d{1,2})?$/,
+                      message: 'Ingrese un número válido (ej: 1, 1.5, 2.75)'
+                    }
+                  })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Ingrese la cantidad"
+                  onWheel={(e) => e.target.blur()}
                 />
+                {errors.cantidad && (
+                  <span className="text-red-500 text-sm mt-1">{errors.cantidad.message}</span>
+                )}
               </div>
             )}
 
