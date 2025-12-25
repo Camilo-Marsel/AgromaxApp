@@ -236,26 +236,39 @@ class RegistroLabor(models.Model):
 
         if registros_mismo_dia.exists():
             # Obtener las labores existentes ese día
-            labores_existentes = registros_mismo_dia.values_list('labor__nombre', flat=True)
+            labores_existentes = list(registros_mismo_dia.values_list('labor__nombre', flat=True))
             labor_actual = self.labor.nombre
 
-            # Caso 1: Si ya existe "Control", solo permitir agregar otra "Control"
-            if 'Control' in labores_existentes and labor_actual != 'Control':
-                raise ValidationError(
-                    'Ya existe un registro de Control para este día. '
-                    'Solo puede agregar más registros de Control.'
-                )
+            # LÓGICA CORREGIDA:
+            # - Control puede coexistir con cualquier labor
+            # - Cualquier labor puede coexistir con Control
+            # - Dos labores diferentes (no Control) NO pueden coexistir
 
-            # Caso 2: Si existe otra labor (no Control), solo permitir agregar "Control"
-            otras_labores = [l for l in labores_existentes if l != 'Control']
-            if otras_labores and labor_actual != 'Control':
-                raise ValidationError(
-                    f'Ya existe un registro de {otras_labores[0]} para este día. '
-                    f'Solo puede agregar Control como labor adicional.'
-                )
+            # Caso 1: Si estamos agregando Control, siempre está permitido
+            if labor_actual == 'Control':
+                # Control puede coexistir con cualquier cosa
+                pass
 
-            # Caso 3: Si estamos agregando Control, está permitido siempre
-            # (no se lanza error)
+            # Caso 2: Si ya existe Control y agregamos otra labor, está permitido
+            elif 'Control' in labores_existentes:
+                # Verificar que no haya OTRA labor diferente (aparte de Control)
+                otras_labores = [l for l in labores_existentes if l != 'Control']
+                if otras_labores:
+                    # Ya existe Control + otra labor, no permitir una tercera
+                    raise ValidationError(
+                        f'Ya existe un registro de {otras_labores[0]} y Control para este día. '
+                        f'No se pueden agregar más labores.'
+                    )
+                # Si solo existe Control, permitir agregar esta labor
+
+            # Caso 3: No existe Control, verificar que no haya otra labor
+            else:
+                if labores_existentes:
+                    # Ya existe otra labor (no Control), solo permitir agregar Control
+                    raise ValidationError(
+                        f'Ya existe un registro de {labores_existentes[0]} para este día. '
+                        f'Solo puede agregar Control como labor adicional.'
+                    )
 
     def save(self, *args, **kwargs):
         self.clean()
