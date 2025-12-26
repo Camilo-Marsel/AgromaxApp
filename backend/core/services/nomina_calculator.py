@@ -432,67 +432,77 @@ class NominaCalculator:
     
     def _calcular_auxilio_transporte(self, nomina):
         """
-        Calcular auxilio de transporte QUINCENAL proporcional a días trabajados.
+        Calcular auxilio de transporte QUINCENAL proporcional a días REALMENTE trabajados.
         Base: $100,000 quincenal completo.
-        
-        REGLAS DE DESCUENTO:
+
+        REGLAS:
+        - Solo cuenta días donde el trabajador tiene registros de labor
         - INCAPACIDAD: Solo pierde auxilio de ese día
         - AUSENCIA/PERMISO NO REMUNERADO: Pierde auxilio de ese día + auxilio del domingo de esa semana
+        - Días sin ningún registro: No se cuentan como trabajados
         """
         auxilio_quincenal = self.variables.get(VariablesNomina.AUXILIO_TRANSPORTE, Decimal('0.00'))
-        
+
         if auxilio_quincenal <= 0:
             return Decimal('0.00')
-        
+
         # Contar días TOTALES de la quincena (incluyendo domingos)
         dias_totales_quincena = (self.quincena.fecha_fin - self.quincena.fecha_inicio).days + 1
-        
+
+        # Obtener TODOS los registros del trabajador en esta quincena
+        registros = RegistroLabor.objects.filter(
+            trabajador=nomina.trabajador,
+            quincena=self.quincena
+        ).select_related('labor')
+
+        # Obtener días únicos donde tiene CUALQUIER registro
+        dias_con_registro = set(registros.values_list('fecha', flat=True).distinct())
+
         # Obtener días con INCAPACIDAD
-        dias_incapacidad = RegistroLabor.objects.filter(
-            trabajador=nomina.trabajador,
-            quincena=self.quincena,
+        dias_incapacidad = set(registros.filter(
             labor__nombre='INCAPACIDAD'
-        ).values_list('fecha', flat=True).distinct()
-        
+        ).values_list('fecha', flat=True).distinct())
+
         # Obtener días con AUSENCIA o PERMISO NO REMUNERADO (pierden dominical)
-        dias_ausencia_permiso = RegistroLabor.objects.filter(
-            trabajador=nomina.trabajador,
-            quincena=self.quincena,
+        dias_ausencia_permiso = set(registros.filter(
             labor__nombre__in=['AUSENCIA', 'PERMISO NO REMUNERADO']
-        ).values_list('fecha', flat=True).distinct()
-        
-        # Calcular días a descontar
+        ).values_list('fecha', flat=True).distinct())
+
+        # Calcular días trabajados efectivos
+        dias_trabajados = len(dias_con_registro)
+
+        # Calcular días a descontar del auxilio
         dias_descuento = 0
         domingos_perdidos = set()
-        
+
         # 1. Descontar días de INCAPACIDAD (solo ese día)
         dias_descuento += len(dias_incapacidad)
-        
+
         # 2. Descontar días de AUSENCIA/PERMISO + sus domingos
         for fecha in dias_ausencia_permiso:
             # Descontar el día mismo
             dias_descuento += 1
-            
+
             # Encontrar el domingo de esa semana
             domingo = self._get_domingo_de_semana(fecha)
-            
+
             # Si el domingo está en la quincena y no lo hemos contado
-            if (self.quincena.fecha_inicio <= domingo <= self.quincena.fecha_fin 
+            if (self.quincena.fecha_inicio <= domingo <= self.quincena.fecha_fin
                 and domingo not in domingos_perdidos):
                 domingos_perdidos.add(domingo)
                 dias_descuento += 1
-        
-        # Calcular días a pagar
-        dias_a_pagar = dias_totales_quincena - dias_descuento
-        
+
+        # Calcular días a pagar: días trabajados - descuentos
+        dias_a_pagar = dias_trabajados - dias_descuento
+
         # Si no hay días a pagar, retornar 0
         if dias_a_pagar <= 0:
             return Decimal('0.00')
-        
-        # Calcular auxilio proporcional
+
+        # Calcular auxilio proporcional basado en días totales de la quincena
         valor_dia = auxilio_quincenal / dias_totales_quincena
         auxilio_proporcional = (valor_dia * dias_a_pagar).quantize(Decimal('0.01'))
-        
+
         # Preparar descripción detallada
         descuentos_texto = []
         if len(dias_incapacidad) > 0:
@@ -501,11 +511,11 @@ class NominaCalculator:
             descuentos_texto.append(f'{len(dias_ausencia_permiso)} ausencia(s)/permiso(s)')
         if len(domingos_perdidos) > 0:
             descuentos_texto.append(f'{len(domingos_perdidos)} domingo(s) perdido(s)')
-        
+
         descripcion = f'Auxilio de Transporte ({dias_a_pagar}/{dias_totales_quincena} días)'
         if descuentos_texto:
             descripcion += f' - Desc: {", ".join(descuentos_texto)}'
-        
+
         DetalleNomina.objects.create(
             nomina=nomina,
             tipo='DEVENGO',
@@ -515,7 +525,7 @@ class NominaCalculator:
             valor_unitario=valor_dia,
             valor_total=auxilio_proporcional
         )
-        
+
         return auxilio_proporcional
 
     def _get_domingo_de_semana(self, fecha):
