@@ -465,7 +465,7 @@ class NominaCalculator:
 
         # Obtener días con AUSENCIA o PERMISO NO REMUNERADO (pierden dominical)
         dias_ausencia_permiso = set(registros.filter(
-            labor__nombre__in=['AUSENCIA', 'PERMISO NO REMUNERADO']
+            labor__nombre__in=['Ausencia', 'AUSENCIA', 'Permiso No Remunerado', 'PERMISO NO REMUNERADO']
         ).values_list('fecha', flat=True).distinct())
 
         # Calcular días trabajados efectivos
