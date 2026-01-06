@@ -264,3 +264,70 @@ def generar_comprobante_pdf(nomina):
     """Función helper para generar PDF de una nómina"""
     generator = ComprobantePDFGenerator(nomina)
     return generator.generar()
+
+
+def generar_colillas_consolidadas(nominas):
+    """
+    Generar un PDF consolidado con todas las colillas de pago.
+    Combina múltiples colillas en un solo PDF, una página por trabajador.
+
+    Args:
+        nominas: QuerySet o lista de objetos Nomina
+
+    Returns:
+        BytesIO buffer con el PDF consolidado
+    """
+    from PyPDF2 import PdfMerger
+
+    if not nominas:
+        # Si no hay nóminas, retornar PDF vacío con mensaje
+        return _generar_pdf_vacio()
+
+    # Crear merger de PDFs
+    merger = PdfMerger()
+
+    # Generar PDF individual para cada nómina y agregarla al merger
+    for nomina in nominas:
+        # Generar PDF individual
+        pdf_buffer = generar_comprobante_pdf(nomina)
+        pdf_buffer.seek(0)
+
+        # Agregar al documento consolidado
+        merger.append(pdf_buffer)
+
+    # Escribir el PDF consolidado a un buffer
+    output_buffer = BytesIO()
+    merger.write(output_buffer)
+    merger.close()
+
+    # Posicionar al inicio para lectura
+    output_buffer.seek(0)
+
+    return output_buffer
+
+
+def _generar_pdf_vacio():
+    """Generar PDF con mensaje de 'No hay datos'"""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # Mensaje de no hay datos
+    message_style = ParagraphStyle(
+        'MessageStyle',
+        parent=styles['Normal'],
+        fontSize=14,
+        textColor=colors.grey,
+        alignment=TA_CENTER,
+        spaceAfter=20
+    )
+
+    elements.append(Spacer(1, 3*inch))
+    elements.append(Paragraph("No hay nóminas para generar", message_style))
+    elements.append(Paragraph("Verifique los filtros seleccionados", message_style))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer

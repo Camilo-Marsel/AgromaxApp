@@ -137,6 +137,15 @@ const nominaService = {
     return response.data;
   },
 
+  // Descargar colillas consolidadas (PDF con todas las colillas)
+  descargarColillasConsolidadas: async (params) => {
+    const response = await api.get('/nominas/descargar_colillas_consolidadas/', {
+      params,
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
 };
 
 export default nominaService;

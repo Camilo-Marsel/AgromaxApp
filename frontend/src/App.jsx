@@ -29,6 +29,7 @@ import ContratoDetail from './pages/Contratos/ContratoDetail';
 import ContratoForm from './pages/Contratos/ContratoForm';
 import ConfiguracionVariables from './pages/Configuracion/ConfiguracionVariables';
 import ReportesList from './pages/Reportes/ReportesList';
+import ReportesNomina from './pages/Reportes/ReportesNomina';
 
 // Componente para rutas protegidas
 function ProtectedRoute({ children }) {
@@ -339,6 +340,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <ReportesList />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reportes/nomina"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ReportesNomina />
                 </MainLayout>
               </ProtectedRoute>
             }

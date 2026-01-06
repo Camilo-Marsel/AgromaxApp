@@ -747,17 +747,86 @@ class NominaViewSet(viewsets.ModelViewSet):
     def descargar_pdf(self, request, pk=None):
         """Descargar comprobante de pago en PDF"""
         nomina = self.get_object()
-        
+
         # Generar PDF
         pdf_buffer = generar_comprobante_pdf(nomina)
-        
+
         # Nombre del archivo
         filename = f"comprobante_nomina_{nomina.trabajador.numero_documento}_{nomina.quincena.año}_{nomina.quincena.mes}_Q{nomina.quincena.numero}.pdf"
-        
+
         # Retornar como descarga
         response = FileResponse(pdf_buffer, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
+
+        return response
+
+    @action(detail=False, methods=['get'])
+    def descargar_colillas_consolidadas(self, request):
+        """
+        Descargar colillas consolidadas en un solo PDF.
+        Combina todas las colillas de pago según los filtros aplicados.
+
+        Query params:
+        - quincena (required): ID de la quincena
+        - finca (optional): ID de la finca
+        - estados (optional): Estados separados por coma (ej: CALCULADA,APROBADA,PAGADA)
+        """
+        from .services.pdf_generator import generar_colillas_consolidadas
+
+        # Obtener parámetros
+        quincena_id = request.query_params.get('quincena')
+        finca_id = request.query_params.get('finca')
+        estados_str = request.query_params.get('estados', '')
+
+        if not quincena_id:
+            return Response(
+                {'error': 'El parámetro quincena es requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar que la quincena existe
+        try:
+            quincena = Quincena.objects.get(id=quincena_id)
+        except Quincena.DoesNotExist:
+            return Response(
+                {'error': 'Quincena no encontrada'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Construir filtro de nóminas
+        filtros = {'quincena': quincena}
+
+        if finca_id:
+            filtros['trabajador__finca_id'] = finca_id
+
+        # Filtrar por estados si se proporcionan
+        if estados_str:
+            estados = [e.strip() for e in estados_str.split(',') if e.strip()]
+            if estados:
+                filtros['estado__in'] = estados
+
+        # Obtener nóminas ordenadas por trabajador
+        nominas = Nomina.objects.filter(**filtros).select_related(
+            'trabajador', 'quincena', 'trabajador__finca', 'trabajador__tipo_contrato'
+        ).order_by('trabajador__nombre_completo')
+
+        if not nominas.exists():
+            return Response(
+                {'error': 'No se encontraron nóminas con los filtros especificados'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Generar PDF consolidado
+        pdf_buffer = generar_colillas_consolidadas(nominas)
+
+        # Nombre del archivo
+        finca_nombre = f"_{Finca.objects.get(id=finca_id).nombre}" if finca_id else ""
+        filename = f"Colillas_Q{quincena.numero}_{quincena.año}{finca_nombre}.pdf"
+
+        # Retornar como descarga
+        response = FileResponse(pdf_buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
         return response
 
 
