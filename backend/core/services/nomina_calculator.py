@@ -650,13 +650,23 @@ class NominaCalculator:
         return total
     
     def _get_precio_vigente(self, labor):
-        """Obtener precio vigente de una labor"""
+        """
+        Obtener precio vigente de una labor para la quincena.
+
+        Busca el precio donde:
+        - La fecha de inicio sea <= fecha inicio de quincena
+        - La fecha de fin sea NULL (abierto) O >= fecha inicio de quincena
+
+        Retorna el más reciente que cumpla las condiciones.
+        """
+        from django.db.models import Q
+
         precio = ListaPrecios.objects.filter(
-            labor=labor,
-            fecha_inicio_vigencia__lte=self.quincena.fecha_inicio,
-            fecha_fin_vigencia__isnull=True
-        ).first()
-        
+            Q(labor=labor) &
+            Q(fecha_inicio_vigencia__lte=self.quincena.fecha_inicio) &
+            (Q(fecha_fin_vigencia__isnull=True) | Q(fecha_fin_vigencia__gte=self.quincena.fecha_inicio))
+        ).order_by('-fecha_inicio_vigencia').first()
+
         return precio.precio if precio else None
     
     def _get_labor_dia_basico(self):
