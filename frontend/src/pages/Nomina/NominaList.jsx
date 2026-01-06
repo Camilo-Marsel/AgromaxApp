@@ -23,7 +23,6 @@ export default function NominaList() {
   const [nominas, setNominas] = useState([]);
   const [nominasFiltradas, setNominasFiltradas] = useState([]);
   const [search, setSearch] = useState('');
-  const [confirmCalculo, setConfirmCalculo] = useState(false);
   const [resumen, setResumen] = useState({
     total_trabajadores: 0,
     total_devengado: 0,
@@ -126,7 +125,6 @@ export default function NominaList() {
   const handleCalcularNomina = async () => {
     try {
       setCalculating(true);
-      setConfirmCalculo(false);
 
       const result = await nominaService.calcularQuincena(quincenaSeleccionada);
       toast.success(result.message);
@@ -198,37 +196,6 @@ export default function NominaList() {
       toast.error(errorMsg);
     } finally {
       setProcesandoMasivo(false);
-    }
-  };
-
-  const handleAprobarTodas = async () => {
-    if (!quincenaSeleccionada) {
-      toast.error('No hay quincena seleccionada');
-      return;
-    }
-
-    try {
-      // Aprobar solo las que están en estado CALCULADA (de las filtradas)
-      const nominasCalculadas = nominasFiltradas.filter(n => n.estado === 'CALCULADA');
-      
-      if (nominasCalculadas.length === 0) {
-        toast.error('No hay nóminas calculadas para aprobar');
-        return;
-      }
-
-      const promises = nominasCalculadas.map(nomina => 
-        nominaService.aprobar(nomina.id)
-      );
-
-      await Promise.all(promises);
-      
-      toast.success(`${nominasCalculadas.length} nóminas aprobadas correctamente`);
-      
-      // Recargar nóminas
-      await loadNominas(quincenaSeleccionada, fincaSeleccionada);
-    } catch (error) {
-      console.error('Error al aprobar nóminas:', error);
-      toast.error('Error al aprobar nóminas');
     }
   };
 
@@ -423,65 +390,13 @@ export default function NominaList() {
         </div>
       </div>
 
-      {/* Barra de Búsqueda y Botones */}
+      {/* Barra de Búsqueda */}
       <div className="bg-white p-4 rounded-lg shadow">
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Buscar por nombre o documento..."
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => setConfirmCalculo(true)}
-              disabled={calculating || !quincenaSeleccionada}
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
-            >
-              {calculating ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  Calculando...
-                </>
-              ) : (
-                <>
-                  <Calculator className="w-5 h-5" />
-                  Calcular
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={handleAprobarTodas}
-              disabled={!quincenaSeleccionada || nominasFiltradas.length === 0}
-              className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
-              title="Aprobar todas las nóminas calculadas"
-            >
-              <CheckCircle className="w-5 h-5" />
-              Aprobar
-            </button>
-
-            <button
-              onClick={handleExportarExcel}
-              disabled={exportando || nominasFiltradas.length === 0}
-              className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-md hover:bg-emerald-700 disabled:bg-gray-400"
-            >
-              {exportando ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  Exportando...
-                </>
-              ) : (
-                <>
-                  <Download className="w-5 h-5" />
-                  Exportar Excel
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          placeholder="Buscar por nombre o documento..."
+        />
       </div>
 
       {/* Diálogos de Confirmación Masiva */}
@@ -721,16 +636,6 @@ export default function NominaList() {
         )}
       </div>
 
-      {/* Confirm Dialog */}
-      <ConfirmDialog
-        isOpen={confirmCalculo}
-        onClose={() => setConfirmCalculo(false)}
-        onConfirm={handleCalcularNomina}
-        title="Calcular Nómina"
-        message="¿Está seguro que desea calcular la nómina para todos los trabajadores? Esto puede tomar unos momentos."
-        type="info"
-        confirmText="Calcular"
-      />
     </div>
   );
 }
