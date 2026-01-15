@@ -14,14 +14,20 @@ from datetime import date, timedelta
 class Rol(models.Model):
     """Roles del sistema para control de permisos"""
 
-    SUPER_ADMIN = 'SUPER_ADMIN'
-    DIGITADOR = 'DIGITADOR'
-    SOLO_LECTURA = 'SOLO_LECTURA'
+    # Nuevos nombres de roles más descriptivos
+    ADMINISTRADOR = 'ADMINISTRADOR'
+    SUPERVISOR = 'SUPERVISOR'
+    CONSULTA = 'CONSULTA'
+
+    # Mantener los antiguos como alias para compatibilidad durante migración
+    SUPER_ADMIN = 'ADMINISTRADOR'  # Alias para compatibilidad
+    DIGITADOR = 'SUPERVISOR'        # Alias para compatibilidad
+    SOLO_LECTURA = 'CONSULTA'       # Alias para compatibilidad
 
     ROLES_CHOICES = [
-        (SUPER_ADMIN, 'Super Administrador'),
-        (DIGITADOR, 'Digitador'),
-        (SOLO_LECTURA, 'Solo Lectura'),
+        (ADMINISTRADOR, 'Administrador'),
+        (SUPERVISOR, 'Supervisor'),
+        (CONSULTA, 'Consulta'),
     ]
 
     nombre = models.CharField(max_length=50, choices=ROLES_CHOICES, unique=True)

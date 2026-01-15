@@ -9,9 +9,11 @@ import SearchBar from '../../components/Common/SearchBar';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import toast from 'react-hot-toast';
 import { UserPlus, Eye, Edit, UserCheck, UserX, Briefcase } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function TrabajadoresList() {
   const navigate = useNavigate();
+  const { canModify } = useAuth();
   const [trabajadores, setTrabajadores] = useState([]);
   const [fincas, setFincas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -134,13 +136,15 @@ export default function TrabajadoresList() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Trabajadores</h1>
-        <button
-          onClick={() => navigate('/trabajadores/nuevo')}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-        >
-          <UserPlus className="w-5 h-5" />
-          Nuevo Trabajador
-        </button>
+        {canModify() && (
+          <button
+            onClick={() => navigate('/trabajadores/nuevo')}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            <UserPlus className="w-5 h-5" />
+            Nuevo Trabajador
+          </button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -274,49 +278,53 @@ export default function TrabajadoresList() {
                       >
                         <Eye className="w-5 h-5" />
                       </button>
-                      <button
-                        onClick={() => navigate(`/trabajadores/${trabajador.id}/editar`)}
-                        className="text-yellow-600 hover:text-yellow-900"
-                        title="Editar"
-                      >
-                        <Edit className="w-5 h-5" />
-                      </button>
-                      {trabajador.estado === 'ACTIVO' ? (
-                        <button
-                          onClick={() =>
-                            openConfirmDialog(
-                              'Inactivar Trabajador',
-                              `¿Está seguro que desea inactivar a ${trabajador.nombre_completo}?`,
-                              () => {
-                                handleInactivar(trabajador.id);
-                                closeConfirmDialog();
-                              },
-                              'warning'
-                            )
-                          }
-                          className="text-red-600 hover:text-red-900"
-                          title="Inactivar"
-                        >
-                          <UserX className="w-5 h-5" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() =>
-                            openConfirmDialog(
-                              'Activar Trabajador',
-                              `¿Está seguro que desea activar a ${trabajador.nombre_completo}?`,
-                              () => {
-                                handleActivar(trabajador.id);
-                                closeConfirmDialog();
-                              },
-                              'info'
-                            )
-                          }
-                          className="text-green-600 hover:text-green-900"
-                          title="Activar"
-                        >
-                          <UserCheck className="w-5 h-5" />
-                        </button>
+                      {canModify() && (
+                        <>
+                          <button
+                            onClick={() => navigate(`/trabajadores/${trabajador.id}/editar`)}
+                            className="text-yellow-600 hover:text-yellow-900"
+                            title="Editar"
+                          >
+                            <Edit className="w-5 h-5" />
+                          </button>
+                          {trabajador.estado === 'ACTIVO' ? (
+                            <button
+                              onClick={() =>
+                                openConfirmDialog(
+                                  'Inactivar Trabajador',
+                                  `¿Está seguro que desea inactivar a ${trabajador.nombre_completo}?`,
+                                  () => {
+                                    handleInactivar(trabajador.id);
+                                    closeConfirmDialog();
+                                  },
+                                  'warning'
+                                )
+                              }
+                              className="text-red-600 hover:text-red-900"
+                              title="Inactivar"
+                            >
+                              <UserX className="w-5 h-5" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                openConfirmDialog(
+                                  'Activar Trabajador',
+                                  `¿Está seguro que desea activar a ${trabajador.nombre_completo}?`,
+                                  () => {
+                                    handleActivar(trabajador.id);
+                                    closeConfirmDialog();
+                                  },
+                                  'info'
+                                )
+                              }
+                              className="text-green-600 hover:text-green-900"
+                              title="Activar"
+                            >
+                              <UserCheck className="w-5 h-5" />
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </td>

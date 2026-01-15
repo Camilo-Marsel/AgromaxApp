@@ -12,8 +12,10 @@ import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import MultipleDatePicker from '../../components/Common/MultipleDatePicker';
 import toast from 'react-hot-toast';
 import { Plus, Trash2, Calendar } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function RegistroLabores() {
+  const { canModify } = useAuth();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   
@@ -278,8 +280,9 @@ export default function RegistroLabores() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* IZQUIERDA: Formulario */}
+      <div className={`grid grid-cols-1 ${canModify() ? 'lg:grid-cols-2' : ''} gap-6`}>
+        {/* IZQUIERDA: Formulario - solo para roles con permisos de modificación */}
+        {canModify() && (
         <div className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Plus className="w-5 h-5" />
@@ -437,6 +440,7 @@ export default function RegistroLabores() {
             </button>
           </form>
         </div>
+        )}
 
         {/* DERECHA: Registros de la Quincena */}
         <div className="bg-white p-6 rounded-lg shadow">
@@ -483,9 +487,11 @@ export default function RegistroLabores() {
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                       Cantidad
                     </th>
+                    {canModify() && (
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                       Acción
                     </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -503,6 +509,7 @@ export default function RegistroLabores() {
                       <td className="px-3 py-2 text-sm text-gray-900">
                         {registro.cantidad} {registro.labor_info?.unidad_medida_info?.simbolo}
                       </td>
+                      {canModify() && (
                       <td className="px-3 py-2 text-sm">
                         <button
                           onClick={() => setConfirmDelete({ isOpen: true, id: registro.id })}
@@ -512,6 +519,7 @@ export default function RegistroLabores() {
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

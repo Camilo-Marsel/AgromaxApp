@@ -10,9 +10,11 @@ import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import SearchBar from '../../components/Common/SearchBar';
 import toast from 'react-hot-toast';
 import { Calculator, Eye, AlertCircle, Download, FileSpreadsheet, CheckCircle, XCircle, DollarSign } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function NominaList() {
   const navigate = useNavigate();
+  const { canModify } = useAuth();
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
   const [exportando, setExportando] = useState(false);
@@ -315,59 +317,64 @@ export default function NominaList() {
         <div className="flex gap-2">
           {quincenaSeleccionada && (
             <>
-              {/* Botón Calcular */}
-              <button
-                onClick={handleCalcularNomina}
-                disabled={calculating}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
-              >
-                {calculating ? (
-                  <>
-                    <LoadingSpinner size="sm" />
-                    Calculando...
-                  </>
-                ) : (
-                  <>
-                    <Calculator className="w-5 h-5" />
-                    Calcular Quincena
-                  </>
-                )}
-              </button>
+              {/* Botones de modificación - solo para ADMINISTRADOR y SUPERVISOR */}
+              {canModify() && (
+                <>
+                  {/* Botón Calcular */}
+                  <button
+                    onClick={handleCalcularNomina}
+                    disabled={calculating}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+                  >
+                    {calculating ? (
+                      <>
+                        <LoadingSpinner size="sm" />
+                        Calculando...
+                      </>
+                    ) : (
+                      <>
+                        <Calculator className="w-5 h-5" />
+                        Calcular Quincena
+                      </>
+                    )}
+                  </button>
 
-              {/* Botón Aprobar Masivo */}
-              <button
-                onClick={() => setConfirmAprobarMasivo(true)}
-                disabled={nominasFiltradas.filter(n => n.estado === 'CALCULADA').length === 0}
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400"
-                title="Aprobar todas las nóminas CALCULADAS"
-              >
-                <CheckCircle className="w-5 h-5" />
-                Aprobar Todas
-              </button>
+                  {/* Botón Aprobar Masivo */}
+                  <button
+                    onClick={() => setConfirmAprobarMasivo(true)}
+                    disabled={nominasFiltradas.filter(n => n.estado === 'CALCULADA').length === 0}
+                    className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400"
+                    title="Aprobar todas las nóminas CALCULADAS"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    Aprobar Todas
+                  </button>
 
-              {/* Botón Rechazar Masivo */}
-              <button
-                onClick={() => setConfirmRechazarMasivo(true)}
-                disabled={nominasFiltradas.filter(n => n.estado === 'APROBADA').length === 0}
-                className="flex items-center gap-2 bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 disabled:bg-gray-400"
-                title="Rechazar todas las nóminas APROBADAS"
-              >
-                <XCircle className="w-5 h-5" />
-                Rechazar Todas
-              </button>
+                  {/* Botón Rechazar Masivo */}
+                  <button
+                    onClick={() => setConfirmRechazarMasivo(true)}
+                    disabled={nominasFiltradas.filter(n => n.estado === 'APROBADA').length === 0}
+                    className="flex items-center gap-2 bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 disabled:bg-gray-400"
+                    title="Rechazar todas las nóminas APROBADAS"
+                  >
+                    <XCircle className="w-5 h-5" />
+                    Rechazar Todas
+                  </button>
 
-              {/* Botón Marcar Pagadas Masivo */}
-              <button
-                onClick={() => setConfirmPagarMasivo(true)}
-                disabled={nominasFiltradas.filter(n => n.estado === 'APROBADA').length === 0}
-                className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
-                title="Marcar todas las APROBADAS como PAGADAS"
-              >
-                <DollarSign className="w-5 h-5" />
-                Marcar Todas Pagadas
-              </button>
+                  {/* Botón Marcar Pagadas Masivo */}
+                  <button
+                    onClick={() => setConfirmPagarMasivo(true)}
+                    disabled={nominasFiltradas.filter(n => n.estado === 'APROBADA').length === 0}
+                    className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
+                    title="Marcar todas las APROBADAS como PAGADAS"
+                  >
+                    <DollarSign className="w-5 h-5" />
+                    Marcar Todas Pagadas
+                  </button>
+                </>
+              )}
 
-              {/* Botón Exportar Excel */}
+              {/* Botón Exportar Excel - disponible para todos los roles */}
               <button
                 onClick={handleExportarExcel}
                 disabled={exportando || nominasFiltradas.length === 0}

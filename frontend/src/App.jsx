@@ -30,6 +30,8 @@ import ContratoForm from './pages/Contratos/ContratoForm';
 import ConfiguracionVariables from './pages/Configuracion/ConfiguracionVariables';
 import ReportesList from './pages/Reportes/ReportesList';
 import ReportesNomina from './pages/Reportes/ReportesNomina';
+import UsuariosList from './pages/Usuarios/UsuariosList';
+import UsuarioForm from './pages/Usuarios/UsuarioForm';
 
 // Componente para rutas protegidas
 function ProtectedRoute({ children }) {
@@ -350,6 +352,38 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <ReportesNomina />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Usuarios - Solo Administrador */}
+          <Route
+            path="/usuarios"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <UsuariosList />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/usuarios/nuevo"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <UsuarioForm />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/usuarios/:id/editar"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <UsuarioForm />
                 </MainLayout>
               </ProtectedRoute>
             }

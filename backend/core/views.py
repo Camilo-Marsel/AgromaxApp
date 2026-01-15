@@ -21,7 +21,11 @@ from .models import (
     Contrato, DocumentoContrato
 )
 from .serializers import *
-from .permissions import IsSuperAdmin, IsDigitadorOrAbove, ReadOnly
+from .permissions import IsAdministrador, IsSupervisorOrAbove, CanModifyData, ReadOnly
+
+# Alias para mantener compatibilidad
+IsSuperAdmin = IsAdministrador
+IsDigitadorOrAbove = IsSupervisorOrAbove
 from .filters import *
 
 # ============================================================================
@@ -64,7 +68,7 @@ class TipoContratoViewSet(viewsets.ReadOnlyModelViewSet):
 class TrabajadorViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de trabajadores"""
     queryset = Trabajador.objects.all()
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = TrabajadorFilter
     search_fields = ['nombres', 'apellidos', 'numero_documento']
@@ -113,7 +117,7 @@ class FincaViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de fincas"""
     queryset = Finca.objects.all()
     serializer_class = FincaSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [CanModifyData]
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['nombre', 'ubicacion']
     ordering_fields = ['nombre', 'created_at']
@@ -132,7 +136,7 @@ class LoteViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de lotes"""
     queryset = Lote.objects.all()
     serializer_class = LoteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['finca', 'activo']
     search_fields = ['nombre']
@@ -154,7 +158,7 @@ class UnidadMedidaViewSet(viewsets.ReadOnlyModelViewSet):
 class LaborViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de labores"""
     queryset = Labor.objects.all()
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = LaborFilter
     search_fields = ['codigo', 'nombre']
@@ -170,7 +174,7 @@ class LaborViewSet(viewsets.ModelViewSet):
 class ListaPreciosViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de precios"""
     queryset = ListaPrecios.objects.all()
-    permission_classes = [IsDigitadorOrAbove]
+    permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['labor', 'fecha_inicio_vigencia']
     ordering_fields = ['fecha_inicio_vigencia', 'created_at']
@@ -189,7 +193,7 @@ class VariablesNominaViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de variables de nómina"""
     queryset = VariablesNomina.objects.all()
     serializer_class = VariablesNominaSerializer
-    permission_classes = [IsDigitadorOrAbove]
+    permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['nombre']
     ordering = ['-fecha_inicio_vigencia']
@@ -206,7 +210,7 @@ class QuincenaViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de quincenas"""
     queryset = Quincena.objects.all()
     serializer_class = QuincenaSerializer
-    permission_classes = [IsDigitadorOrAbove]
+    permission_classes = [CanModifyData]
     filter_backends = [OrderingFilter]
     ordering = ['-año', '-mes', '-numero']
     
@@ -302,7 +306,7 @@ class QuincenaViewSet(viewsets.ModelViewSet):
 class RegistroLaborViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de registros de labores"""
     queryset = RegistroLabor.objects.all()
-    permission_classes = [IsDigitadorOrAbove]
+    permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = RegistroLaborFilter
     ordering = ['-fecha', 'trabajador']
@@ -396,7 +400,7 @@ class NominaViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de nóminas"""
     queryset = Nomina.objects.all()
     serializer_class = NominaSerializer
-    permission_classes = [IsDigitadorOrAbove]
+    permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = NominaFilter
     ordering = ['-quincena', 'trabajador']
@@ -837,7 +841,7 @@ class NominaViewSet(viewsets.ModelViewSet):
 class PrestamoViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de préstamos"""
     queryset = Prestamo.objects.all()
-    permission_classes = [IsDigitadorOrAbove]
+    permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = PrestamoFilter
     ordering = ['-fecha_prestamo']
@@ -877,7 +881,7 @@ class PrestamoViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de préstamos"""
     queryset = Prestamo.objects.all()
     serializer_class = PrestamoSerializer
-    permission_classes = [IsDigitadorOrAbove]
+    permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['trabajador', 'estado', 'tipo_pago']
     search_fields = ['trabajador__nombres', 'trabajador__apellidos', 'trabajador__numero_documento']
@@ -960,7 +964,7 @@ class VariablesNominaViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de variables de nómina"""
     queryset = VariablesNomina.objects.all()
     serializer_class = VariablesNominaSerializer
-    permission_classes = [IsDigitadorOrAbove]
+    permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['nombre']
     ordering = ['-fecha_inicio_vigencia']
@@ -1041,7 +1045,7 @@ class VariablesNominaViewSet(viewsets.ModelViewSet):
 class ContratoViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de contratos laborales"""
     queryset = Contrato.objects.select_related('trabajador', 'created_by').all()
-    permission_classes = [IsDigitadorOrAbove]
+    permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['numero_contrato', 'trabajador__nombres', 'trabajador__apellidos', 'cargo']
     filterset_fields = ['estado', 'trabajador', 'tipo_contrato']
@@ -1261,7 +1265,7 @@ class DocumentoContratoViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de documentos de contratos"""
     queryset = DocumentoContrato.objects.select_related('contrato', 'created_by').all()
     serializer_class = DocumentoContratoSerializer
-    permission_classes = [IsDigitadorOrAbove]
+    permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['contrato', 'tipo_documento']
     ordering = ['-created_at']

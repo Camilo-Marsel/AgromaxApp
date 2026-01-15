@@ -8,9 +8,11 @@ import SearchBar from '../../components/Common/SearchBar';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import toast from 'react-hot-toast';
 import { Plus, Edit, Trash2, DollarSign } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function LaboresList() {
   const navigate = useNavigate();
+  const { canModify } = useAuth();
   const [labores, setLabores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -66,13 +68,15 @@ export default function LaboresList() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Labores</h1>
-        <button
-          onClick={() => navigate('/labores/nueva')}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-        >
-          <Plus className="w-5 h-5" />
-          Nueva Labor
-        </button>
+        {canModify() && (
+          <button
+            onClick={() => navigate('/labores/nueva')}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            <Plus className="w-5 h-5" />
+            Nueva Labor
+          </button>
+        )}
       </div>
 
       {/* Búsqueda */}
@@ -141,24 +145,28 @@ export default function LaboresList() {
                       <button
                         onClick={() => navigate(`/labores/${labor.id}/precios`)}
                         className="text-green-600 hover:text-green-900"
-                        title="Gestionar precios"
+                        title="Ver precios"
                       >
                         <DollarSign className="w-5 h-5" />
                       </button>
-                      <button
-                        onClick={() => navigate(`/labores/${labor.id}/editar`)}
-                        className="text-yellow-600 hover:text-yellow-900"
-                        title="Editar"
-                      >
-                        <Edit className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete({ isOpen: true, id: labor.id })}
-                        className="text-red-600 hover:text-red-900"
-                        title="Eliminar"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      {canModify() && (
+                        <>
+                          <button
+                            onClick={() => navigate(`/labores/${labor.id}/editar`)}
+                            className="text-yellow-600 hover:text-yellow-900"
+                            title="Editar"
+                          >
+                            <Edit className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => setConfirmDelete({ isOpen: true, id: labor.id })}
+                            className="text-red-600 hover:text-red-900"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
