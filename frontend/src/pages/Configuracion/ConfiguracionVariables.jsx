@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import variablesNominaService from '../../services/variablesNominaService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
-import { Save, TrendingUp, DollarSign, Heart, Shield, History, X } from 'lucide-react';
+import { Save, TrendingUp, DollarSign, Heart, Shield, History, X, AlertTriangle, Plus } from 'lucide-react';
 
 export default function ConfiguracionVariables() {
   const [variables, setVariables] = useState({});
@@ -36,7 +36,7 @@ export default function ConfiguracionVariables() {
     const variable = variables[nombreVar];
     setVariableEditando(nombreVar);
     reset({
-      valor: variable.valor,
+      valor: variable.tiene_vigente ? variable.valor : '',
       fecha_inicio_vigencia: new Date().toISOString().split('T')[0],
       descripcion: '',
     });
@@ -158,23 +158,29 @@ export default function ConfiguracionVariables() {
               key={nombreVar}
               className={`bg-white rounded-lg shadow-md border-l-4 border-${color}-600 overflow-hidden`}
             >
-              <div className={`bg-${color}-50 p-4 flex justify-between items-start`}>
+              <div className={`${variable.tiene_vigente ? `bg-${color}-50` : 'bg-orange-50'} p-4 flex justify-between items-start`}>
                 <div className="flex items-center gap-3">
-                  <div className={`text-${color}-600`}>
-                    {getIcono(nombreVar)}
+                  <div className={variable.tiene_vigente ? `text-${color}-600` : 'text-orange-600'}>
+                    {variable.tiene_vigente ? getIcono(nombreVar) : <AlertTriangle className="w-6 h-6" />}
                   </div>
                   <div>
-                    <h3 className={`text-lg font-semibold text-${color}-900`}>
+                    <h3 className={`text-lg font-semibold ${variable.tiene_vigente ? `text-${color}-900` : 'text-orange-900'}`}>
                       {variable.nombre}
                     </h3>
-                    <p className="text-xs text-gray-600">
-                      Vigente desde: {new Date(variable.fecha_inicio_vigencia).toLocaleDateString('es-ES')}
-                    </p>
+                    {variable.tiene_vigente ? (
+                      <p className="text-xs text-gray-600">
+                        Vigente desde: {new Date(variable.fecha_inicio_vigencia).toLocaleDateString('es-ES')}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-orange-700 font-medium">
+                        Sin valor vigente configurado
+                      </p>
+                    )}
                   </div>
                 </div>
                 <button
                   onClick={() => handleVerHistorial(nombreVar)}
-                  className={`text-${color}-600 hover:text-${color}-800`}
+                  className={`${variable.tiene_vigente ? `text-${color}-600 hover:text-${color}-800` : 'text-orange-600 hover:text-orange-800'}`}
                   title="Ver historial"
                 >
                   <History className="w-5 h-5" />
@@ -184,20 +190,39 @@ export default function ConfiguracionVariables() {
               <div className="p-4">
                 {!editando ? (
                   <>
-                    <div className="mb-4">
-                      <p className="text-sm text-gray-600">Valor Actual</p>
-                      <p className={`text-3xl font-bold text-${color}-600`}>
-                        {nombreVar.includes('PORCENTAJE')
-                          ? `${variable.valor}%`
-                          : formatMoney(variable.valor)}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleEditar(nombreVar)}
-                      className={`w-full bg-${color}-600 text-white px-4 py-2 rounded-md hover:bg-${color}-700`}
-                    >
-                      Actualizar Valor
-                    </button>
+                    {variable.tiene_vigente ? (
+                      <>
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-600">Valor Actual</p>
+                          <p className={`text-3xl font-bold text-${color}-600`}>
+                            {nombreVar.includes('PORCENTAJE')
+                              ? `${variable.valor}%`
+                              : formatMoney(variable.valor)}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleEditar(nombreVar)}
+                          className={`w-full bg-${color}-600 text-white px-4 py-2 rounded-md hover:bg-${color}-700`}
+                        >
+                          Actualizar Valor
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="mb-4 p-3 bg-orange-100 rounded-md">
+                          <p className="text-sm text-orange-800">
+                            Esta variable no tiene un valor vigente. Los cálculos de nómina no podrán usar este valor hasta que se configure.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleEditar(nombreVar)}
+                          className="w-full flex items-center justify-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700"
+                        >
+                          <Plus className="w-5 h-5" />
+                          Configurar Valor
+                        </button>
+                      </>
+                    )}
                   </>
                 ) : (
                   <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">

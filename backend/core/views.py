@@ -971,33 +971,52 @@ class VariablesNominaViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def vigentes(self, request):
-        """Obtener variables vigentes actualmente"""
+        """Obtener todas las variables (vigentes o no) para la página de configuración"""
         from django.utils import timezone
         hoy = timezone.now().date()
-        
-        variables_vigentes = {}
-        
+
+        # Nombres legibles para las variables
+        NOMBRES_DISPLAY = {
+            VariablesNomina.SALARIO_MINIMO: 'Salario Mínimo',
+            VariablesNomina.AUXILIO_TRANSPORTE: 'Auxilio de Transporte',
+            VariablesNomina.PORCENTAJE_SALUD: 'Porcentaje Salud',
+            VariablesNomina.PORCENTAJE_PENSION: 'Porcentaje Pensión',
+        }
+
+        variables_resultado = {}
+
         for nombre_var in [
             VariablesNomina.SALARIO_MINIMO,
             VariablesNomina.AUXILIO_TRANSPORTE,
             VariablesNomina.PORCENTAJE_SALUD,
             VariablesNomina.PORCENTAJE_PENSION
         ]:
+            # Buscar variable vigente
             variable = VariablesNomina.objects.filter(
                 nombre=nombre_var,
                 fecha_inicio_vigencia__lte=hoy,
                 fecha_fin_vigencia__isnull=True
             ).first()
-            
+
             if variable:
-                variables_vigentes[nombre_var] = {
+                variables_resultado[nombre_var] = {
                     'id': variable.id,
                     'nombre': variable.get_nombre_display(),
                     'valor': str(variable.valor),
                     'fecha_inicio_vigencia': variable.fecha_inicio_vigencia,
+                    'tiene_vigente': True,
                 }
-        
-        return Response(variables_vigentes)
+            else:
+                # Variable sin valor vigente - mostrar para que pueda crearse
+                variables_resultado[nombre_var] = {
+                    'id': None,
+                    'nombre': NOMBRES_DISPLAY.get(nombre_var, nombre_var),
+                    'valor': None,
+                    'fecha_inicio_vigencia': None,
+                    'tiene_vigente': False,
+                }
+
+        return Response(variables_resultado)
     
     @action(detail=False, methods=['post'])
     def actualizar_variable(self, request):
