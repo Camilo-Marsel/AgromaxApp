@@ -29,13 +29,14 @@ export default function TrabajadorForm() {
   } = useForm();
 
   useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  useEffect(() => {
-    if (isEditing) {
-      loadTrabajador();
-    }
+    const initializeForm = async () => {
+      await loadInitialData();
+      // Cargar trabajador después de los datos iniciales para que los selects estén listos
+      if (isEditing) {
+        loadTrabajador();
+      }
+    };
+    initializeForm();
   }, [id]);
 
   const loadInitialData = async () => {
@@ -57,7 +58,28 @@ export default function TrabajadorForm() {
     try {
       setLoading(true);
       const data = await trabajadorService.getById(id);
-      reset(data);
+      // Mapear campos de la API al formulario
+      reset({
+        tipo_documento: data.tipo_documento || '',
+        numero_documento: data.numero_documento || '',
+        nombres: data.nombres || '',
+        apellidos: data.apellidos || '',
+        fecha_nacimiento: data.fecha_nacimiento || '',
+        telefono: data.telefono || '',
+        direccion: data.direccion || '',
+        email: data.correo || '', // API usa 'correo', form usa 'email'
+        tipo_contrato: data.tipo_contrato || '',
+        estado: data.estado || 'ACTIVO',
+        fecha_ingreso: data.fecha_ingreso || '',
+        fecha_retiro: data.fecha_retiro || '',
+        finca: data.finca || '',
+        arl: data.arl || '',
+        es_administrativo: data.es_administrativo || false,
+        salario_quincenal: data.salario_quincenal || '',
+        banco: data.banco || '',
+        tipo_cuenta_bancaria: data.tipo_cuenta_bancaria || '',
+        numero_cuenta_bancaria: data.numero_cuenta_bancaria || '',
+      });
     } catch (error) {
       console.error('Error al cargar trabajador:', error);
       toast.error('Error al cargar trabajador');
@@ -76,11 +98,18 @@ export default function TrabajadorForm() {
         data.salario_quincenal = null;
       }
 
+      // Mapear campo email a correo para el backend
+      const submitData = {
+        ...data,
+        correo: data.email, // El form usa 'email', la API espera 'correo'
+      };
+      delete submitData.email;
+
       if (isEditing) {
-        await trabajadorService.update(id, data);
+        await trabajadorService.update(id, submitData);
         toast.success('Trabajador actualizado correctamente');
       } else {
-        await trabajadorService.create(data);
+        await trabajadorService.create(submitData);
         toast.success('Trabajador creado correctamente');
       }
 

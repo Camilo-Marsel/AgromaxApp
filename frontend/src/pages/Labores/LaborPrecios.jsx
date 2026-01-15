@@ -73,10 +73,12 @@ export default function LaborPrecios() {
 
   const handleEdit = (precio) => {
     setEditingPrecio(precio);
+    // Usar undefined en lugar de '' para campos de fecha vacíos
+    // ya que react-hook-form maneja mejor undefined para inputs tipo date
     reset({
       precio: precio.precio,
-      fecha_inicio_vigencia: precio.fecha_inicio_vigencia,
-      fecha_fin_vigencia: precio.fecha_fin_vigencia || '',
+      fecha_inicio_vigencia: precio.fecha_inicio_vigencia || '',
+      fecha_fin_vigencia: precio.fecha_fin_vigencia ? precio.fecha_fin_vigencia : '',
     });
     setShowForm(true);
   };
