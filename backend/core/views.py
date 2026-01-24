@@ -833,6 +833,100 @@ class NominaViewSet(viewsets.ModelViewSet):
 
         return response
 
+    @action(detail=True, methods=['post'])
+    def enviar_recibo(self, request, pk=None):
+        """Enviar recibo de nómina por correo electrónico al trabajador"""
+        nomina = self.get_object()
+
+        # Verificar que la nómina esté en estado válido
+        if nomina.estado not in ['CALCULADA', 'APROBADA', 'PAGADA']:
+            return Response(
+                {'error': 'Solo se pueden enviar recibos de nóminas calculadas, aprobadas o pagadas'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Verificar que el trabajador tenga correo
+        if not nomina.trabajador.correo:
+            return Response(
+                {'error': f'El trabajador {nomina.trabajador.nombre_completo} no tiene correo registrado'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            from .services.email_service import enviar_recibo_nomina
+
+            resultado = enviar_recibo_nomina(nomina)
+
+            if resultado['success']:
+                return Response({
+                    'message': resultado['message'],
+                    'correo': nomina.trabajador.correo
+                })
+            else:
+                return Response(
+                    {'error': resultado['message']},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Exception as e:
+            return Response(
+                {'error': f'Error al enviar correo: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'])
+    def enviar_recibos_masivo(self, request):
+        """
+        Enviar recibos de nómina por correo electrónico a múltiples trabajadores.
+
+        Body params:
+        - quincena_id (required): ID de la quincena
+        - finca_id (optional): Filtrar por finca
+        - estados (optional): Lista de estados (por defecto ['PAGADA'])
+        """
+        quincena_id = request.data.get('quincena_id')
+        finca_id = request.data.get('finca_id')
+        estados = request.data.get('estados', ['PAGADA'])
+
+        if not quincena_id:
+            return Response(
+                {'error': 'El ID de quincena es requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Filtrar nóminas
+        nominas = Nomina.objects.filter(
+            quincena_id=quincena_id,
+            estado__in=estados,
+            trabajador__correo__isnull=False
+        ).exclude(trabajador__correo='').select_related('trabajador', 'quincena')
+
+        # Aplicar filtro de finca si se proporciona
+        if finca_id:
+            nominas = nominas.filter(trabajador__finca_id=finca_id)
+
+        if not nominas.exists():
+            return Response(
+                {'error': 'No hay nóminas con correo registrado para enviar'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            from .services.email_service import enviar_recibos_masivo
+
+            resultado = enviar_recibos_masivo(nominas)
+
+            return Response({
+                'message': f'Proceso completado: {resultado["exitosos"]} enviados, {resultado["fallidos"]} fallidos',
+                'exitosos': resultado['exitosos'],
+                'fallidos': resultado['fallidos'],
+                'detalles': resultado['detalles']
+            })
+        except Exception as e:
+            return Response(
+                {'error': f'Error en el envío masivo: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 # ============================================================================
 # PRÉSTAMOS

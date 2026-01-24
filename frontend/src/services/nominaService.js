@@ -146,6 +146,22 @@ const nominaService = {
     return response.data;
   },
 
+  // Enviar recibo por correo electrónico a un trabajador
+  enviarRecibo: async (nominaId) => {
+    const response = await api.post(`/nominas/${nominaId}/enviar_recibo/`);
+    return response.data;
+  },
+
+  // Enviar recibos masivos por correo electrónico
+  enviarRecibosMasivo: async (quincenaId, fincaId = null, estados = ['PAGADA']) => {
+    const response = await api.post('/nominas/enviar_recibos_masivo/', {
+      quincena_id: quincenaId,
+      finca_id: fincaId,
+      estados,
+    });
+    return response.data;
+  },
+
 };
 
 export default nominaService;
