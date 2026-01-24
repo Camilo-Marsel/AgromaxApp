@@ -7,7 +7,7 @@ import nominaService from '../../services/nominaService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Download, Edit2, Save, X, CheckCircle, DollarSign } from 'lucide-react';
+import { ArrowLeft, Download, Edit2, Save, X, CheckCircle, DollarSign, Mail } from 'lucide-react';
 
 export default function NominaDetail() {
   const navigate = useNavigate();
@@ -22,6 +22,7 @@ export default function NominaDetail() {
   const [confirmPagar, setConfirmPagar] = useState(false);
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [procesando, setProcesando] = useState(false);
+  const [enviandoCorreo, setEnviandoCorreo] = useState(false);
 
   const { register, handleSubmit, reset, watch } = useForm();
 
@@ -142,6 +143,25 @@ export default function NominaDetail() {
     }
   };
 
+  const handleEnviarCorreo = async () => {
+    if (!nomina.trabajador_info?.correo) {
+      toast.error(`El trabajador ${nomina.trabajador_info?.nombre_completo} no tiene correo registrado`);
+      return;
+    }
+
+    try {
+      setEnviandoCorreo(true);
+      const result = await nominaService.enviarRecibo(id);
+      toast.success(result.message || 'Recibo enviado correctamente');
+    } catch (error) {
+      console.error('Error al enviar correo:', error);
+      const errorMsg = error.response?.data?.error || 'Error al enviar correo';
+      toast.error(errorMsg);
+    } finally {
+      setEnviandoCorreo(false);
+    }
+  };
+
   const formatMoney = (value) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -190,6 +210,26 @@ export default function NominaDetail() {
           >
             <Download className="w-5 h-5" />
             Descargar PDF
+          </button>
+
+          {/* Botón enviar por correo */}
+          <button
+            onClick={handleEnviarCorreo}
+            disabled={enviandoCorreo}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400"
+            title={nomina.trabajador_info?.correo ? `Enviar a ${nomina.trabajador_info.correo}` : 'Sin correo registrado'}
+          >
+            {enviandoCorreo ? (
+              <>
+                <LoadingSpinner size="sm" />
+                Enviando...
+              </>
+            ) : (
+              <>
+                <Mail className="w-5 h-5" />
+                Enviar por Correo
+              </>
+            )}
           </button>
 
           {/* Botones según estado */}

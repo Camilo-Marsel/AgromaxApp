@@ -9,7 +9,7 @@ import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import SearchBar from '../../components/Common/SearchBar';
 import toast from 'react-hot-toast';
-import { Calculator, Eye, AlertCircle, Download, FileSpreadsheet, CheckCircle, XCircle, DollarSign } from 'lucide-react';
+import { Calculator, Eye, AlertCircle, Download, FileSpreadsheet, CheckCircle, XCircle, DollarSign, Mail } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function NominaList() {
@@ -36,8 +36,11 @@ export default function NominaList() {
   const [confirmAprobarMasivo, setConfirmAprobarMasivo] = useState(false);
   const [confirmRechazarMasivo, setConfirmRechazarMasivo] = useState(false);
   const [confirmPagarMasivo, setConfirmPagarMasivo] = useState(false);
+  const [confirmEnviarCorreosMasivo, setConfirmEnviarCorreosMasivo] = useState(false);
   const [motivoRechazoMasivo, setMotivoRechazoMasivo] = useState('');
   const [procesandoMasivo, setProcesandoMasivo] = useState(false);
+  const [enviandoCorreos, setEnviandoCorreos] = useState(false);
+  const [estadosEnvioCorreo, setEstadosEnvioCorreo] = useState(['PAGADA']);
 
   useEffect(() => {
     loadInitialData();
@@ -220,24 +223,72 @@ export default function NominaList() {
     }
   };
 
+  const handleEnviarCorreosMasivo = async () => {
+    try {
+      setEnviandoCorreos(true);
+      const result = await nominaService.enviarRecibosMasivo(
+        quincenaSeleccionada,
+        fincaSeleccionada || null,
+        estadosEnvioCorreo
+      );
+
+      if (result.exitosos > 0) {
+        toast.success(`${result.exitosos} recibo(s) enviado(s) correctamente`);
+      }
+      if (result.fallidos > 0) {
+        toast.error(`${result.fallidos} envío(s) fallido(s)`);
+      }
+
+      setConfirmEnviarCorreosMasivo(false);
+    } catch (error) {
+      console.error('Error al enviar correos:', error);
+      const errorMsg = error.response?.data?.error || 'Error al enviar correos';
+      toast.error(errorMsg);
+    } finally {
+      setEnviandoCorreos(false);
+    }
+  };
+
+  // Contar nóminas con correo para envío masivo
+  const nominasConCorreo = nominasFiltradas.filter(
+    n => estadosEnvioCorreo.includes(n.estado) && n.trabajador_info?.correo
+  );
+
   const handleDescargarPDF = async (nomina) => {
     try {
       const blob = await nominaService.descargarPDF(nomina.id);
-      
+
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `comprobante_${nomina.trabajador_info?.numero_documento}_Q${nomina.quincena_info?.numero}.pdf`;
       document.body.appendChild(link);
       link.click();
-      
+
       link.remove();
       window.URL.revokeObjectURL(url);
-      
+
       toast.success('PDF descargado correctamente');
     } catch (error) {
       console.error('Error al descargar PDF:', error);
       toast.error('Error al descargar PDF');
+    }
+  };
+
+  const handleEnviarCorreoIndividual = async (nomina) => {
+    if (!nomina.trabajador_info?.correo) {
+      toast.error(`${nomina.trabajador_info?.nombre_completo} no tiene correo registrado`);
+      return;
+    }
+
+    try {
+      toast.loading('Enviando correo...', { id: `email-${nomina.id}` });
+      const result = await nominaService.enviarRecibo(nomina.id);
+      toast.success(result.message || 'Recibo enviado correctamente', { id: `email-${nomina.id}` });
+    } catch (error) {
+      console.error('Error al enviar correo:', error);
+      const errorMsg = error.response?.data?.error || 'Error al enviar correo';
+      toast.error(errorMsg, { id: `email-${nomina.id}` });
     }
   };
 
@@ -392,6 +443,26 @@ export default function NominaList() {
                   </>
                 )}
               </button>
+
+              {/* Botón Enviar Recibos por Correo */}
+              <button
+                onClick={() => setConfirmEnviarCorreosMasivo(true)}
+                disabled={enviandoCorreos || nominasConCorreo.length === 0}
+                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400"
+                title="Enviar recibos por correo electrónico"
+              >
+                {enviandoCorreos ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    Enviando...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-5 h-5" />
+                    Enviar Correos
+                  </>
+                )}
+              </button>
             </>
           )}
         </div>
@@ -499,6 +570,68 @@ export default function NominaList() {
         }
         confirmText={procesandoMasivo ? "Procesando..." : "Confirmar Pago Masivo"}
         disabled={procesandoMasivo}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmEnviarCorreosMasivo}
+        onClose={() => setConfirmEnviarCorreosMasivo(false)}
+        onConfirm={handleEnviarCorreosMasivo}
+        title="Enviar Recibos por Correo"
+        message={
+          <div className="space-y-3">
+            <p>Enviar recibos de pago por correo electrónico a los trabajadores.</p>
+
+            {/* Selector de estados */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Enviar recibos de nóminas en estado:
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {['CALCULADA', 'APROBADA', 'PAGADA'].map((estado) => (
+                  <label key={estado} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={estadosEnvioCorreo.includes(estado)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setEstadosEnvioCorreo([...estadosEnvioCorreo, estado]);
+                        } else {
+                          setEstadosEnvioCorreo(estadosEnvioCorreo.filter(s => s !== estado));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                      estado === 'PAGADA' ? 'bg-green-100 text-green-800' :
+                      estado === 'APROBADA' ? 'bg-blue-100 text-blue-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {estado}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-indigo-50 p-3 rounded-md">
+              <p className="text-sm font-medium text-indigo-900">
+                {nominasConCorreo.length} trabajador(es) con correo registrado recibirán su recibo
+              </p>
+              {fincaSeleccionada && (
+                <p className="text-xs text-indigo-700 mt-1">
+                  Solo de la finca seleccionada
+                </p>
+              )}
+              {nominasFiltradas.filter(n => estadosEnvioCorreo.includes(n.estado) && !n.trabajador_info?.correo).length > 0 && (
+                <p className="text-xs text-orange-600 mt-1">
+                  ⚠️ {nominasFiltradas.filter(n => estadosEnvioCorreo.includes(n.estado) && !n.trabajador_info?.correo).length} trabajador(es) no tienen correo registrado
+                </p>
+              )}
+            </div>
+          </div>
+        }
+        confirmText={enviandoCorreos ? "Enviando..." : `Enviar ${nominasConCorreo.length} Correo(s)`}
+        disabled={enviandoCorreos || nominasConCorreo.length === 0}
       />
 
       {/* Resumen */}
@@ -631,6 +764,14 @@ export default function NominaList() {
                             title="Descargar PDF"
                           >
                             <Download className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => handleEnviarCorreoIndividual(nomina)}
+                            className={`${nomina.trabajador_info?.correo ? 'text-indigo-600 hover:text-indigo-900' : 'text-gray-300 cursor-not-allowed'}`}
+                            title={nomina.trabajador_info?.correo ? `Enviar a ${nomina.trabajador_info.correo}` : 'Sin correo registrado'}
+                            disabled={!nomina.trabajador_info?.correo}
+                          >
+                            <Mail className="w-5 h-5" />
                           </button>
                         </div>
                       </td>
