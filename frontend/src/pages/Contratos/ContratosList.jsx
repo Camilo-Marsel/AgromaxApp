@@ -82,7 +82,10 @@ export default function ContratosList() {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
+    if (!dateString) return '';
+    // Agregar T12:00:00 para evitar desfase de zona horaria
+    const dateStr = dateString.includes('T') ? dateString : `${dateString}T12:00:00`;
+    return new Date(dateStr).toLocaleDateString('es-CO', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

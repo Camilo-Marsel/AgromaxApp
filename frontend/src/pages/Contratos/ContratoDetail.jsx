@@ -22,6 +22,8 @@ import {
   Trash2,
   FileCheck,
   TrendingUp,
+  Printer,
+  Eye,
 } from 'lucide-react';
 
 export default function ContratoDetail() {
@@ -41,6 +43,7 @@ export default function ContratoDetail() {
     onConfirm: null,
     type: 'warning',
   });
+  const [generandoPdf, setGenerandoPdf] = useState(false);
 
   useEffect(() => {
     loadContrato();
@@ -179,6 +182,32 @@ export default function ContratoDetail() {
     }
   };
 
+  const handleGenerarPdf = async () => {
+    try {
+      setGenerandoPdf(true);
+      await contratoService.generarPdf(id);
+      toast.success('PDF generado correctamente');
+    } catch (error) {
+      console.error('Error al generar PDF:', error);
+      toast.error('Error al generar el PDF del contrato');
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
+
+  const handleDescargarPdf = async () => {
+    try {
+      setGenerandoPdf(true);
+      await contratoService.descargarPdf(id, contrato?.numero_contrato);
+      toast.success('PDF descargado correctamente');
+    } catch (error) {
+      console.error('Error al descargar PDF:', error);
+      toast.error('Error al descargar el PDF del contrato');
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
+
   const formatMoney = (value) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -188,7 +217,11 @@ export default function ContratoDetail() {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
+    if (!dateString) return '';
+    // Agregar T12:00:00 para evitar desfase de zona horaria
+    // Las fechas ISO sin hora se interpretan como UTC y se desfasan al convertir a hora local
+    const dateStr = dateString.includes('T') ? dateString : `${dateString}T12:00:00`;
+    return new Date(dateStr).toLocaleDateString('es-CO', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -268,6 +301,27 @@ export default function ContratoDetail() {
 
         <div className="flex items-center gap-3">
           {getEstadoBadge(contrato.estado)}
+
+          {/* Botones de PDF */}
+          <button
+            onClick={handleGenerarPdf}
+            disabled={generandoPdf}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Ver contrato PDF"
+          >
+            <Eye className="w-4 h-4" />
+            {generandoPdf ? 'Generando...' : 'Ver PDF'}
+          </button>
+
+          <button
+            onClick={handleDescargarPdf}
+            disabled={generandoPdf}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Descargar contrato PDF"
+          >
+            <Download className="w-4 h-4" />
+            Descargar
+          </button>
 
           {contrato.estado === 'ACTIVO' && (
             <button

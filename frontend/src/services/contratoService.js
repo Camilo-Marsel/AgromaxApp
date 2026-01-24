@@ -80,6 +80,41 @@ const contratoService = {
     const response = await api.get(`/contratos/${id}/nominas/`, { params });
     return response.data;
   },
+
+  // Generar PDF del contrato (abre en nueva pestaña)
+  generarPdf: async (id) => {
+    const response = await api.get(`/contratos/${id}/generar_pdf/`, {
+      responseType: 'blob',
+    });
+    // Crear URL del blob y abrir en nueva pestaña
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    return url;
+  },
+
+  // Descargar PDF del contrato
+  descargarPdf: async (id, numeroContrato) => {
+    const response = await api.get(`/contratos/${id}/descargar_pdf/`, {
+      responseType: 'blob',
+    });
+    // Crear enlace de descarga
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `contrato_${numeroContrato || id}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
+  // Obtener alertas de contratos (por vencer y vencidos)
+  getAlertas: async () => {
+    const response = await api.get('/contratos/alertas/');
+    return response.data;
+  },
 };
 
 // Servicio para documentos de contrato

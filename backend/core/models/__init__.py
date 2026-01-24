@@ -9,6 +9,7 @@ from .labor import UnidadMedida, Labor, ListaPrecios, Quincena, RegistroLabor
 from .payroll import VariablesNomina, Nomina, DetalleNomina
 from .loans import Prestamo, CuotaPrestamo
 from .audit import AuditoriaLog
+from .config import ConfiguracionEmpresa
 
 # Export all models so they can be imported as: from core.models import ModelName
 __all__ = [
@@ -42,4 +43,7 @@ __all__ = [
 
     # Audit models
     'AuditoriaLog',
+
+    # Config models
+    'ConfiguracionEmpresa',
 ]

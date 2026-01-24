@@ -8,7 +8,7 @@ from .models import (
     UnidadMedida, Labor, ListaPrecios, VariablesNomina,
     Quincena, RegistroLabor, Nomina, DetalleNomina,
     Prestamo, CuotaPrestamo, AuditoriaLog,
-    Contrato, DocumentoContrato
+    Contrato, DocumentoContrato, ConfiguracionEmpresa
 )
 from decimal import Decimal
 
@@ -195,13 +195,13 @@ class TrabajadorDetailSerializer(serializers.ModelSerializer):
     tipo_documento_display = serializers.CharField(source='get_tipo_documento_display', read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
     tipo_cuenta_display = serializers.CharField(source='get_tipo_cuenta_bancaria_display', read_only=True)
-    
+
     class Meta:
         model = Trabajador
         fields = [
             'id', 'nombres', 'apellidos', 'nombre_completo',
             'tipo_documento', 'tipo_documento_display', 'numero_documento',
-            'lugar_expedicion_documento', 'fecha_nacimiento',
+            'lugar_expedicion_documento', 'fecha_nacimiento', 'nacionalidad',
             'telefono', 'direccion', 'correo', 'eps', 'arl',
             'tipo_contrato', 'tipo_contrato_info',
             'finca', 'finca_info',
@@ -231,7 +231,7 @@ class TrabajadorCreateUpdateSerializer(serializers.ModelSerializer):
         model = Trabajador
         fields = [
             'nombres', 'apellidos', 'tipo_documento', 'numero_documento',
-            'lugar_expedicion_documento', 'fecha_nacimiento',
+            'lugar_expedicion_documento', 'fecha_nacimiento', 'nacionalidad',
             'telefono', 'direccion', 'correo', 'eps', 'arl',
             'tipo_contrato', 'finca',
             'es_administrativo', 'salario_quincenal',
@@ -793,3 +793,30 @@ class ContratoCancelarSerializer(serializers.Serializer):
 class ContratoReactivarSerializer(serializers.Serializer):
     """Serializer para reactivar un contrato"""
     observaciones = serializers.CharField(required=False, allow_blank=True)
+
+
+# ============================================================================
+# CONFIGURACIÓN EMPRESA
+# ============================================================================
+
+class ConfiguracionEmpresaSerializer(serializers.ModelSerializer):
+    """Serializer para la configuración de empresa (singleton)"""
+    tipo_documento_representante_display = serializers.CharField(
+        source='get_tipo_documento_representante_display', read_only=True
+    )
+    periodo_pago_display = serializers.CharField(
+        source='get_periodo_pago_display', read_only=True
+    )
+
+    class Meta:
+        model = ConfiguracionEmpresa
+        fields = [
+            'id', 'razon_social', 'nit',
+            'representante_legal', 'tipo_documento_representante',
+            'tipo_documento_representante_display', 'documento_representante',
+            'correo', 'telefono', 'direccion',
+            'ciudad', 'departamento', 'logo_path',
+            'periodo_pago', 'periodo_pago_display',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']

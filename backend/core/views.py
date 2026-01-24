@@ -14,11 +14,11 @@ from django.utils import timezone
 
 
 from .models import (
-    Usuario, Rol, TipoContrato, Finca, Lote, Trabajador,  # Agregar Finca y Lote
+    Usuario, Rol, TipoContrato, Finca, Lote, Trabajador,
     UnidadMedida, Labor, ListaPrecios, VariablesNomina,
     Quincena, RegistroLabor, Nomina, DetalleNomina,
     Prestamo, CuotaPrestamo, AuditoriaLog,
-    Contrato, DocumentoContrato
+    Contrato, DocumentoContrato, ConfiguracionEmpresa
 )
 from .serializers import *
 from .permissions import IsAdministrador, IsSupervisorOrAbove, CanModifyData, ReadOnly
@@ -1279,6 +1279,147 @@ class ContratoViewSet(viewsets.ModelViewSet):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=True, methods=['get'])
+    def generar_pdf(self, request, pk=None):
+        """Generar PDF del contrato laboral"""
+        from .services.contract_pdf_generator import generar_contrato_pdf
+
+        contrato = self.get_object()
+
+        try:
+            pdf_buffer = generar_contrato_pdf(contrato)
+
+            response = FileResponse(
+                pdf_buffer,
+                content_type='application/pdf',
+                as_attachment=False,
+                filename=f'contrato_{contrato.numero_contrato}.pdf'
+            )
+            response['Content-Disposition'] = f'inline; filename="contrato_{contrato.numero_contrato}.pdf"'
+
+            return response
+
+        except Exception as e:
+            return Response(
+                {'error': f'Error al generar PDF: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['get'])
+    def descargar_pdf(self, request, pk=None):
+        """Descargar PDF del contrato laboral"""
+        from .services.contract_pdf_generator import generar_contrato_pdf
+
+        contrato = self.get_object()
+
+        try:
+            pdf_buffer = generar_contrato_pdf(contrato)
+
+            response = FileResponse(
+                pdf_buffer,
+                content_type='application/pdf',
+                as_attachment=True,
+                filename=f'contrato_{contrato.numero_contrato}.pdf'
+            )
+
+            return response
+
+        except Exception as e:
+            return Response(
+                {'error': f'Error al generar PDF: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['get'])
+    def historial(self, request, pk=None):
+        """Obtener historial de cambios del contrato desde auditoría"""
+        contrato = self.get_object()
+
+        # Buscar en auditoría los cambios relacionados con este contrato
+        logs = AuditoriaLog.objects.filter(
+            tabla_afectada='Contrato',
+            registro_id=str(contrato.id)
+        ).select_related('usuario').order_by('-created_at')
+
+        historial = []
+        for log in logs:
+            historial.append({
+                'accion': log.get_accion_display(),
+                'fecha': log.created_at,
+                'usuario': log.usuario.get_full_name() if log.usuario else 'Sistema',
+                'descripcion': self._format_cambios(log.datos_anteriores, log.datos_nuevos)
+            })
+
+        # Agregar evento de creación si no hay logs
+        if not historial:
+            historial.append({
+                'accion': 'Creación',
+                'fecha': contrato.created_at,
+                'usuario': contrato.created_by.get_full_name() if contrato.created_by else 'Sistema',
+                'descripcion': f'Contrato {contrato.numero_contrato} creado'
+            })
+
+        return Response(historial)
+
+    def _format_cambios(self, datos_ant, datos_new):
+        """Formatear cambios para mostrar en historial"""
+        if not datos_ant and not datos_new:
+            return 'Sin detalles'
+
+        cambios = []
+        if datos_new:
+            for key, value in datos_new.items():
+                if key in ['created_at', 'updated_at', 'id']:
+                    continue
+                old_val = datos_ant.get(key, 'N/A') if datos_ant else 'N/A'
+                if old_val != value:
+                    cambios.append(f'{key}: {old_val} → {value}')
+
+        return ', '.join(cambios) if cambios else 'Actualización de datos'
+
+    @action(detail=True, methods=['get'])
+    def nominas(self, request, pk=None):
+        """Obtener nóminas del trabajador asociado al contrato"""
+        contrato = self.get_object()
+        trabajador = contrato.trabajador
+
+        # Buscar nóminas del trabajador durante el período del contrato
+        nominas_qs = Nomina.objects.filter(
+            trabajador=trabajador
+        ).select_related('quincena').order_by('-quincena__año', '-quincena__mes', '-quincena__numero')
+
+        # Filtrar por fechas del contrato si aplica
+        if contrato.fecha_inicio:
+            nominas_qs = nominas_qs.filter(
+                quincena__fecha_inicio__gte=contrato.fecha_inicio
+            )
+        if contrato.fecha_fin:
+            nominas_qs = nominas_qs.filter(
+                quincena__fecha_fin__lte=contrato.fecha_fin
+            )
+
+        # Serializar las nóminas
+        nominas_data = []
+        for nomina in nominas_qs[:20]:  # Limitar a 20 más recientes
+            nominas_data.append({
+                'id': nomina.id,
+                'quincena_info': {
+                    'id': nomina.quincena.id,
+                    'nombre': f'Q{nomina.quincena.numero} - {nomina.quincena.mes}/{nomina.quincena.año}',
+                    'fecha_inicio': nomina.quincena.fecha_inicio,
+                    'fecha_fin': nomina.quincena.fecha_fin,
+                },
+                'total_devengado': nomina.total_devengado,
+                'total_deducciones': nomina.total_deducciones,
+                'total_neto': nomina.total_neto,
+                'total_pagar': nomina.total_neto,  # Alias para compatibilidad
+                'estado': nomina.estado,
+                'estado_display': nomina.get_estado_display(),
+                'fecha_calculo': nomina.fecha_calculo,
+            })
+
+        return Response(nominas_data)
+
 
 class DocumentoContratoViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de documentos de contratos"""
@@ -1292,3 +1433,38 @@ class DocumentoContratoViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Guardar usuario que sube el documento"""
         serializer.save(created_by=self.request.user)
+
+
+# ============================================================================
+# CONFIGURACIÓN EMPRESA
+# ============================================================================
+
+class ConfiguracionEmpresaViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para la configuración de empresa (singleton).
+    Solo puede existir un registro.
+    """
+    queryset = ConfiguracionEmpresa.objects.all()
+    serializer_class = ConfiguracionEmpresaSerializer
+    permission_classes = [CanModifyData]
+
+    def list(self, request, *args, **kwargs):
+        """Retorna la configuración única de empresa"""
+        config = ConfiguracionEmpresa.get_config()
+        serializer = self.get_serializer(config)
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        """Crear o actualizar la configuración única"""
+        config = ConfiguracionEmpresa.get_config()
+        serializer = self.get_serializer(config, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def actual(self, request):
+        """Obtener la configuración actual de empresa"""
+        config = ConfiguracionEmpresa.get_config()
+        serializer = self.get_serializer(config)
+        return Response(serializer.data)

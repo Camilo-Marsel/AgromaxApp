@@ -28,6 +28,7 @@ router.register(r'nominas', NominaViewSet, basename='nomina')
 router.register(r'auditoria', AuditoriaLogViewSet, basename='auditoria')
 router.register(r'contratos', ContratoViewSet, basename='contrato')
 router.register(r'documentos-contrato', DocumentoContratoViewSet, basename='documento-contrato')
+router.register(r'configuracion-empresa', ConfiguracionEmpresaViewSet, basename='configuracion-empresa')
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

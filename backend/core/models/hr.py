@@ -150,6 +150,12 @@ class Trabajador(models.Model):
     numero_documento = models.CharField(max_length=20, unique=True)
     lugar_expedicion_documento = models.CharField(max_length=100, blank=True, null=True)
     fecha_nacimiento = models.DateField()
+    nacionalidad = models.CharField(
+        max_length=50,
+        default='COLOMBIANA',
+        verbose_name='Nacionalidad',
+        help_text='Nacionalidad del trabajador'
+    )
 
     # Contacto
     telefono = models.CharField(max_length=20, blank=True, null=True)
