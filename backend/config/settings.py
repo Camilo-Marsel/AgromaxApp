@@ -192,10 +192,13 @@ if not DEBUG:
     X_FRAME_OPTIONS = 'DENY'
 
 # Email Settings (Gmail SMTP)
+# Usar SSL (puerto 465) en lugar de TLS (puerto 587) para mejor compatibilidad con Render
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+EMAIL_PORT = 465
+EMAIL_USE_SSL = True
+EMAIL_USE_TLS = False
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_TIMEOUT = 30  # Timeout en segundos
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='AGROMAXD <agromaxd.notificaciones@gmail.com>')
