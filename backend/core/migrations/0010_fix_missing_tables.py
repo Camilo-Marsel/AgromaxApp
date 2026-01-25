@@ -1,4 +1,5 @@
 # Generated manually to fix missing tables after faked migration
+# NOTA: Los modelos usan db_table personalizado (trabajadores, fincas, etc.)
 
 from django.db import migrations, connection
 
@@ -6,15 +7,15 @@ from django.db import migrations, connection
 def add_nacionalidad_if_not_exists(apps, schema_editor):
     """Agregar campo nacionalidad a trabajador si no existe"""
     with connection.cursor() as cursor:
-        # Verificar si la columna existe
+        # IMPORTANTE: Usar 'trabajadores' (db_table del modelo), NO 'core_trabajador'
         cursor.execute("""
             SELECT column_name
             FROM information_schema.columns
-            WHERE table_name = 'core_trabajador' AND column_name = 'nacionalidad'
+            WHERE table_name = 'trabajadores' AND column_name = 'nacionalidad'
         """)
         if not cursor.fetchone():
             cursor.execute("""
-                ALTER TABLE core_trabajador
+                ALTER TABLE trabajadores
                 ADD COLUMN nacionalidad VARCHAR(50) DEFAULT 'COLOMBIANA'
             """)
 

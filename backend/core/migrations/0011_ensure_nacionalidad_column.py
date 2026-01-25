@@ -1,21 +1,22 @@
 # Generated manually to ensure nacionalidad column exists
+# NOTA: Los modelos usan db_table personalizado (trabajadores, fincas, etc.)
 
 from django.db import migrations, connection
 
 
 def ensure_nacionalidad_exists(apps, schema_editor):
-    """Asegurar que el campo nacionalidad existe en core_trabajador"""
+    """Asegurar que el campo nacionalidad existe en trabajadores"""
     with connection.cursor() as cursor:
-        # Verificar si la columna existe
+        # IMPORTANTE: Usar 'trabajadores' (db_table del modelo), NO 'core_trabajador'
         cursor.execute("""
             SELECT column_name
             FROM information_schema.columns
-            WHERE table_name = 'core_trabajador' AND column_name = 'nacionalidad'
+            WHERE table_name = 'trabajadores' AND column_name = 'nacionalidad'
         """)
         if not cursor.fetchone():
-            print("Adding nacionalidad column to core_trabajador...")
+            print("Adding nacionalidad column to trabajadores...")
             cursor.execute("""
-                ALTER TABLE core_trabajador
+                ALTER TABLE trabajadores
                 ADD COLUMN nacionalidad VARCHAR(50) DEFAULT 'COLOMBIANA'
             """)
             print("Column nacionalidad added successfully!")

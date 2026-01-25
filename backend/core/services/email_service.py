@@ -12,6 +12,12 @@ logger = logging.getLogger(__name__)
 class EmailService:
     """Servicio para envío de correos electrónicos"""
 
+    MESES = {
+        1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+        5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+        9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+    }
+
     @staticmethod
     def enviar_recibo_nomina(nomina, pdf_buffer=None):
         """
@@ -48,7 +54,8 @@ class EmailService:
 
             # Preparar datos para el email
             quincena = nomina.quincena
-            periodo = f"Q{quincena.numero} - {quincena.get_mes_display()} {quincena.año}"
+            nombre_mes = EmailService.MESES.get(quincena.mes, f"Mes {quincena.mes}")
+            periodo = f"Q{quincena.numero} - {nombre_mes} {quincena.año}"
 
             # Asunto del correo
             subject = f'Recibo de Pago - {periodo} | AGROMAXD'
