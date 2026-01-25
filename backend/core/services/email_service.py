@@ -1,17 +1,17 @@
 # backend/core/services/email_service.py
+# Usando Resend API (HTTP) en lugar de SMTP porque Render bloquea SMTP
 
-from django.core.mail import EmailMessage
+import resend
 from django.conf import settings
-from django.template.loader import render_to_string
 from io import BytesIO
 import logging
-import smtplib
+import base64
 
 logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """Servicio para envío de correos electrónicos"""
+    """Servicio para envío de correos electrónicos usando Resend API"""
 
     MESES = {
         1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
@@ -40,14 +40,18 @@ class EmailService:
                 'message': f'El trabajador {trabajador.nombre_completo} no tiene correo registrado'
             }
 
-        # Verificar configuración de email
-        if not settings.EMAIL_HOST_USER:
+        # Verificar configuración de Resend
+        resend_api_key = getattr(settings, 'RESEND_API_KEY', None)
+        if not resend_api_key:
             return {
                 'success': False,
-                'message': 'El sistema de correo no está configurado'
+                'message': 'El sistema de correo no está configurado (falta RESEND_API_KEY)'
             }
 
         try:
+            # Configurar Resend
+            resend.api_key = resend_api_key
+
             # Generar PDF si no se proporcionó
             if pdf_buffer is None:
                 from .pdf_generator import generar_comprobante_pdf
@@ -58,8 +62,13 @@ class EmailService:
             nombre_mes = EmailService.MESES.get(quincena.mes, f"Mes {quincena.mes}")
             periodo = f"Q{quincena.numero} - {nombre_mes} {quincena.año}"
 
-            # Asunto del correo
-            subject = f'Recibo de Pago - {periodo} | AGROMAXD'
+            # Nombre del archivo PDF
+            safe_periodo = f"Q{quincena.numero}_{nombre_mes}_{quincena.año}"
+            filename = f'recibo_pago_{trabajador.numero_documento}_{safe_periodo}.pdf'
+
+            # Leer el PDF y convertir a base64
+            pdf_buffer.seek(0)
+            pdf_content = pdf_buffer.read()
 
             # Cuerpo del mensaje en HTML
             html_content = f"""
@@ -127,44 +136,29 @@ class EmailService:
             </html>
             """
 
-            # Crear el email
-            email = EmailMessage(
-                subject=subject,
-                body=html_content,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[trabajador.correo],
-            )
-            email.content_subtype = 'html'
+            # Enviar usando Resend API
+            params = {
+                "from": getattr(settings, 'DEFAULT_FROM_EMAIL', 'AGROMAXD <onboarding@resend.dev>'),
+                "to": [trabajador.correo],
+                "subject": f'Recibo de Pago - {periodo} | AGROMAXD',
+                "html": html_content,
+                "attachments": [
+                    {
+                        "filename": filename,
+                        "content": list(pdf_content),  # Resend acepta lista de bytes
+                    }
+                ],
+            }
 
-            # Adjuntar el PDF
-            pdf_buffer.seek(0)
-            # Limpiar nombre de archivo (sin caracteres especiales)
-            safe_periodo = f"Q{quincena.numero}_{nombre_mes}_{quincena.año}"
-            filename = f'recibo_pago_{trabajador.numero_documento}_{safe_periodo}.pdf'
-            email.attach(filename, pdf_buffer.read(), 'application/pdf')
+            response = resend.Emails.send(params)
 
-            # Enviar
-            email.send(fail_silently=False)
-
-            logger.info(f'Recibo enviado exitosamente a {trabajador.correo}')
+            logger.info(f'Recibo enviado exitosamente a {trabajador.correo}. ID: {response.get("id", "N/A")}')
 
             return {
                 'success': True,
                 'message': f'Recibo enviado exitosamente a {trabajador.correo}'
             }
 
-        except smtplib.SMTPAuthenticationError as e:
-            logger.error(f'Error de autenticación SMTP: {str(e)}')
-            return {
-                'success': False,
-                'message': 'Error de autenticación con el servidor de correo. Verifique las credenciales.'
-            }
-        except smtplib.SMTPException as e:
-            logger.error(f'Error SMTP al enviar a {trabajador.correo}: {str(e)}')
-            return {
-                'success': False,
-                'message': f'Error del servidor de correo: {str(e)}'
-            }
         except Exception as e:
             logger.error(f'Error al enviar recibo a {trabajador.correo}: {str(e)}')
             return {
