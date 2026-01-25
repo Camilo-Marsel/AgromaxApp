@@ -38,8 +38,8 @@ export default function PrestamosList() {
       const data = await prestamoService.getAll(params);
       setprestamos(data.results || data);
     } catch (error) {
-      console.error('Error al cargar préstamos:', error);
-      toast.error('Error al cargar préstamos');
+      console.error('Error al cargar adelantos:', error);
+      toast.error('Error al cargar adelantos');
     } finally {
       setLoading(false);
     }
@@ -62,12 +62,12 @@ export default function PrestamosList() {
   const handleCancelar = async (id) => {
     try {
       await prestamoService.cancelar(id);
-      toast.success('Préstamo cancelado correctamente');
+      toast.success('Adelanto cancelado correctamente');
       loadPrestamos();
       setConfirmCancel({ isOpen: false, id: null });
     } catch (error) {
-      console.error('Error al cancelar préstamo:', error);
-      toast.error('Error al cancelar préstamo');
+      console.error('Error al cancelar adelanto:', error);
+      toast.error('Error al cancelar adelanto');
     }
   };
 
@@ -78,7 +78,7 @@ export default function PrestamosList() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `autorizacion_prestamo_${prestamo.id}_${prestamo.trabajador_info?.numero_documento}.pdf`;
+      link.download = `autorizacion_adelanto_${prestamo.id}_${prestamo.trabajador_info?.numero_documento}.pdf`;
       document.body.appendChild(link);
       link.click();
       
@@ -99,7 +99,7 @@ export default function PrestamosList() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `paz_y_salvo_prestamo_${prestamo.id}_${prestamo.trabajador_info?.numero_documento}.pdf`;
+      link.download = `paz_y_salvo_adelanto_${prestamo.id}_${prestamo.trabajador_info?.numero_documento}.pdf`;
       document.body.appendChild(link);
       link.click();
       
@@ -143,13 +143,13 @@ export default function PrestamosList() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Préstamos</h1>
+        <h1 className="text-2xl font-bold">Adelantos de Nómina</h1>
         <button
           onClick={() => navigate('/prestamos/nuevo')}
           className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
         >
           <Plus className="w-5 h-5" />
-          Nuevo Préstamo
+          Nuevo Adelanto
         </button>
       </div>
 
@@ -183,7 +183,7 @@ export default function PrestamosList() {
       {prestamosFiltrados.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-blue-50 rounded-lg shadow p-4 border-l-4 border-blue-600">
-            <p className="text-sm text-blue-700">Total Prestado</p>
+            <p className="text-sm text-blue-700">Total Adelantado</p>
             <p className="text-2xl font-bold text-blue-600">
               {formatMoney(resumen.total_prestado)}
             </p>
@@ -209,7 +209,7 @@ export default function PrestamosList() {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {prestamosFiltrados.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
-            No se encontraron préstamos
+            No se encontraron adelantos
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -312,7 +312,7 @@ export default function PrestamosList() {
                           <button
                             onClick={() => setConfirmCancel({ isOpen: true, id: prestamo.id })}
                             className="text-red-600 hover:text-red-900"
-                            title="Cancelar préstamo"
+                            title="Cancelar adelanto"
                           >
                             <Ban className="w-5 h-5" />
                           </button>
@@ -332,8 +332,8 @@ export default function PrestamosList() {
         isOpen={confirmCancel.isOpen}
         onClose={() => setConfirmCancel({ isOpen: false, id: null })}
         onConfirm={() => handleCancelar(confirmCancel.id)}
-        title="Cancelar Préstamo"
-        message="¿Está seguro que desea cancelar este préstamo? Esta acción no se puede deshacer."
+        title="Cancelar Adelanto"
+        message="¿Está seguro que desea cancelar este adelanto? Esta acción no se puede deshacer."
         type="danger"
       />
     </div>

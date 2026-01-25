@@ -16,7 +16,7 @@ export default function Sidebar() {
     { path: '/registros', icon: Briefcase, label: 'Registro Labores' },
     { path: '/nomina', icon: DollarSign, label: 'Nómina' },
     { path: '/reportes', icon: FileText, label: 'Reportes' },
-    { path: '/prestamos', icon: DollarSign, label: 'Préstamos' },
+    { path: '/prestamos', icon: DollarSign, label: 'Adelantos' },
     { path: '/configuracion/variables', icon: Settings, label: 'Configuración' },
     // Solo visible para ADMINISTRADOR
     { path: '/usuarios', icon: UserCog, label: 'Usuarios', adminOnly: true },

@@ -60,7 +60,7 @@ export default function TrabajadorDetail() {
       const data = await prestamoService.getAll({ trabajador: id });
       setPrestamos(data.results || data);
     } catch (error) {
-      console.error('Error al cargar préstamos:', error);
+      console.error('Error al cargar adelantos:', error);
     }
   };
 
@@ -189,7 +189,7 @@ export default function TrabajadorDetail() {
         <div className="bg-purple-50 rounded-lg shadow p-4 border-l-4 border-purple-600">
           <p className="text-sm text-purple-700 flex items-center gap-1">
             <DollarSign className="w-4 h-4" />
-            Préstamos
+            Adelantos
           </p>
           <p className="text-2xl font-bold text-purple-600">{prestamos.length}</p>
           <p className="text-xs text-purple-600 mt-1">
@@ -198,7 +198,7 @@ export default function TrabajadorDetail() {
         </div>
 
         <div className="bg-yellow-50 rounded-lg shadow p-4 border-l-4 border-yellow-600">
-          <p className="text-sm text-yellow-700">Saldo Préstamos</p>
+          <p className="text-sm text-yellow-700">Saldo Adelantos</p>
           <p className="text-2xl font-bold text-yellow-600">{formatMoney(totalPendiente)}</p>
         </div>
 
@@ -232,7 +232,7 @@ export default function TrabajadorDetail() {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Préstamos ({prestamos.length})
+              Adelantos ({prestamos.length})
             </button>
             <button
               onClick={() => setActiveTab('nominas')}
@@ -367,25 +367,25 @@ export default function TrabajadorDetail() {
             </div>
           )}
 
-          {/* TAB: Préstamos */}
+          {/* TAB: Adelantos */}
           {activeTab === 'prestamos' && (
             <div>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Préstamos del Trabajador</h3>
+                <h3 className="text-lg font-semibold">Adelantos del Trabajador</h3>
                 <button
                   onClick={() => navigate('/prestamos/nuevo', { state: { trabajadorId: id } })}
                   className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
                 >
                   <Plus className="w-4 h-4" />
-                  Nuevo Préstamo
+                  Nuevo Adelanto
                 </button>
               </div>
 
               {prestamos.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <DollarSign className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                  <p className="text-lg font-medium">No hay préstamos registrados</p>
-                  <p className="text-sm mt-2">Crea el primer préstamo para este trabajador</p>
+                  <p className="text-lg font-medium">No hay adelantos registrados</p>
+                  <p className="text-sm mt-2">Crea el primer adelanto para este trabajador</p>
                 </div>
               ) : (
                 <div className="space-y-3">

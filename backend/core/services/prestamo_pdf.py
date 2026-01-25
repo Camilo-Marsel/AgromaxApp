@@ -11,7 +11,7 @@ from datetime import datetime
 
 
 def generar_autorizacion_pdf(prestamo):
-    """Generar documento de autorización de descuento por nómina"""
+    """Generar documento de autorización de descuento por nómina (adelanto)"""
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
     
@@ -62,10 +62,10 @@ def generar_autorizacion_pdf(prestamo):
     tipo_pago = "Pago Único" if prestamo.tipo_pago == 'UNICO' else f"{prestamo.numero_cuotas} Cuotas"
     
     data = [
-        ['MONTO DEL PRÉSTAMO:', monto_formateado],
+        ['MONTO DEL ADELANTO:', monto_formateado],
         ['FORMA DE PAGO:', tipo_pago],
         ['VALOR POR CUOTA:', cuota_formateada],
-        ['FECHA DEL PRÉSTAMO:', prestamo.fecha_prestamo.strftime('%d/%m/%Y')],
+        ['FECHA DEL ADELANTO:', prestamo.fecha_prestamo.strftime('%d/%m/%Y')],
     ]
     
     table = Table(data, colWidths=[3*inch, 3*inch])
@@ -88,9 +88,9 @@ def generar_autorizacion_pdf(prestamo):
     texto2 = """
     <b>Manifiesto que:</b><br/>
     <br/>
-    1. He recibido el monto total del préstamo en efectivo/transferencia.<br/>
+    1. He recibido el monto total del adelanto de nómina en efectivo/transferencia.<br/>
     2. Autorizo el descuento automático de mi nómina quincenal hasta liquidar la deuda.<br/>
-    3. Conozco que el descuento se realizará quincenalmente hasta liquidar el total del préstamo.<br/>
+    3. Conozco que el descuento se realizará quincenalmente hasta liquidar el total del adelanto.<br/>
     4. En caso de retiro, autorizo descontar el saldo pendiente de mi liquidación final.<br/>
     5. Este documento tiene plena validez legal para efectos de descuento por nómina.
     """
@@ -163,10 +163,10 @@ def generar_paz_y_salvo_pdf(prestamo):
     monto_formateado = f"${prestamo.monto_total:,.0f}".replace(',', '.')
     
     texto = f"""
-    <b>AGROMAXD DC S.A.S.</b> certifica que el(la) señor(a) 
-    <b>{trabajador.nombre_completo}</b>, identificado(a) con C.C. 
-    <b>{trabajador.numero_documento}</b>, se encuentra <b>A PAZ Y SALVO</b> por concepto 
-    del préstamo No. <b>{prestamo.id}</b> otorgado el día 
+    <b>AGROMAXD DC S.A.S.</b> certifica que el(la) señor(a)
+    <b>{trabajador.nombre_completo}</b>, identificado(a) con C.C.
+    <b>{trabajador.numero_documento}</b>, se encuentra <b>A PAZ Y SALVO</b> por concepto
+    del adelanto de nómina No. <b>{prestamo.id}</b> otorgado el día
     <b>{prestamo.fecha_prestamo.strftime('%d de %B de %Y')}</b>.
     """
     
@@ -175,7 +175,7 @@ def generar_paz_y_salvo_pdf(prestamo):
     
     # Detalles
     data = [
-        ['Monto del Préstamo:', monto_formateado],
+        ['Monto del Adelanto:', monto_formateado],
         ['Total Pagado:', monto_formateado],
         ['Saldo Pendiente:', '$0'],
         ['Fecha de Liquidación:', datetime.now().strftime('%d/%m/%Y')],

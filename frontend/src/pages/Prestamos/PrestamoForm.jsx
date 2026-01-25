@@ -71,10 +71,10 @@ export default function PrestamoForm() {
       }
 
       await prestamoService.create(data);
-      toast.success('Préstamo creado correctamente');
+      toast.success('Adelanto creado correctamente');
       navigate('/prestamos');
     } catch (error) {
-      console.error('Error al crear préstamo:', error);
+      console.error('Error al crear adelanto:', error);
       if (error.response?.data) {
         const errorData = error.response.data;
         Object.keys(errorData).forEach((key) => {
@@ -84,7 +84,7 @@ export default function PrestamoForm() {
           toast.error(`${key}: ${message}`);
         });
       } else {
-        toast.error('Error al crear préstamo');
+        toast.error('Error al crear adelanto');
       }
     } finally {
       setLoading(false);
@@ -108,7 +108,7 @@ export default function PrestamoForm() {
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-2xl font-bold">Nuevo Préstamo</h1>
+        <h1 className="text-2xl font-bold">Nuevo Adelanto</h1>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -120,7 +120,7 @@ export default function PrestamoForm() {
               <p className="font-medium mb-1">Información importante:</p>
               <ul className="list-disc list-inside space-y-1 text-blue-700">
                 <li>Monto máximo: $3,000,000</li>
-                <li>Solo un préstamo activo por trabajador</li>
+                <li>Solo un adelanto activo por trabajador</li>
                 <li>El descuento se realiza automáticamente en nómina</li>
                 <li>Requiere autorización firmada por el trabajador</li>
               </ul>
@@ -128,9 +128,9 @@ export default function PrestamoForm() {
           </div>
         </div>
 
-        {/* Datos del Préstamo */}
+        {/* Datos del Adelanto */}
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4">Datos del Préstamo</h3>
+          <h3 className="text-lg font-semibold mb-4">Datos del Adelanto</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Trabajador */}
             <div className="md:col-span-2">
@@ -156,7 +156,7 @@ export default function PrestamoForm() {
             {/* Monto */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Monto del Préstamo *
+                Monto del Adelanto *
               </label>
               <input
                 type="number"
@@ -177,7 +177,7 @@ export default function PrestamoForm() {
             {/* Fecha */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Fecha del Préstamo *
+                Fecha del Adelanto *
               </label>
               <input
                 type="date"
@@ -234,13 +234,13 @@ export default function PrestamoForm() {
                 {...register('observaciones')}
                 rows="3"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Información adicional sobre el préstamo..."
+                placeholder="Información adicional sobre el adelanto..."
               />
             </div>
           </div>
         </div>
 
-        {/* Resumen del Préstamo */}
+        {/* Resumen del Adelanto */}
         {montoTotal > 0 && (
           <div className="bg-green-50 p-6 rounded-lg shadow border-l-4 border-green-600">
             <h3 className="text-lg font-semibold text-green-800 mb-4">Resumen</h3>
@@ -293,7 +293,7 @@ export default function PrestamoForm() {
             ) : (
               <>
                 <Save className="w-4 h-4" />
-                Guardar Préstamo
+                Guardar Adelanto
               </>
             )}
           </button>

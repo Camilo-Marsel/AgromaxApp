@@ -1,15 +1,17 @@
 # backend/core/models/loans.py
+# NOTA: Internamente se llama "Prestamo" pero se muestra como "Adelanto de Nómina"
+# por requerimientos legales (no se pueden descontar préstamos del salario)
 
 from django.db import models
 from django.core.validators import MinValueValidator
 from decimal import Decimal
 
 # ============================================================================
-# PRÉSTAMOS
+# ADELANTOS DE NÓMINA (antes llamados "Préstamos")
 # ============================================================================
 
 class Prestamo(models.Model):
-    """Registro de préstamos otorgados a trabajadores"""
+    """Registro de adelantos de nómina otorgados a trabajadores"""
 
     TIPO_PAGO_CHOICES = [
         ('UNICO', 'Pago Único'),
@@ -25,14 +27,14 @@ class Prestamo(models.Model):
     trabajador = models.ForeignKey(
         'Trabajador',
         on_delete=models.CASCADE,
-        related_name='prestamos'
+        related_name='prestamos'  # Mantener por compatibilidad
     )
     monto_total = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         validators=[MinValueValidator(Decimal('0.01'))]
     )
-    fecha_prestamo = models.DateField()
+    fecha_prestamo = models.DateField()  # Campo interno, se muestra como "Fecha del adelanto"
     tipo_pago = models.CharField(max_length=20, choices=TIPO_PAGO_CHOICES)
     numero_cuotas = models.IntegerField(
         null=True,
@@ -61,8 +63,8 @@ class Prestamo(models.Model):
     )
 
     class Meta:
-        verbose_name = "Préstamo"
-        verbose_name_plural = "Préstamos"
+        verbose_name = "Adelanto de Nómina"
+        verbose_name_plural = "Adelantos de Nómina"
         ordering = ['-fecha_prestamo']
 
     def __str__(self):
@@ -107,9 +109,9 @@ class CuotaPrestamo(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = "Cuota de Préstamo"
-        verbose_name_plural = "Cuotas de Préstamos"
+        verbose_name = "Cuota de Adelanto"
+        verbose_name_plural = "Cuotas de Adelantos"
         ordering = ['prestamo', 'numero_cuota']
 
     def __str__(self):
-        return f"Préstamo {self.prestamo.id} - Cuota {self.numero_cuota}"
+        return f"Adelanto {self.prestamo.id} - Cuota {self.numero_cuota}"

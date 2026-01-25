@@ -128,7 +128,7 @@ class NominaCalculator:
             )
             total_deducciones += deducciones_adicionales
         
-        # 8. PRÉSTAMOS (AL FINAL)
+        # 8. ADELANTOS DE NÓMINA (AL FINAL)
         total_deducciones += self._calcular_prestamos(nomina, trabajador, total_devengado)
         
         # Calcular totales finales
@@ -266,7 +266,7 @@ class NominaCalculator:
             )
             total_deducciones += deducciones_adicionales
         
-        # 6. Préstamos (al final)
+        # 6. Adelantos de nómina (al final)
         total_deducciones += self._calcular_prestamos(nomina, trabajador, total_devengado)
         
         # Calcular totales finales
@@ -571,7 +571,7 @@ class NominaCalculator:
     
     def _calcular_prestamos(self, nomina, trabajador, total_devengado_actual):
         """
-        Calcular descuentos de préstamos pendientes.
+        Calcular descuentos de adelantos de nómina pendientes.
         El descuento NO puede exceder el total devengado de la quincena.
         """
         total = Decimal('0.00')
@@ -591,8 +591,8 @@ class NominaCalculator:
                     DetalleNomina.objects.create(
                         nomina=nomina,
                         tipo='DEDUCCION',
-                        concepto='PRESTAMO',
-                        descripcion=f'Préstamo #{prestamo.id} (Pago Único)',
+                        concepto='PRESTAMO',  # Mantener código interno
+                        descripcion=f'Adelanto #{prestamo.id} (Pago Único)',
                         valor_total=valor_descuento
                     )
                     
@@ -619,8 +619,8 @@ class NominaCalculator:
                         DetalleNomina.objects.create(
                             nomina=nomina,
                             tipo='DEDUCCION',
-                            concepto='PRESTAMO',
-                            descripcion=f'Préstamo #{prestamo.id} - Cuota {cuota.numero_cuota}/{prestamo.numero_cuotas}',
+                            concepto='PRESTAMO',  # Mantener código interno
+                            descripcion=f'Adelanto #{prestamo.id} - Cuota {cuota.numero_cuota}/{prestamo.numero_cuotas}',
                             valor_total=valor_descuento
                         )
                         

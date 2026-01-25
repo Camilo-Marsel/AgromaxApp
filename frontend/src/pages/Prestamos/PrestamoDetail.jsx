@@ -26,8 +26,8 @@ export default function PrestamoDetail() {
       const data = await prestamoService.getById(id);
       setPrestamo(data);
     } catch (error) {
-      console.error('Error al cargar préstamo:', error);
-      toast.error('Error al cargar préstamo');
+      console.error('Error al cargar adelanto:', error);
+      toast.error('Error al cargar adelanto');
       navigate('/prestamos');
     } finally {
       setLoading(false);
@@ -37,12 +37,12 @@ export default function PrestamoDetail() {
   const handleCancelar = async () => {
     try {
       await prestamoService.cancelar(id);
-      toast.success('Préstamo cancelado correctamente');
+      toast.success('Adelanto cancelado correctamente');
       setConfirmCancel(false);
       loadPrestamo();
     } catch (error) {
-      console.error('Error al cancelar préstamo:', error);
-      toast.error('Error al cancelar préstamo');
+      console.error('Error al cancelar adelanto:', error);
+      toast.error('Error al cancelar adelanto');
     }
   };
 
@@ -53,7 +53,7 @@ export default function PrestamoDetail() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `autorizacion_prestamo_${id}_${prestamo.trabajador_info?.numero_documento}.pdf`;
+      link.download = `autorizacion_adelanto_${id}_${prestamo.trabajador_info?.numero_documento}.pdf`;
       document.body.appendChild(link);
       link.click();
       
@@ -74,7 +74,7 @@ export default function PrestamoDetail() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `paz_y_salvo_prestamo_${id}_${prestamo.trabajador_info?.numero_documento}.pdf`;
+      link.download = `paz_y_salvo_adelanto_${id}_${prestamo.trabajador_info?.numero_documento}.pdf`;
       document.body.appendChild(link);
       link.click();
       
@@ -124,7 +124,7 @@ export default function PrestamoDetail() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold">Detalle de Préstamo #{prestamo.id}</h1>
+            <h1 className="text-2xl font-bold">Detalle de Adelanto #{prestamo.id}</h1>
             <p className="text-gray-600">
               {prestamo.trabajador_info?.nombre_completo}
             </p>
@@ -172,7 +172,7 @@ export default function PrestamoDetail() {
             <p className="text-sm text-gray-500">{prestamo.trabajador_info?.numero_documento}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Fecha del Préstamo</p>
+            <p className="text-sm text-gray-600">Fecha del Adelanto</p>
             <p className="font-medium">
               {new Date(prestamo.fecha_prestamo).toLocaleDateString('es-ES', {
                 day: '2-digit',
@@ -348,8 +348,8 @@ export default function PrestamoDetail() {
         isOpen={confirmCancel}
         onClose={() => setConfirmCancel(false)}
         onConfirm={handleCancelar}
-        title="Cancelar Préstamo"
-        message="¿Está seguro que desea cancelar este préstamo? Esta acción no se puede deshacer y todas las cuotas pendientes serán canceladas."
+        title="Cancelar Adelanto"
+        message="¿Está seguro que desea cancelar este adelanto? Esta acción no se puede deshacer y todas las cuotas pendientes serán canceladas."
         type="danger"
       />
     </div>
