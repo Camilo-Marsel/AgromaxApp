@@ -5,6 +5,7 @@ from django.conf import settings
 from django.template.loader import render_to_string
 from io import BytesIO
 import logging
+import smtplib
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,9 @@ class EmailService:
 
             # Adjuntar el PDF
             pdf_buffer.seek(0)
-            filename = f'recibo_pago_{trabajador.numero_documento}_{periodo.replace(" ", "_")}.pdf'
+            # Limpiar nombre de archivo (sin caracteres especiales)
+            safe_periodo = f"Q{quincena.numero}_{nombre_mes}_{quincena.año}"
+            filename = f'recibo_pago_{trabajador.numero_documento}_{safe_periodo}.pdf'
             email.attach(filename, pdf_buffer.read(), 'application/pdf')
 
             # Enviar
@@ -150,6 +153,18 @@ class EmailService:
                 'message': f'Recibo enviado exitosamente a {trabajador.correo}'
             }
 
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error(f'Error de autenticación SMTP: {str(e)}')
+            return {
+                'success': False,
+                'message': 'Error de autenticación con el servidor de correo. Verifique las credenciales.'
+            }
+        except smtplib.SMTPException as e:
+            logger.error(f'Error SMTP al enviar a {trabajador.correo}: {str(e)}')
+            return {
+                'success': False,
+                'message': f'Error del servidor de correo: {str(e)}'
+            }
         except Exception as e:
             logger.error(f'Error al enviar recibo a {trabajador.correo}: {str(e)}')
             return {
