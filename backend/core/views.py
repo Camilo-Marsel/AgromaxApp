@@ -18,7 +18,12 @@ from .models import (
     UnidadMedida, Labor, ListaPrecios, VariablesNomina,
     Quincena, RegistroLabor, Nomina, DetalleNomina,
     Prestamo, CuotaPrestamo, AuditoriaLog,
-    Contrato, DocumentoContrato, ConfiguracionEmpresa
+    Contrato, DocumentoContrato, ConfiguracionEmpresa,
+    PILA, DetallePILA, ProvisionPrestaciones, ResumenPrestaciones,
+    PORCENTAJE_SALUD_EMPLEADOR, PORCENTAJE_PENSION_EMPLEADOR,
+    PORCENTAJE_ARL, PORCENTAJE_CAJA_COMPENSACION,
+    PORCENTAJE_CESANTIAS, PORCENTAJE_INTERESES_CESANTIAS,
+    PORCENTAJE_PRIMA, PORCENTAJE_VACACIONES,
 )
 from .serializers import *
 from .permissions import IsAdministrador, IsSupervisorOrAbove, CanModifyData, ReadOnly
@@ -1562,3 +1567,412 @@ class ConfiguracionEmpresaViewSet(viewsets.ModelViewSet):
         config = ConfiguracionEmpresa.get_config()
         serializer = self.get_serializer(config)
         return Response(serializer.data)
+
+
+# ============================================================================
+# PILA - SEGURIDAD SOCIAL
+# ============================================================================
+
+class PILAViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gestión de PILA (Planilla Integrada de Liquidación de Aportes).
+    Calcula aportes de seguridad social basados en las nóminas del mes.
+    """
+    queryset = PILA.objects.all()
+    permission_classes = [CanModifyData]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['año', 'mes', 'estado']
+    ordering = ['-año', '-mes']
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return PILAListSerializer
+        elif self.action == 'create':
+            return PILACreateSerializer
+        return PILADetailSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=False, methods=['post'])
+    def calcular(self, request):
+        """
+        Calcular PILA para un mes específico basado en las nóminas.
+        Requiere: mes, año
+        """
+        mes = request.data.get('mes')
+        año = request.data.get('año')
+
+        if not mes or not año:
+            return Response(
+                {'error': 'Se requieren mes y año'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Verificar si ya existe
+        if PILA.objects.filter(mes=mes, año=año).exists():
+            return Response(
+                {'error': f'Ya existe una PILA para {mes:02d}/{año}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Obtener nóminas del mes (usando quincenas del mes)
+        from django.db.models import Sum
+        from decimal import Decimal
+
+        # Buscar quincenas del mes
+        quincenas = Quincena.objects.filter(mes=mes, año=año)
+
+        if not quincenas.exists():
+            return Response(
+                {'error': f'No hay quincenas para {mes:02d}/{año}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Obtener nóminas aprobadas/pagadas de esas quincenas
+        nominas = Nomina.objects.filter(
+            quincena__in=quincenas,
+            estado__in=['APROBADA', 'PAGADA']
+        ).select_related('trabajador', 'quincena')
+
+        if not nominas.exists():
+            return Response(
+                {'error': f'No hay nóminas aprobadas para {mes:02d}/{año}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Crear PILA
+        pila = PILA.objects.create(
+            mes=mes,
+            año=año,
+            estado='CALCULADA',
+            created_by=request.user
+        )
+
+        # Agrupar nóminas por trabajador y calcular IBC del mes
+        from collections import defaultdict
+        trabajadores_ibc = defaultdict(lambda: {'ibc': Decimal('0'), 'dias': 0, 'nominas': []})
+
+        for nomina in nominas:
+            trab_id = nomina.trabajador_id
+            # IBC = total devengado (sin auxilio de transporte para > 2 SMMLV)
+            ibc = nomina.total_devengado
+            trabajadores_ibc[trab_id]['ibc'] += ibc
+            trabajadores_ibc[trab_id]['dias'] += 15  # Cada quincena = 15 días
+            trabajadores_ibc[trab_id]['nominas'].append(nomina)
+
+        # Crear detalles por trabajador
+        total_ibc = Decimal('0')
+        total_salud = Decimal('0')
+        total_pension = Decimal('0')
+        total_arl = Decimal('0')
+        total_caja = Decimal('0')
+
+        for trab_id, data in trabajadores_ibc.items():
+            ibc = data['ibc']
+            dias = min(data['dias'], 30)  # Máximo 30 días
+
+            # Calcular aportes
+            aporte_salud = ibc * PORCENTAJE_SALUD_EMPLEADOR
+            aporte_pension = ibc * PORCENTAJE_PENSION_EMPLEADOR
+            aporte_arl = ibc * PORCENTAJE_ARL
+            aporte_caja = ibc * PORCENTAJE_CAJA_COMPENSACION
+            total_trabajador = aporte_salud + aporte_pension + aporte_arl + aporte_caja
+
+            # Crear detalle
+            DetallePILA.objects.create(
+                pila=pila,
+                trabajador_id=trab_id,
+                ibc=ibc,
+                dias_cotizados=dias,
+                aporte_salud=aporte_salud,
+                aporte_pension=aporte_pension,
+                aporte_arl=aporte_arl,
+                aporte_caja=aporte_caja,
+                total_aportes=total_trabajador,
+                nomina=data['nominas'][-1]  # Última nómina del mes
+            )
+
+            # Acumular totales
+            total_ibc += ibc
+            total_salud += aporte_salud
+            total_pension += aporte_pension
+            total_arl += aporte_arl
+            total_caja += aporte_caja
+
+        # Actualizar totales en PILA
+        pila.total_ibc = total_ibc
+        pila.total_salud = total_salud
+        pila.total_pension = total_pension
+        pila.total_arl = total_arl
+        pila.total_caja = total_caja
+        pila.total_aportes = total_salud + total_pension + total_arl + total_caja
+        pila.save()
+
+        serializer = PILADetailSerializer(pila)
+        return Response({
+            'message': f'PILA calculada para {mes:02d}/{año} con {len(trabajadores_ibc)} trabajadores',
+            'pila': serializer.data
+        }, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def marcar_pagada(self, request, pk=None):
+        """Marcar PILA como pagada"""
+        pila = self.get_object()
+
+        if pila.estado == 'PAGADA':
+            return Response(
+                {'error': 'Esta PILA ya está marcada como pagada'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = PILAMarcarPagadaSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        pila.estado = 'PAGADA'
+        pila.fecha_pago = serializer.validated_data['fecha_pago']
+        pila.numero_planilla = serializer.validated_data['numero_planilla']
+        pila.save()
+
+        return Response({
+            'message': 'PILA marcada como pagada',
+            'pila': PILADetailSerializer(pila).data
+        })
+
+    @action(detail=False, methods=['get'])
+    def resumen(self, request):
+        """Obtener resumen de PILA pendientes y porcentajes vigentes"""
+        from datetime import date
+        hoy = date.today()
+
+        # PILA del mes actual
+        pila_actual = PILA.objects.filter(mes=hoy.month, año=hoy.year).first()
+
+        # PILAs pendientes (no pagadas)
+        pilas_pendientes = PILA.objects.filter(estado__in=['BORRADOR', 'CALCULADA'])
+        total_pendiente = sum(p.total_aportes for p in pilas_pendientes)
+
+        # Porcentajes vigentes
+        porcentajes = {
+            'seguridad_social': {
+                'salud': float(PORCENTAJE_SALUD_EMPLEADOR * 100),
+                'pension': float(PORCENTAJE_PENSION_EMPLEADOR * 100),
+                'arl': float(PORCENTAJE_ARL * 100),
+                'caja_compensacion': float(PORCENTAJE_CAJA_COMPENSACION * 100),
+                'total': float((PORCENTAJE_SALUD_EMPLEADOR + PORCENTAJE_PENSION_EMPLEADOR +
+                               PORCENTAJE_ARL + PORCENTAJE_CAJA_COMPENSACION) * 100)
+            },
+            'prestaciones': {
+                'cesantias': float(PORCENTAJE_CESANTIAS * 100),
+                'intereses_cesantias': float(PORCENTAJE_INTERESES_CESANTIAS * 100),
+                'prima': float(PORCENTAJE_PRIMA * 100),
+                'vacaciones': float(PORCENTAJE_VACACIONES * 100),
+                'total': float((PORCENTAJE_CESANTIAS + PORCENTAJE_INTERESES_CESANTIAS +
+                               PORCENTAJE_PRIMA + PORCENTAJE_VACACIONES) * 100)
+            }
+        }
+
+        return Response({
+            'pila_mes_actual': PILAListSerializer(pila_actual).data if pila_actual else None,
+            'pilas_pendientes': pilas_pendientes.count(),
+            'total_pendiente': total_pendiente,
+            'porcentajes': porcentajes
+        })
+
+
+# ============================================================================
+# PRESTACIONES SOCIALES
+# ============================================================================
+
+class PrestacionesViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gestión de provisiones de prestaciones sociales.
+    Calcula provisiones mensuales basadas en las nóminas.
+    """
+    queryset = ResumenPrestaciones.objects.all()
+    permission_classes = [CanModifyData]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['año', 'mes']
+    ordering = ['-año', '-mes']
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return ResumenPrestacionesListSerializer
+        elif self.action == 'create':
+            return ResumenPrestacionesCreateSerializer
+        return ResumenPrestacionesDetailSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=False, methods=['post'])
+    def calcular(self, request):
+        """
+        Calcular provisiones de prestaciones para un mes específico.
+        Requiere: mes, año
+        """
+        mes = request.data.get('mes')
+        año = request.data.get('año')
+
+        if not mes or not año:
+            return Response(
+                {'error': 'Se requieren mes y año'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Verificar si ya existe
+        if ResumenPrestaciones.objects.filter(mes=mes, año=año).exists():
+            return Response(
+                {'error': f'Ya existen provisiones para {mes:02d}/{año}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Obtener quincenas del mes
+        from decimal import Decimal
+        quincenas = Quincena.objects.filter(mes=mes, año=año)
+
+        if not quincenas.exists():
+            return Response(
+                {'error': f'No hay quincenas para {mes:02d}/{año}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Obtener nóminas aprobadas/pagadas
+        nominas = Nomina.objects.filter(
+            quincena__in=quincenas,
+            estado__in=['APROBADA', 'PAGADA']
+        ).select_related('trabajador', 'quincena')
+
+        if not nominas.exists():
+            return Response(
+                {'error': f'No hay nóminas aprobadas para {mes:02d}/{año}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Agrupar por trabajador
+        from collections import defaultdict
+        trabajadores_salario = defaultdict(lambda: {'salario': Decimal('0'), 'nominas': []})
+
+        for nomina in nominas:
+            trab_id = nomina.trabajador_id
+            trabajadores_salario[trab_id]['salario'] += nomina.total_devengado
+            trabajadores_salario[trab_id]['nominas'].append(nomina)
+
+        # Calcular provisiones por trabajador
+        total_salario = Decimal('0')
+        total_cesantias = Decimal('0')
+        total_intereses = Decimal('0')
+        total_prima = Decimal('0')
+        total_vacaciones = Decimal('0')
+
+        provisiones_creadas = []
+
+        for trab_id, data in trabajadores_salario.items():
+            salario = data['salario']
+
+            # Calcular provisiones
+            cesantias = salario * PORCENTAJE_CESANTIAS
+            intereses = cesantias * PORCENTAJE_INTERESES_CESANTIAS
+            prima = salario * PORCENTAJE_PRIMA
+            vacaciones = salario * PORCENTAJE_VACACIONES
+            total_provision = cesantias + intereses + prima + vacaciones
+
+            # Crear provisión
+            provision = ProvisionPrestaciones.objects.create(
+                mes=mes,
+                año=año,
+                trabajador_id=trab_id,
+                salario_base=salario,
+                cesantias=cesantias,
+                intereses_cesantias=intereses,
+                prima=prima,
+                vacaciones=vacaciones,
+                total_provision=total_provision,
+                nomina=data['nominas'][-1]
+            )
+            provisiones_creadas.append(provision)
+
+            # Acumular totales
+            total_salario += salario
+            total_cesantias += cesantias
+            total_intereses += intereses
+            total_prima += prima
+            total_vacaciones += vacaciones
+
+        # Crear resumen
+        resumen = ResumenPrestaciones.objects.create(
+            mes=mes,
+            año=año,
+            total_salario_base=total_salario,
+            total_cesantias=total_cesantias,
+            total_intereses_cesantias=total_intereses,
+            total_prima=total_prima,
+            total_vacaciones=total_vacaciones,
+            total_provisiones=total_cesantias + total_intereses + total_prima + total_vacaciones,
+            num_trabajadores=len(trabajadores_salario),
+            created_by=request.user
+        )
+
+        serializer = ResumenPrestacionesDetailSerializer(resumen)
+        return Response({
+            'message': f'Prestaciones calculadas para {mes:02d}/{año} con {len(trabajadores_salario)} trabajadores',
+            'resumen': serializer.data
+        }, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'])
+    def acumulado_año(self, request):
+        """Obtener acumulado de provisiones del año"""
+        from datetime import date
+        from django.db.models import Sum
+
+        año = request.query_params.get('año', date.today().year)
+
+        acumulado = ResumenPrestaciones.objects.filter(año=año).aggregate(
+            total_cesantias=Sum('total_cesantias'),
+            total_intereses=Sum('total_intereses_cesantias'),
+            total_prima=Sum('total_prima'),
+            total_vacaciones=Sum('total_vacaciones'),
+            total_provisiones=Sum('total_provisiones'),
+            total_salarios=Sum('total_salario_base')
+        )
+
+        meses_calculados = ResumenPrestaciones.objects.filter(año=año).count()
+
+        return Response({
+            'año': año,
+            'meses_calculados': meses_calculados,
+            'acumulado': acumulado
+        })
+
+    @action(detail=False, methods=['get'])
+    def por_trabajador(self, request):
+        """Obtener provisiones acumuladas por trabajador"""
+        from django.db.models import Sum
+        from datetime import date
+
+        año = request.query_params.get('año', date.today().year)
+        trabajador_id = request.query_params.get('trabajador')
+
+        queryset = ProvisionPrestaciones.objects.filter(año=año)
+
+        if trabajador_id:
+            queryset = queryset.filter(trabajador_id=trabajador_id)
+
+        acumulado = queryset.values(
+            'trabajador__id',
+            'trabajador__nombres',
+            'trabajador__apellidos',
+            'trabajador__numero_documento'
+        ).annotate(
+            total_cesantias=Sum('cesantias'),
+            total_intereses=Sum('intereses_cesantias'),
+            total_prima=Sum('prima'),
+            total_vacaciones=Sum('vacaciones'),
+            total_provisiones=Sum('total_provision'),
+            total_salarios=Sum('salario_base')
+        ).order_by('trabajador__apellidos', 'trabajador__nombres')
+
+        return Response({
+            'año': año,
+            'trabajadores': list(acumulado)
+        })

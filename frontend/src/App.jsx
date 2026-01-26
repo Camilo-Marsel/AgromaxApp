@@ -33,6 +33,12 @@ import ReportesNomina from './pages/Reportes/ReportesNomina';
 import UsuariosList from './pages/Usuarios/UsuariosList';
 import UsuarioForm from './pages/Usuarios/UsuarioForm';
 
+// Obligaciones Laborales
+import PILAList from './pages/ObligacionesLaborales/PILA/PILAList';
+import PILADetail from './pages/ObligacionesLaborales/PILA/PILADetail';
+import PrestacionesList from './pages/ObligacionesLaborales/Prestaciones/PrestacionesList';
+import PrestacionesDetail from './pages/ObligacionesLaborales/Prestaciones/PrestacionesDetail';
+
 // Componente para rutas protegidas
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useContext(AuthContext);
@@ -352,6 +358,52 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <ReportesNomina />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Obligaciones Laborales */}
+          <Route
+            path="/obligaciones"
+            element={<Navigate to="/obligaciones/pila" replace />}
+          />
+          <Route
+            path="/obligaciones/pila"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <PILAList />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/obligaciones/pila/:id"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <PILADetail />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/obligaciones/prestaciones"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <PrestacionesList />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/obligaciones/prestaciones/:id"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <PrestacionesDetail />
                 </MainLayout>
               </ProtectedRoute>
             }

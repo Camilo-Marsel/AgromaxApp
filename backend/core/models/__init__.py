@@ -10,6 +10,13 @@ from .payroll import VariablesNomina, Nomina, DetalleNomina
 from .loans import Prestamo, CuotaPrestamo
 from .audit import AuditoriaLog
 from .config import ConfiguracionEmpresa
+from .obligations import (
+    PILA, DetallePILA, ProvisionPrestaciones, ResumenPrestaciones,
+    PORCENTAJE_SALUD_EMPLEADOR, PORCENTAJE_PENSION_EMPLEADOR,
+    PORCENTAJE_ARL, PORCENTAJE_CAJA_COMPENSACION,
+    PORCENTAJE_CESANTIAS, PORCENTAJE_INTERESES_CESANTIAS,
+    PORCENTAJE_PRIMA, PORCENTAJE_VACACIONES,
+)
 
 # Export all models so they can be imported as: from core.models import ModelName
 __all__ = [
@@ -46,4 +53,20 @@ __all__ = [
 
     # Config models
     'ConfiguracionEmpresa',
+
+    # Obligations models (PILA and Prestaciones)
+    'PILA',
+    'DetallePILA',
+    'ProvisionPrestaciones',
+    'ResumenPrestaciones',
+
+    # Obligation constants
+    'PORCENTAJE_SALUD_EMPLEADOR',
+    'PORCENTAJE_PENSION_EMPLEADOR',
+    'PORCENTAJE_ARL',
+    'PORCENTAJE_CAJA_COMPENSACION',
+    'PORCENTAJE_CESANTIAS',
+    'PORCENTAJE_INTERESES_CESANTIAS',
+    'PORCENTAJE_PRIMA',
+    'PORCENTAJE_VACACIONES',
 ]

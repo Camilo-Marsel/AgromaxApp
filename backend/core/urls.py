@@ -30,6 +30,10 @@ router.register(r'contratos', ContratoViewSet, basename='contrato')
 router.register(r'documentos-contrato', DocumentoContratoViewSet, basename='documento-contrato')
 router.register(r'configuracion-empresa', ConfiguracionEmpresaViewSet, basename='configuracion-empresa')
 
+# Obligaciones Laborales
+router.register(r'pila', PILAViewSet, basename='pila')
+router.register(r'prestaciones', PrestacionesViewSet, basename='prestaciones')
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def health_check(request):

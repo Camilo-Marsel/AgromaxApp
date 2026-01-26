@@ -8,7 +8,12 @@ from .models import (
     UnidadMedida, Labor, ListaPrecios, VariablesNomina,
     Quincena, RegistroLabor, Nomina, DetalleNomina,
     Prestamo, CuotaPrestamo, AuditoriaLog,
-    Contrato, DocumentoContrato, ConfiguracionEmpresa
+    Contrato, DocumentoContrato, ConfiguracionEmpresa,
+    PILA, DetallePILA, ProvisionPrestaciones, ResumenPrestaciones,
+    PORCENTAJE_SALUD_EMPLEADOR, PORCENTAJE_PENSION_EMPLEADOR,
+    PORCENTAJE_ARL, PORCENTAJE_CAJA_COMPENSACION,
+    PORCENTAJE_CESANTIAS, PORCENTAJE_INTERESES_CESANTIAS,
+    PORCENTAJE_PRIMA, PORCENTAJE_VACACIONES,
 )
 from decimal import Decimal
 
@@ -820,3 +825,200 @@ class ConfiguracionEmpresaSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
+
+
+# ============================================================================
+# PILA - SEGURIDAD SOCIAL
+# ============================================================================
+
+class TrabajadorPILASerializer(serializers.ModelSerializer):
+    """Serializer simplificado de trabajador para PILA"""
+    class Meta:
+        model = Trabajador
+        fields = ['id', 'nombres', 'apellidos', 'numero_documento', 'nombre_completo']
+
+
+class DetallePILASerializer(serializers.ModelSerializer):
+    """Serializer para detalle de aportes PILA por trabajador"""
+    trabajador_info = TrabajadorPILASerializer(source='trabajador', read_only=True)
+
+    class Meta:
+        model = DetallePILA
+        fields = [
+            'id', 'pila', 'trabajador', 'trabajador_info',
+            'ibc', 'dias_cotizados',
+            'aporte_salud', 'aporte_pension', 'aporte_arl', 'aporte_caja',
+            'total_aportes', 'nomina', 'created_at'
+        ]
+        read_only_fields = ['created_at']
+
+
+class PILAListSerializer(serializers.ModelSerializer):
+    """Serializer para listado de PILA"""
+    periodo_display = serializers.CharField(read_only=True)
+    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    num_trabajadores = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PILA
+        fields = [
+            'id', 'mes', 'año', 'periodo_display',
+            'total_ibc', 'total_salud', 'total_pension',
+            'total_arl', 'total_caja', 'total_aportes',
+            'estado', 'estado_display', 'fecha_pago',
+            'numero_planilla', 'num_trabajadores'
+        ]
+
+    def get_num_trabajadores(self, obj):
+        return obj.detalles.count()
+
+
+class PILADetailSerializer(serializers.ModelSerializer):
+    """Serializer para detalle de PILA con todos los aportes"""
+    periodo_display = serializers.CharField(read_only=True)
+    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    detalles = DetallePILASerializer(many=True, read_only=True)
+    created_by_info = UsuarioSerializer(source='created_by', read_only=True)
+
+    class Meta:
+        model = PILA
+        fields = [
+            'id', 'mes', 'año', 'periodo_display',
+            'total_ibc', 'total_salud', 'total_pension',
+            'total_arl', 'total_caja', 'total_aportes',
+            'estado', 'estado_display', 'fecha_pago',
+            'numero_planilla', 'observaciones',
+            'detalles', 'created_by', 'created_by_info',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+
+class PILACreateSerializer(serializers.ModelSerializer):
+    """Serializer para crear/calcular PILA"""
+
+    class Meta:
+        model = PILA
+        fields = ['mes', 'año', 'observaciones']
+
+    def validate(self, data):
+        # Verificar que no exista una PILA para este periodo
+        if PILA.objects.filter(mes=data['mes'], año=data['año']).exists():
+            raise serializers.ValidationError(
+                f"Ya existe una PILA para {data['mes']:02d}/{data['año']}"
+            )
+        return data
+
+
+class PILAMarcarPagadaSerializer(serializers.Serializer):
+    """Serializer para marcar PILA como pagada"""
+    fecha_pago = serializers.DateField()
+    numero_planilla = serializers.CharField(max_length=50)
+
+
+# ============================================================================
+# PRESTACIONES SOCIALES
+# ============================================================================
+
+class ProvisionPrestacionesSerializer(serializers.ModelSerializer):
+    """Serializer para provisiones individuales por trabajador"""
+    trabajador_info = TrabajadorPILASerializer(source='trabajador', read_only=True)
+
+    class Meta:
+        model = ProvisionPrestaciones
+        fields = [
+            'id', 'mes', 'año', 'trabajador', 'trabajador_info',
+            'salario_base', 'cesantias', 'intereses_cesantias',
+            'prima', 'vacaciones', 'total_provision',
+            'nomina', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+
+class ResumenPrestacionesListSerializer(serializers.ModelSerializer):
+    """Serializer para listado de resúmenes de prestaciones"""
+    periodo_display = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = ResumenPrestaciones
+        fields = [
+            'id', 'mes', 'año', 'periodo_display',
+            'total_salario_base', 'total_cesantias',
+            'total_intereses_cesantias', 'total_prima',
+            'total_vacaciones', 'total_provisiones',
+            'num_trabajadores', 'created_at'
+        ]
+
+
+class ResumenPrestacionesDetailSerializer(serializers.ModelSerializer):
+    """Serializer para detalle de resumen con provisiones individuales"""
+    periodo_display = serializers.CharField(read_only=True)
+    provisiones = serializers.SerializerMethodField()
+    created_by_info = UsuarioSerializer(source='created_by', read_only=True)
+
+    class Meta:
+        model = ResumenPrestaciones
+        fields = [
+            'id', 'mes', 'año', 'periodo_display',
+            'total_salario_base', 'total_cesantias',
+            'total_intereses_cesantias', 'total_prima',
+            'total_vacaciones', 'total_provisiones',
+            'num_trabajadores', 'provisiones',
+            'created_by', 'created_by_info',
+            'created_at', 'updated_at'
+        ]
+
+    def get_provisiones(self, obj):
+        provisiones = ProvisionPrestaciones.objects.filter(
+            mes=obj.mes, año=obj.año
+        ).select_related('trabajador')
+        return ProvisionPrestacionesSerializer(provisiones, many=True).data
+
+
+class ResumenPrestacionesCreateSerializer(serializers.Serializer):
+    """Serializer para calcular prestaciones de un periodo"""
+    mes = serializers.IntegerField(min_value=1, max_value=12)
+    año = serializers.IntegerField(min_value=2020)
+
+    def validate(self, data):
+        if ResumenPrestaciones.objects.filter(mes=data['mes'], año=data['año']).exists():
+            raise serializers.ValidationError(
+                f"Ya existe un resumen de prestaciones para {data['mes']:02d}/{data['año']}"
+            )
+        return data
+
+
+# ============================================================================
+# RESUMEN OBLIGACIONES LABORALES (Dashboard)
+# ============================================================================
+
+class ObligacionesResumenSerializer(serializers.Serializer):
+    """Serializer para resumen general de obligaciones laborales"""
+    # PILA del mes actual
+    pila_mes_actual = PILAListSerializer(allow_null=True)
+    pila_pendientes = serializers.IntegerField()
+    total_pila_pendiente = serializers.DecimalField(max_digits=15, decimal_places=2)
+
+    # Prestaciones del mes actual
+    prestaciones_mes_actual = ResumenPrestacionesListSerializer(allow_null=True)
+    total_provisiones_año = serializers.DecimalField(max_digits=15, decimal_places=2)
+
+    # Porcentajes vigentes
+    porcentajes = serializers.DictField()
+
+
+class PorcentajesObligacionesSerializer(serializers.Serializer):
+    """Serializer para mostrar los porcentajes de obligaciones"""
+    # Seguridad Social
+    salud_empleador = serializers.DecimalField(max_digits=5, decimal_places=3)
+    pension_empleador = serializers.DecimalField(max_digits=5, decimal_places=3)
+    arl = serializers.DecimalField(max_digits=5, decimal_places=4)
+    caja_compensacion = serializers.DecimalField(max_digits=5, decimal_places=3)
+    total_seguridad_social = serializers.DecimalField(max_digits=5, decimal_places=3)
+
+    # Prestaciones Sociales
+    cesantias = serializers.DecimalField(max_digits=5, decimal_places=4)
+    intereses_cesantias = serializers.DecimalField(max_digits=5, decimal_places=4)
+    prima = serializers.DecimalField(max_digits=5, decimal_places=4)
+    vacaciones = serializers.DecimalField(max_digits=5, decimal_places=4)
+    total_prestaciones = serializers.DecimalField(max_digits=5, decimal_places=4)
