@@ -712,7 +712,7 @@ class Contrato(models.Model):
             trabajador=self.trabajador,
             quincena__fecha_inicio__gte=fecha_inicio_periodo,
             quincena__fecha_fin__lte=fecha_fin_periodo,
-            estado__in=[Nomina.PAGADA, Nomina.APROBADA]
+            estado=Nomina.APROBADA
         )
 
         if not nominas.exists():

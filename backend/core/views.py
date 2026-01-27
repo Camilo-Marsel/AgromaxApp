@@ -512,10 +512,10 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # CAMBIO: Obtener nóminas de la quincena (cualquier estado excepto BORRADOR)
+        # Obtener nóminas de la quincena (cualquier estado)
         nominas = self.queryset.filter(
             quincena=quincena,
-            estado__in=['CALCULADA', 'APROBADA', 'PAGADA']  # PERMITIR CALCULADAS TAMBIÉN
+            estado__in=['PENDIENTE', 'APROBADA']
         ).select_related('trabajador', 'quincena').order_by('trabajador__apellidos', 'trabajador__nombres')
         # Obtener filtro opcional de finca desde query params
         finca_id = request.query_params.get('finca')
@@ -571,10 +571,10 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         """Recalcular nómina manteniendo ajustes manuales"""
         nomina = self.get_object()
         
-        # Solo se puede recalcular si está en CALCULADA
-        if nomina.estado != 'CALCULADA':
+        # Solo se puede recalcular si está en PENDIENTE
+        if nomina.estado != 'PENDIENTE':
             return Response(
-                {'error': 'Solo se pueden recalcular nóminas en estado CALCULADA'},
+                {'error': 'Solo se pueden recalcular nóminas en estado PENDIENTE'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -619,111 +619,91 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def aprobar(self, request, pk=None):
-        """Aprobar nómina calculada"""
+        """Aprobar nómina pendiente"""
         nomina = self.get_object()
-        
-        if nomina.estado != 'CALCULADA':
+
+        if nomina.estado != 'PENDIENTE':
             return Response(
-                {'error': 'Solo se pueden aprobar nóminas en estado CALCULADA'},
+                {'error': 'Solo se pueden aprobar nóminas en estado PENDIENTE'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Cambiar estado
         nomina.estado = 'APROBADA'
         nomina.fecha_aprobacion = timezone.now()
         nomina.save()
-        
+
         serializer = self.get_serializer(nomina)
         return Response(serializer.data)
 
 
     @action(detail=True, methods=['post'])
     def rechazar(self, request, pk=None):
-        """Rechazar nómina aprobada (regresa a CALCULADA)"""
+        """Rechazar nómina aprobada (regresa a PENDIENTE)"""
         nomina = self.get_object()
-        
+
         if nomina.estado != 'APROBADA':
             return Response(
                 {'error': 'Solo se pueden rechazar nóminas en estado APROBADA'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Obtener motivo del rechazo (opcional)
         motivo = request.data.get('motivo', '')
-        
-        # Regresar a calculada
-        nomina.estado = 'CALCULADA'
+
+        # Regresar a pendiente
+        nomina.estado = 'PENDIENTE'
         nomina.fecha_aprobacion = None
-        
+
         # Agregar motivo a observaciones
         if motivo:
             fecha_hora = timezone.now().strftime('%Y-%m-%d %H:%M')
             nota = f"\n[{fecha_hora}] Nómina rechazada: {motivo}"
             nomina.observaciones = (nomina.observaciones or '') + nota
-        
-        nomina.save()
-        
-        serializer = self.get_serializer(nomina)
-        return Response(serializer.data)
 
-
-    @action(detail=True, methods=['post'])
-    def marcar_pagada(self, request, pk=None):
-        """Marcar nómina como pagada"""
-        nomina = self.get_object()
-        
-        if nomina.estado != 'APROBADA':
-            return Response(
-                {'error': 'Solo se pueden marcar como pagadas las nóminas APROBADAS'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Cambiar estado
-        nomina.estado = 'PAGADA'
-        nomina.fecha_pago = timezone.now()
         nomina.save()
-        
+
         serializer = self.get_serializer(nomina)
         return Response(serializer.data)
 
 
     @action(detail=False, methods=['post'])
     def aprobar_masivo(self, request):
-        """Aprobar todas las nóminas CALCULADAS de una quincena (con filtro opcional de finca)"""
+        """Aprobar todas las nóminas PENDIENTES de una quincena (con filtro opcional de finca)"""
         quincena_id = request.data.get('quincena_id')
         finca_id = request.data.get('finca_id')
-        
+
         if not quincena_id:
             return Response(
                 {'error': 'El ID de quincena es requerido'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Filtrar nóminas
         nominas = Nomina.objects.filter(
             quincena_id=quincena_id,
-            estado='CALCULADA'
+            estado='PENDIENTE'
         )
-        
+
         # Aplicar filtro de finca si se proporciona
         if finca_id:
             nominas = nominas.filter(trabajador__finca_id=finca_id)
-        
+
         # Contar antes de actualizar
         count = nominas.count()
-        
+
         if count == 0:
             return Response(
-                {'error': 'No hay nóminas CALCULADAS para aprobar con los filtros aplicados'},
+                {'error': 'No hay nóminas PENDIENTES para aprobar con los filtros aplicados'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Aprobar todas
         nominas.update(
             estado='APROBADA',
             fecha_aprobacion=timezone.now()
         )
-        
+
         return Response({
             'message': f'{count} nómina(s) aprobada(s) correctamente',
             'count': count
@@ -731,95 +711,52 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
 
 
     @action(detail=False, methods=['post'])
-    def marcar_pagadas_masivo(self, request):
-        """Marcar todas las nóminas APROBADAS como PAGADAS (con filtro opcional de finca)"""
-        quincena_id = request.data.get('quincena_id')
-        finca_id = request.data.get('finca_id')
-        
-        if not quincena_id:
-            return Response(
-                {'error': 'El ID de quincena es requerido'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Filtrar nóminas
-        nominas = Nomina.objects.filter(
-            quincena_id=quincena_id,
-            estado='APROBADA'
-        )
-        
-        # Aplicar filtro de finca si se proporciona
-        if finca_id:
-            nominas = nominas.filter(trabajador__finca_id=finca_id)
-        
-        # Contar antes de actualizar
-        count = nominas.count()
-        
-        if count == 0:
-            return Response(
-                {'error': 'No hay nóminas APROBADAS para marcar como pagadas con los filtros aplicados'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Marcar como pagadas
-        nominas.update(
-            estado='PAGADA',
-            fecha_pago=timezone.now()
-        )
-        
-        return Response({
-            'message': f'{count} nómina(s) marcada(s) como pagada(s) correctamente',
-            'count': count
-        })
-
-
-    @action(detail=False, methods=['post'])
     def rechazar_masivo(self, request):
-        """Rechazar todas las nóminas APROBADAS de una quincena (regresa a CALCULADA)"""
+        """Rechazar todas las nóminas APROBADAS de una quincena (regresa a PENDIENTE)"""
         quincena_id = request.data.get('quincena_id')
         finca_id = request.data.get('finca_id')
         motivo = request.data.get('motivo', '')
-        
+
         if not quincena_id:
             return Response(
                 {'error': 'El ID de quincena es requerido'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Filtrar nóminas
         nominas = Nomina.objects.filter(
             quincena_id=quincena_id,
             estado='APROBADA'
         )
-        
+
         # Aplicar filtro de finca si se proporciona
         if finca_id:
             nominas = nominas.filter(trabajador__finca_id=finca_id)
-        
+
         # Contar antes de actualizar
         count = nominas.count()
-        
+
         if count == 0:
             return Response(
                 {'error': 'No hay nóminas APROBADAS para rechazar con los filtros aplicados'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Agregar motivo a observaciones si se proporciona
         if motivo:
             fecha_hora = timezone.now().strftime('%Y-%m-%d %H:%M')
             for nomina in nominas:
                 nota = f"\n[{fecha_hora}] Rechazo masivo: {motivo}"
                 nomina.observaciones = (nomina.observaciones or '') + nota
-                nomina.estado = 'CALCULADA'
+                nomina.estado = 'PENDIENTE'
                 nomina.fecha_aprobacion = None
                 nomina.save()
         else:
             nominas.update(
-                estado='CALCULADA',
+                estado='PENDIENTE',
                 fecha_aprobacion=None
             )
-        
+
         return Response({
             'message': f'{count} nómina(s) rechazada(s) correctamente',
             'count': count
@@ -851,7 +788,7 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         Query params:
         - quincena (required): ID de la quincena
         - finca (optional): ID de la finca
-        - estados (optional): Estados separados por coma (ej: CALCULADA,APROBADA,PAGADA)
+        - estados (optional): Estados separados por coma (ej: PENDIENTE,APROBADA)
         """
         from .services.pdf_generator import generar_colillas_consolidadas
 
@@ -917,9 +854,9 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         nomina = self.get_object()
 
         # Verificar que la nómina esté en estado válido
-        if nomina.estado not in ['CALCULADA', 'APROBADA', 'PAGADA']:
+        if nomina.estado not in ['PENDIENTE', 'APROBADA']:
             return Response(
-                {'error': 'Solo se pueden enviar recibos de nóminas calculadas, aprobadas o pagadas'},
+                {'error': 'Solo se pueden enviar recibos de nóminas pendientes o aprobadas'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -959,11 +896,11 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         Body params:
         - quincena_id (required): ID de la quincena
         - finca_id (optional): Filtrar por finca
-        - estados (optional): Lista de estados (por defecto ['PAGADA'])
+        - estados (optional): Lista de estados (por defecto ['APROBADA'])
         """
         quincena_id = request.data.get('quincena_id')
         finca_id = request.data.get('finca_id')
-        estados = request.data.get('estados', ['PAGADA'])
+        estados = request.data.get('estados', ['APROBADA'])
 
         if not quincena_id:
             return Response(
@@ -1679,10 +1616,10 @@ class PILAViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Obtener nóminas aprobadas/pagadas de esas quincenas
+        # Obtener nóminas aprobadas de esas quincenas
         nominas = Nomina.objects.filter(
             quincena__in=quincenas,
-            estado__in=['APROBADA', 'PAGADA']
+            estado='APROBADA'
         ).select_related('trabajador', 'quincena')
 
         if not nominas.exists():
@@ -1887,10 +1824,10 @@ class PrestacionesViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Obtener nóminas aprobadas/pagadas
+        # Obtener nóminas aprobadas
         nominas = Nomina.objects.filter(
             quincena__in=quincenas,
-            estado__in=['APROBADA', 'PAGADA']
+            estado='APROBADA'
         ).select_related('trabajador', 'quincena')
 
         if not nominas.exists():

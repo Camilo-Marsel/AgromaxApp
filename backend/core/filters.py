@@ -21,16 +21,6 @@ class TrabajadorFilter(filters.FilterSet):
             models.Q(numero_documento__icontains=value)
         )
     
-class NominaFilter(filters.FilterSet):
-    quincena = filters.NumberFilter(field_name='quincena__id')
-    trabajador = filters.NumberFilter(field_name='trabajador__id')
-    finca = filters.NumberFilter(field_name='trabajador__finca__id')  # NUEVO
-    estado = filters.ChoiceFilter(choices=Nomina.ESTADO_CHOICES)
-    
-    class Meta:
-        model = Nomina
-        fields = ['quincena', 'trabajador', 'finca', 'estado']
-
 class LaborFilter(filters.FilterSet):
     activa = filters.BooleanFilter()
     unidad_medida = filters.NumberFilter(field_name='unidad_medida__id')
@@ -56,11 +46,12 @@ class RegistroLaborFilter(filters.FilterSet):
 class NominaFilter(filters.FilterSet):
     quincena = filters.NumberFilter(field_name='quincena__id')
     trabajador = filters.NumberFilter(field_name='trabajador__id')
+    finca = filters.NumberFilter(field_name='trabajador__finca__id')
     estado = filters.ChoiceFilter(choices=Nomina.ESTADO_CHOICES)
-    
+
     class Meta:
         model = Nomina
-        fields = ['quincena', 'trabajador', 'estado']
+        fields = ['quincena', 'trabajador', 'finca', 'estado']
 
 
 class PrestamoFilter(filters.FilterSet):
