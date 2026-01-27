@@ -55,12 +55,36 @@ class Usuario(AbstractUser):
     es_activo = models.BooleanField(default=True)
     ultimo_acceso = models.DateTimeField(null=True, blank=True)
 
+    # Fincas asignadas al usuario (para filtrar datos)
+    # Si está vacío y no es admin, no ve ninguna finca
+    fincas_asignadas = models.ManyToManyField(
+        'Finca',
+        blank=True,
+        related_name='usuarios_asignados',
+        help_text='Fincas que este usuario puede ver. Admins ven todas.'
+    )
+
     class Meta:
         verbose_name = "Usuario"
         verbose_name_plural = "Usuarios"
 
     def __str__(self):
         return f"{self.get_full_name() or self.username}"
+
+    @property
+    def es_administrador(self):
+        """Verifica si el usuario es administrador"""
+        return self.rol and self.rol.nombre == Rol.ADMINISTRADOR
+
+    def get_fincas_visibles(self):
+        """
+        Retorna las fincas que el usuario puede ver.
+        Admins ven todas, otros solo las asignadas.
+        """
+        if self.es_administrador:
+            from .farm import Finca
+            return Finca.objects.all()
+        return self.fincas_asignadas.all()
 
 
 # ============================================================================

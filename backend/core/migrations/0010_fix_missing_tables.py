@@ -7,13 +7,10 @@ from django.db import migrations, connection
 def add_nacionalidad_if_not_exists(apps, schema_editor):
     """Agregar campo nacionalidad a trabajador si no existe"""
     with connection.cursor() as cursor:
-        # IMPORTANTE: Usar 'trabajadores' (db_table del modelo), NO 'core_trabajador'
-        cursor.execute("""
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_name = 'trabajadores' AND column_name = 'nacionalidad'
-        """)
-        if not cursor.fetchone():
+        # SQLite: usar PRAGMA table_info para verificar columnas
+        cursor.execute("PRAGMA table_info(trabajadores)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if 'nacionalidad' not in columns:
             cursor.execute("""
                 ALTER TABLE trabajadores
                 ADD COLUMN nacionalidad VARCHAR(50) DEFAULT 'COLOMBIANA'
@@ -23,16 +20,15 @@ def add_nacionalidad_if_not_exists(apps, schema_editor):
 def create_config_empresa_if_not_exists(apps, schema_editor):
     """Crear tabla ConfiguracionEmpresa si no existe"""
     with connection.cursor() as cursor:
-        # Verificar si la tabla existe
+        # SQLite: verificar si la tabla existe
         cursor.execute("""
-            SELECT table_name
-            FROM information_schema.tables
-            WHERE table_name = 'core_configuracionempresa'
+            SELECT name FROM sqlite_master
+            WHERE type='table' AND name='core_configuracionempresa'
         """)
         if not cursor.fetchone():
             cursor.execute("""
                 CREATE TABLE core_configuracionempresa (
-                    id BIGSERIAL PRIMARY KEY,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     razon_social VARCHAR(200) NOT NULL,
                     nit VARCHAR(20) NOT NULL,
                     representante_legal VARCHAR(200) NOT NULL,
@@ -45,8 +41,8 @@ def create_config_empresa_if_not_exists(apps, schema_editor):
                     departamento VARCHAR(100) DEFAULT '',
                     logo_path VARCHAR(300) DEFAULT 'logos/logo_completo.jpeg',
                     periodo_pago VARCHAR(20) DEFAULT 'QUINCENAL',
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 

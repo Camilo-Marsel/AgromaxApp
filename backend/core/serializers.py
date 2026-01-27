@@ -56,19 +56,29 @@ class RolSerializer(serializers.ModelSerializer):
         fields = ['id', 'nombre', 'nombre_display', 'descripcion', 'permisos']
 
 
+class FincaSimpleSerializer(serializers.ModelSerializer):
+    """Serializer simple para mostrar fincas asignadas"""
+    class Meta:
+        model = Finca
+        fields = ['id', 'nombre']
+
+
 class UsuarioSerializer(serializers.ModelSerializer):
     rol_info = RolSerializer(source='rol', read_only=True)
     nombre_completo = serializers.SerializerMethodField()
-    
+    fincas_asignadas_info = FincaSimpleSerializer(source='fincas_asignadas', many=True, read_only=True)
+    es_administrador = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = Usuario
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
             'nombre_completo', 'rol', 'rol_info', 'es_activo',
-            'ultimo_acceso', 'date_joined'
+            'ultimo_acceso', 'date_joined', 'fincas_asignadas',
+            'fincas_asignadas_info', 'es_administrador'
         ]
         read_only_fields = ['date_joined', 'ultimo_acceso']
-    
+
     def get_nombre_completo(self, obj):
         return obj.get_full_name() or obj.username
 
@@ -76,24 +86,30 @@ class UsuarioSerializer(serializers.ModelSerializer):
 class UsuarioCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True)
-    
+    fincas_asignadas = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Finca.objects.all(), required=False
+    )
+
     class Meta:
         model = Usuario
         fields = [
             'username', 'email', 'first_name', 'last_name',
-            'password', 'password_confirm', 'rol', 'es_activo'
+            'password', 'password_confirm', 'rol', 'es_activo',
+            'fincas_asignadas'
         ]
-    
+
     def validate(self, data):
         if data['password'] != data['password_confirm']:
             raise serializers.ValidationError("Las contraseñas no coinciden")
         return data
-    
+
     def create(self, validated_data):
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
+        fincas = validated_data.pop('fincas_asignadas', [])
         user = Usuario.objects.create(**validated_data)
         user.set_password(password)
+        user.fincas_asignadas.set(fincas)
         user.save()
         return user
 

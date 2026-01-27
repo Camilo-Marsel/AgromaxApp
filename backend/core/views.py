@@ -26,7 +26,7 @@ from .models import (
     PORCENTAJE_PRIMA, PORCENTAJE_VACACIONES,
 )
 from .serializers import *
-from .permissions import IsAdministrador, IsSupervisorOrAbove, CanModifyData, ReadOnly
+from .permissions import IsAdministrador, IsSupervisorOrAbove, CanModifyData, ReadOnly, FincaFilterMixin
 
 # Alias para mantener compatibilidad
 IsSuperAdmin = IsAdministrador
@@ -70,7 +70,7 @@ class TipoContratoViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 
-class TrabajadorViewSet(viewsets.ModelViewSet):
+class TrabajadorViewSet(FincaFilterMixin, viewsets.ModelViewSet):
     """ViewSet para gestión de trabajadores"""
     queryset = Trabajador.objects.all()
     permission_classes = [CanModifyData]
@@ -79,6 +79,7 @@ class TrabajadorViewSet(viewsets.ModelViewSet):
     search_fields = ['nombres', 'apellidos', 'numero_documento']
     ordering_fields = ['apellidos', 'fecha_ingreso', 'created_at']
     ordering = ['apellidos', 'nombres']
+    finca_field = 'finca'  # Filtrar por finca del trabajador
     
     def get_serializer_class(self):
         if self.action == 'list':
@@ -127,7 +128,22 @@ class FincaViewSet(viewsets.ModelViewSet):
     search_fields = ['nombre', 'ubicacion']
     ordering_fields = ['nombre', 'created_at']
     ordering = ['nombre']
-    
+
+    def get_queryset(self):
+        """Filtra fincas por asignación del usuario"""
+        queryset = super().get_queryset()
+        user = self.request.user
+
+        if not user or not user.is_authenticated:
+            return queryset.none()
+
+        # Admins ven todas las fincas
+        if user.es_administrador:
+            return queryset
+
+        # Otros usuarios solo ven sus fincas asignadas
+        return user.fincas_asignadas.all()
+
     @action(detail=True, methods=['get'])
     def trabajadores(self, request, pk=None):
         """Obtener trabajadores de una finca"""
@@ -137,12 +153,13 @@ class FincaViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class LoteViewSet(viewsets.ModelViewSet):
+class LoteViewSet(FincaFilterMixin, viewsets.ModelViewSet):
     """ViewSet para gestión de lotes"""
     queryset = Lote.objects.all()
     serializer_class = LoteSerializer
     permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    finca_field = 'finca'  # Filtrar por finca
     filterset_fields = ['finca', 'activo']
     search_fields = ['nombre']
     ordering_fields = ['nombre', 'finca__nombre']
@@ -308,13 +325,14 @@ class QuincenaViewSet(viewsets.ModelViewSet):
         })
 
 
-class RegistroLaborViewSet(viewsets.ModelViewSet):
+class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
     """ViewSet para gestión de registros de labores"""
     queryset = RegistroLabor.objects.all()
     permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = RegistroLaborFilter
     ordering = ['-fecha', 'trabajador']
+    finca_field = 'trabajador__finca'  # Filtrar por finca del trabajador
     
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -401,7 +419,7 @@ class RegistroLaborViewSet(viewsets.ModelViewSet):
 
 
 
-class NominaViewSet(viewsets.ModelViewSet):
+class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
     """ViewSet para gestión de nóminas"""
     queryset = Nomina.objects.all()
     serializer_class = NominaSerializer
@@ -409,6 +427,7 @@ class NominaViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = NominaFilter
     ordering = ['-quincena', 'trabajador']
+    finca_field = 'trabajador__finca'  # Filtrar por finca del trabajador
     
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     
@@ -934,31 +953,6 @@ class NominaViewSet(viewsets.ModelViewSet):
 
 
 # ============================================================================
-# PRÉSTAMOS
-# ============================================================================
-
-class PrestamoViewSet(viewsets.ModelViewSet):
-    """ViewSet para gestión de préstamos"""
-    queryset = Prestamo.objects.all()
-    permission_classes = [CanModifyData]
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_class = PrestamoFilter
-    ordering = ['-fecha_prestamo']
-    
-    def get_serializer_class(self):
-        if self.action == 'create':
-            return PrestamoCreateSerializer
-        return PrestamoSerializer
-
-    def perform_create(self, serializer):
-        # Guardar el creador del préstamo
-        serializer.save(created_by=self.request.user)
-    
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
-
-
-# ============================================================================
 # AUDITORÍA
 # ============================================================================
 
@@ -976,8 +970,8 @@ class AuditoriaLogViewSet(viewsets.ReadOnlyModelViewSet):
 # PRESTAMOS Y CUOTAS
 # ============================================================================  
 
-class PrestamoViewSet(viewsets.ModelViewSet):
-    """ViewSet para gestión de préstamos"""
+class PrestamoViewSet(FincaFilterMixin, viewsets.ModelViewSet):
+    """ViewSet para gestión de préstamos (adelantos de nómina)"""
     queryset = Prestamo.objects.all()
     serializer_class = PrestamoSerializer
     permission_classes = [CanModifyData]
@@ -985,6 +979,7 @@ class PrestamoViewSet(viewsets.ModelViewSet):
     filterset_fields = ['trabajador', 'estado', 'tipo_pago']
     search_fields = ['trabajador__nombres', 'trabajador__apellidos', 'trabajador__numero_documento']
     ordering = ['-fecha_prestamo']
+    finca_field = 'trabajador__finca'  # Filtrar por finca del trabajador
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -1160,7 +1155,7 @@ class VariablesNominaViewSet(viewsets.ModelViewSet):
 # CONTRATOS
 # ============================================================================
 
-class ContratoViewSet(viewsets.ModelViewSet):
+class ContratoViewSet(FincaFilterMixin, viewsets.ModelViewSet):
     """ViewSet para gestión de contratos laborales"""
     queryset = Contrato.objects.select_related('trabajador', 'created_by').all()
     permission_classes = [CanModifyData]
@@ -1168,6 +1163,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
     search_fields = ['numero_contrato', 'trabajador__nombres', 'trabajador__apellidos', 'cargo']
     filterset_fields = ['estado', 'trabajador', 'tipo_contrato']
     ordering = ['-fecha_inicio']
+    finca_field = 'trabajador__finca'  # Filtrar por finca del trabajador
 
     def get_serializer_class(self):
         """Seleccionar serializer según acción"""

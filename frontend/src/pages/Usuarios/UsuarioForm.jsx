@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import usuarioService from '../../services/usuarioService';
+import fincaService from '../../services/fincaService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
-import { Save, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Save, ArrowLeft, Eye, EyeOff, MapPin } from 'lucide-react';
 
 export default function UsuarioForm() {
   const navigate = useNavigate();
@@ -14,8 +15,11 @@ export default function UsuarioForm() {
   const isEditing = !!id;
 
   const [loading, setLoading] = useState(false);
-  const [loadingData, setLoadingData] = useState(isEditing);
+  const [loadingData, setLoadingData] = useState(true); // Siempre esperar carga inicial
   const [roles, setRoles] = useState([]);
+  const [fincas, setFincas] = useState([]);
+  const [loadingFincas, setLoadingFincas] = useState(true);
+  const [selectedFincas, setSelectedFincas] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -28,17 +32,31 @@ export default function UsuarioForm() {
   } = useForm();
 
   const password = watch('password');
+  const selectedRol = watch('rol');
+
+  // Verificar si el rol seleccionado es Administrador
+  const isAdminRol = roles.find(r => r.id === parseInt(selectedRol))?.nombre === 'ADMINISTRADOR';
 
   useEffect(() => {
-    loadRoles();
-    if (isEditing) {
-      loadUsuario();
-    }
+    loadInitialData();
   }, [id]);
+
+  const loadInitialData = async () => {
+    try {
+      if (isEditing) setLoadingData(true);
+      await Promise.all([loadRoles(), loadFincas()]);
+      if (isEditing) {
+        await loadUsuario();
+      }
+    } finally {
+      setLoadingData(false);
+    }
+  };
 
   const loadRoles = async () => {
     try {
       const data = await usuarioService.getRoles();
+      console.log('Roles cargados:', data); // Debug
       setRoles(data.results || data);
     } catch (error) {
       console.error('Error al cargar roles:', error);
@@ -46,9 +64,22 @@ export default function UsuarioForm() {
     }
   };
 
+  const loadFincas = async () => {
+    try {
+      setLoadingFincas(true);
+      const data = await fincaService.getAll();
+      console.log('Fincas cargadas:', data); // Debug
+      setFincas(data.results || data);
+    } catch (error) {
+      console.error('Error al cargar fincas:', error);
+      toast.error('Error al cargar fincas');
+    } finally {
+      setLoadingFincas(false);
+    }
+  };
+
   const loadUsuario = async () => {
     try {
-      setLoadingData(true);
       const data = await usuarioService.getById(id);
       reset({
         username: data.username,
@@ -58,12 +89,32 @@ export default function UsuarioForm() {
         rol: data.rol,
         es_activo: data.es_activo,
       });
+      // Cargar fincas asignadas
+      if (data.fincas_asignadas) {
+        setSelectedFincas(data.fincas_asignadas);
+      }
     } catch (error) {
       console.error('Error al cargar usuario:', error);
       toast.error('Error al cargar usuario');
       navigate('/usuarios');
-    } finally {
-      setLoadingData(false);
+    }
+  };
+
+  const handleFincaToggle = (fincaId) => {
+    setSelectedFincas(prev => {
+      if (prev.includes(fincaId)) {
+        return prev.filter(id => id !== fincaId);
+      } else {
+        return [...prev, fincaId];
+      }
+    });
+  };
+
+  const handleSelectAllFincas = () => {
+    if (selectedFincas.length === fincas.length) {
+      setSelectedFincas([]);
+    } else {
+      setSelectedFincas(fincas.map(f => f.id));
     }
   };
 
@@ -79,6 +130,8 @@ export default function UsuarioForm() {
         last_name: data.last_name,
         rol: data.rol || null,
         es_activo: data.es_activo,
+        // Incluir fincas asignadas (vacío para admin ya que ve todas)
+        fincas_asignadas: isAdminRol ? [] : selectedFincas,
       };
 
       // Solo incluir contraseña si se está creando o si se proporcionó una nueva
@@ -260,6 +313,74 @@ export default function UsuarioForm() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Fincas Asignadas */}
+        <div>
+          <h2 className="text-lg font-semibold mb-4 text-gray-900 flex items-center gap-2">
+            <MapPin className="w-5 h-5" />
+            Fincas Asignadas
+          </h2>
+
+          {isAdminRol ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-700">
+                <strong>Nota:</strong> Los usuarios con rol Administrador tienen acceso a todas las fincas automáticamente.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-gray-500 mb-3">
+                Seleccione las fincas que este usuario puede ver. Solo verá trabajadores, nóminas y registros de estas fincas.
+              </p>
+
+              {loadingFincas ? (
+                <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-lg">
+                  <LoadingSpinner size="sm" />
+                  <span className="text-sm text-gray-500">Cargando fincas...</span>
+                </div>
+              ) : fincas.length > 0 ? (
+                <>
+                  <div className="mb-3">
+                    <button
+                      type="button"
+                      onClick={handleSelectAllFincas}
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      {selectedFincas.length === fincas.length ? 'Deseleccionar todas' : 'Seleccionar todas'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-lg max-h-60 overflow-y-auto">
+                    {fincas.map((finca) => (
+                      <label
+                        key={finca.id}
+                        className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${
+                          selectedFincas.includes(finca.id)
+                            ? 'bg-green-100 border border-green-300'
+                            : 'bg-white border border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedFincas.includes(finca.id)}
+                          onChange={() => handleFincaToggle(finca.id)}
+                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                        />
+                        <span className="text-sm text-gray-700">{finca.nombre}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {selectedFincas.length === 0 && (
+                    <p className="mt-2 text-sm text-amber-600">
+                      Sin fincas asignadas, el usuario no podrá ver ningún dato.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-500 italic">No hay fincas disponibles.</p>
+              )}
+            </>
+          )}
         </div>
 
         {/* Contraseña */}
