@@ -44,15 +44,15 @@ const trabajadorService = {
     return response.data;
   },
 
-  // Activar trabajador
-  activar: async (id) => {
-    const response = await api.post(`/trabajadores/${id}/activar/`);
+  // Retirar trabajador (requiere motivo_retiro)
+  retirar: async (id, data) => {
+    const response = await api.post(`/trabajadores/${id}/retirar/`, data);
     return response.data;
   },
 
-  // Inactivar trabajador
-  inactivar: async (id) => {
-    const response = await api.post(`/trabajadores/${id}/inactivar/`);
+  // Reactivar trabajador retirado (vuelve a SIN_CONTRATO)
+  reactivar: async (id) => {
+    const response = await api.post(`/trabajadores/${id}/reactivar/`);
     return response.data;
   },
 

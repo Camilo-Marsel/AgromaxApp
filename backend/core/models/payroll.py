@@ -62,13 +62,21 @@ class VariablesNomina(models.Model):
 # ============================================================================
 
 class Nomina(models.Model):
-    """Cálculo de nómina por trabajador por quincena"""
+    """
+    Cálculo de nómina por trabajador por quincena.
+
+    Estados simplificados:
+    - PENDIENTE: Nómina en preparación, puede recalcularse libremente
+    - APROBADA: Nómina cerrada/pagada, números son oficiales
+    """
+
+    # Constantes de estado
+    PENDIENTE = 'PENDIENTE'
+    APROBADA = 'APROBADA'
 
     ESTADO_CHOICES = [
-        ('BORRADOR', 'Borrador'),
-        ('CALCULADA', 'Calculada'),
-        ('APROBADA', 'Aprobada'),
-        ('PAGADA', 'Pagada'),
+        (PENDIENTE, 'Pendiente'),
+        (APROBADA, 'Aprobada'),
     ]
 
     trabajador = models.ForeignKey(
@@ -96,10 +104,9 @@ class Nomina(models.Model):
         decimal_places=2,
         default=Decimal('0.00')
     )
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='BORRADOR')
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default=PENDIENTE)
     fecha_calculo = models.DateTimeField(auto_now_add=True)
     fecha_aprobacion = models.DateTimeField(null=True, blank=True)
-    fecha_pago = models.DateTimeField(null=True, blank=True)
     observaciones = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(

@@ -9,7 +9,7 @@ import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import SearchBar from '../../components/Common/SearchBar';
 import toast from 'react-hot-toast';
-import { Calculator, Eye, AlertCircle, Download, FileSpreadsheet, CheckCircle, XCircle, DollarSign, Mail } from 'lucide-react';
+import { Calculator, Eye, AlertCircle, Download, CheckCircle, Mail } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function NominaList() {
@@ -34,13 +34,10 @@ export default function NominaList() {
 
   // Estados para acciones masivas
   const [confirmAprobarMasivo, setConfirmAprobarMasivo] = useState(false);
-  const [confirmRechazarMasivo, setConfirmRechazarMasivo] = useState(false);
-  const [confirmPagarMasivo, setConfirmPagarMasivo] = useState(false);
   const [confirmEnviarCorreosMasivo, setConfirmEnviarCorreosMasivo] = useState(false);
-  const [motivoRechazoMasivo, setMotivoRechazoMasivo] = useState('');
   const [procesandoMasivo, setProcesandoMasivo] = useState(false);
   const [enviandoCorreos, setEnviandoCorreos] = useState(false);
-  const [estadosEnvioCorreo, setEstadosEnvioCorreo] = useState(['PAGADA']);
+  const [estadosEnvioCorreo, setEstadosEnvioCorreo] = useState(['APROBADA']);
 
   useEffect(() => {
     loadInitialData();
@@ -158,46 +155,6 @@ export default function NominaList() {
     } catch (error) {
       console.error('Error al aprobar masivo:', error);
       const errorMsg = error.response?.data?.error || 'Error al aprobar nóminas';
-      toast.error(errorMsg);
-    } finally {
-      setProcesandoMasivo(false);
-    }
-  };
-
-  const handleRechazarMasivo = async () => {
-    try {
-      setProcesandoMasivo(true);
-      const result = await nominaService.rechazarMasivo(
-        quincenaSeleccionada,
-        fincaSeleccionada || null,
-        motivoRechazoMasivo
-      );
-      toast.success(result.message);
-      setConfirmRechazarMasivo(false);
-      setMotivoRechazoMasivo('');
-      await loadNominas(quincenaSeleccionada, fincaSeleccionada);
-    } catch (error) {
-      console.error('Error al rechazar masivo:', error);
-      const errorMsg = error.response?.data?.error || 'Error al rechazar nóminas';
-      toast.error(errorMsg);
-    } finally {
-      setProcesandoMasivo(false);
-    }
-  };
-
-  const handlePagarMasivo = async () => {
-    try {
-      setProcesandoMasivo(true);
-      const result = await nominaService.marcarPagadasMasivo(
-        quincenaSeleccionada,
-        fincaSeleccionada || null
-      );
-      toast.success(result.message);
-      setConfirmPagarMasivo(false);
-      await loadNominas(quincenaSeleccionada, fincaSeleccionada);
-    } catch (error) {
-      console.error('Error al marcar como pagadas:', error);
-      const errorMsg = error.response?.data?.error || 'Error al marcar nóminas como pagadas';
       toast.error(errorMsg);
     } finally {
       setProcesandoMasivo(false);
@@ -393,34 +350,12 @@ export default function NominaList() {
                   {/* Botón Aprobar Masivo */}
                   <button
                     onClick={() => setConfirmAprobarMasivo(true)}
-                    disabled={nominasFiltradas.filter(n => n.estado === 'CALCULADA').length === 0}
+                    disabled={nominasFiltradas.filter(n => n.estado === 'PENDIENTE').length === 0}
                     className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400"
-                    title="Aprobar todas las nóminas CALCULADAS"
+                    title="Aprobar todas las nóminas PENDIENTES"
                   >
                     <CheckCircle className="w-5 h-5" />
                     Aprobar Todas
-                  </button>
-
-                  {/* Botón Rechazar Masivo */}
-                  <button
-                    onClick={() => setConfirmRechazarMasivo(true)}
-                    disabled={nominasFiltradas.filter(n => n.estado === 'APROBADA').length === 0}
-                    className="flex items-center gap-2 bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 disabled:bg-gray-400"
-                    title="Rechazar todas las nóminas APROBADAS"
-                  >
-                    <XCircle className="w-5 h-5" />
-                    Rechazar Todas
-                  </button>
-
-                  {/* Botón Marcar Pagadas Masivo */}
-                  <button
-                    onClick={() => setConfirmPagarMasivo(true)}
-                    disabled={nominasFiltradas.filter(n => n.estado === 'APROBADA').length === 0}
-                    className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
-                    title="Marcar todas las APROBADAS como PAGADAS"
-                  >
-                    <DollarSign className="w-5 h-5" />
-                    Marcar Todas Pagadas
                   </button>
                 </>
               )}
@@ -485,10 +420,10 @@ export default function NominaList() {
         title="Aprobar Nóminas Masivamente"
         message={
           <div className="space-y-2">
-            <p>¿Está seguro que desea aprobar todas las nóminas CALCULADAS?</p>
+            <p>¿Está seguro que desea aprobar todas las nóminas PENDIENTES?</p>
             <div className="bg-blue-50 p-3 rounded-md">
               <p className="text-sm font-medium text-blue-900">
-                {nominasFiltradas.filter(n => n.estado === 'CALCULADA').length} nómina(s) serán aprobadas
+                {nominasFiltradas.filter(n => n.estado === 'PENDIENTE').length} nómina(s) serán aprobadas
               </p>
               {fincaSeleccionada && (
                 <p className="text-xs text-blue-700 mt-1">
@@ -496,79 +431,12 @@ export default function NominaList() {
                 </p>
               )}
             </div>
-            <p className="text-sm text-gray-600">
-              Una vez aprobadas, no se podrán editar ajustes manuales.
+            <p className="text-sm text-red-600 font-medium">
+              ⚠️ Una vez aprobadas, los valores quedan como oficiales.
             </p>
           </div>
         }
         confirmText={procesandoMasivo ? "Aprobando..." : "Aprobar Todas"}
-        disabled={procesandoMasivo}
-      />
-
-      <ConfirmDialog
-        isOpen={confirmRechazarMasivo}
-        onClose={() => {
-          setConfirmRechazarMasivo(false);
-          setMotivoRechazoMasivo('');
-        }}
-        onConfirm={handleRechazarMasivo}
-        title="Rechazar Nóminas Masivamente"
-        message={
-          <div className="space-y-3">
-            <p>¿Está seguro que desea rechazar todas las nóminas APROBADAS?</p>
-            <div className="bg-yellow-50 p-3 rounded-md">
-              <p className="text-sm font-medium text-yellow-900">
-                {nominasFiltradas.filter(n => n.estado === 'APROBADA').length} nómina(s) regresarán a CALCULADA
-              </p>
-              {fincaSeleccionada && (
-                <p className="text-xs text-yellow-700 mt-1">
-                  Solo de la finca seleccionada
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Motivo del rechazo (opcional):
-              </label>
-              <textarea
-                value={motivoRechazoMasivo}
-                onChange={(e) => setMotivoRechazoMasivo(e.target.value)}
-                rows="3"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                placeholder="Ej: Error en cálculo de dominicales"
-              />
-            </div>
-          </div>
-        }
-        confirmText={procesandoMasivo ? "Rechazando..." : "Rechazar Todas"}
-        type="warning"
-        disabled={procesandoMasivo}
-      />
-
-      <ConfirmDialog
-        isOpen={confirmPagarMasivo}
-        onClose={() => setConfirmPagarMasivo(false)}
-        onConfirm={handlePagarMasivo}
-        title="Marcar Nóminas como Pagadas"
-        message={
-          <div className="space-y-2">
-            <p>¿Confirma que estas nóminas ya fueron pagadas a los trabajadores?</p>
-            <div className="bg-purple-50 p-3 rounded-md">
-              <p className="text-sm font-medium text-purple-900">
-                {nominasFiltradas.filter(n => n.estado === 'APROBADA').length} nómina(s) serán marcadas como PAGADAS
-              </p>
-              {fincaSeleccionada && (
-                <p className="text-xs text-purple-700 mt-1">
-                  Solo de la finca seleccionada
-                </p>
-              )}
-            </div>
-            <p className="text-sm text-red-600 font-medium">
-              ⚠️ Esta acción es permanente y no se puede deshacer.
-            </p>
-          </div>
-        }
-        confirmText={procesandoMasivo ? "Procesando..." : "Confirmar Pago Masivo"}
         disabled={procesandoMasivo}
       />
 
@@ -587,7 +455,7 @@ export default function NominaList() {
                 Enviar recibos de nóminas en estado:
               </label>
               <div className="flex flex-wrap gap-2">
-                {['CALCULADA', 'APROBADA', 'PAGADA'].map((estado) => (
+                {['PENDIENTE', 'APROBADA'].map((estado) => (
                   <label key={estado} className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -602,11 +470,10 @@ export default function NominaList() {
                       className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                      estado === 'PAGADA' ? 'bg-green-100 text-green-800' :
-                      estado === 'APROBADA' ? 'bg-blue-100 text-blue-800' :
+                      estado === 'APROBADA' ? 'bg-green-100 text-green-800' :
                       'bg-yellow-100 text-yellow-800'
                     }`}>
-                      {estado}
+                      {estado === 'PENDIENTE' ? 'Pendiente' : 'Aprobada'}
                     </span>
                   </label>
                 ))}
@@ -737,16 +604,12 @@ export default function NominaList() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            nomina.estado === 'PAGADA'
+                            nomina.estado === 'APROBADA'
                               ? 'bg-green-100 text-green-800'
-                              : nomina.estado === 'APROBADA'
-                              ? 'bg-blue-100 text-blue-800'
-                              : nomina.estado === 'CALCULADA'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
+                              : 'bg-yellow-100 text-yellow-800'
                           }`}
                         >
-                          {nomina.estado_display}
+                          {nomina.estado_display || nomina.estado}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">

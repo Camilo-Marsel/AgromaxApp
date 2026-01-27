@@ -8,7 +8,7 @@ import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import SearchBar from '../../components/Common/SearchBar';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import toast from 'react-hot-toast';
-import { UserPlus, Eye, Edit, UserCheck, UserX, Briefcase } from 'lucide-react';
+import { UserPlus, Eye, Edit, UserCheck, Briefcase, UserMinus } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function TrabajadoresList() {
@@ -18,7 +18,7 @@ export default function TrabajadoresList() {
   const [fincas, setFincas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState('ACTIVO');
+  const [filtroEstado, setFiltroEstado] = useState('');  // Vacío = todos excepto retirados
   const [filtroFinca, setFiltroFinca] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
@@ -64,25 +64,29 @@ export default function TrabajadoresList() {
     }
   };
 
-  const handleActivar = async (id) => {
+  const handleRetirar = async (id, motivo) => {
     try {
-      await trabajadorService.activar(id);
-      toast.success('Trabajador activado correctamente');
+      const response = await trabajadorService.retirar(id, { motivo_retiro: motivo });
+      if (response.warning) {
+        toast.success(`Trabajador retirado. Nota: ${response.warning}`);
+      } else {
+        toast.success('Trabajador retirado correctamente');
+      }
       loadTrabajadores();
     } catch (error) {
-      console.error('Error al activar trabajador:', error);
-      toast.error('Error al activar trabajador');
+      console.error('Error al retirar trabajador:', error);
+      toast.error(error.response?.data?.error || 'Error al retirar trabajador');
     }
   };
 
-  const handleInactivar = async (id) => {
+  const handleReactivar = async (id) => {
     try {
-      await trabajadorService.inactivar(id);
-      toast.success('Trabajador inactivado correctamente');
+      await trabajadorService.reactivar(id);
+      toast.success('Trabajador reactivado correctamente');
       loadTrabajadores();
     } catch (error) {
-      console.error('Error al inactivar trabajador:', error);
-      toast.error('Error al inactivar trabajador');
+      console.error('Error al reactivar trabajador:', error);
+      toast.error(error.response?.data?.error || 'Error al reactivar trabajador');
     }
   };
 
@@ -179,9 +183,10 @@ export default function TrabajadoresList() {
               onChange={(e) => setFiltroEstado(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="ACTIVO">Activos</option>
-              <option value="INACTIVO">Inactivos</option>
-              <option value="">Todos</option>
+              <option value="">Todos (no retirados)</option>
+              <option value="CONTRATADO">Contratados</option>
+              <option value="SIN_CONTRATO">Sin Contrato</option>
+              <option value="RETIRADO">Retirados</option>
             </select>
           </div>
         </div>
@@ -261,12 +266,14 @@ export default function TrabajadoresList() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        trabajador.estado === 'ACTIVO'
+                        trabajador.estado === 'CONTRATADO'
                           ? 'bg-green-100 text-green-800'
+                          : trabajador.estado === 'SIN_CONTRATO'
+                          ? 'bg-yellow-100 text-yellow-800'
                           : 'bg-red-100 text-red-800'
                       }`}
                     >
-                      {trabajador.estado_display}
+                      {trabajador.estado_display || trabajador.estado}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -287,41 +294,41 @@ export default function TrabajadoresList() {
                           >
                             <Edit className="w-5 h-5" />
                           </button>
-                          {trabajador.estado === 'ACTIVO' ? (
+                          {trabajador.estado === 'RETIRADO' ? (
                             <button
                               onClick={() =>
                                 openConfirmDialog(
-                                  'Inactivar Trabajador',
-                                  `¿Está seguro que desea inactivar a ${trabajador.nombre_completo}?`,
+                                  'Reactivar Trabajador',
+                                  `¿Está seguro que desea reactivar a ${trabajador.nombre_completo}? Volverá al estado "Sin Contrato".`,
                                   () => {
-                                    handleInactivar(trabajador.id);
-                                    closeConfirmDialog();
-                                  },
-                                  'warning'
-                                )
-                              }
-                              className="text-red-600 hover:text-red-900"
-                              title="Inactivar"
-                            >
-                              <UserX className="w-5 h-5" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() =>
-                                openConfirmDialog(
-                                  'Activar Trabajador',
-                                  `¿Está seguro que desea activar a ${trabajador.nombre_completo}?`,
-                                  () => {
-                                    handleActivar(trabajador.id);
+                                    handleReactivar(trabajador.id);
                                     closeConfirmDialog();
                                   },
                                   'info'
                                 )
                               }
                               className="text-green-600 hover:text-green-900"
-                              title="Activar"
+                              title="Reactivar"
                             >
                               <UserCheck className="w-5 h-5" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                openConfirmDialog(
+                                  'Retirar Trabajador',
+                                  `¿Está seguro que desea retirar a ${trabajador.nombre_completo}? Ya no aparecerá en nóminas ni registros de labor.`,
+                                  () => {
+                                    handleRetirar(trabajador.id, 'RENUNCIA');
+                                    closeConfirmDialog();
+                                  },
+                                  'warning'
+                                )
+                              }
+                              className="text-red-600 hover:text-red-900"
+                              title="Retirar"
+                            >
+                              <UserMinus className="w-5 h-5" />
                             </button>
                           )}
                         </>

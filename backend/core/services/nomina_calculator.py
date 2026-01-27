@@ -34,35 +34,40 @@ class NominaCalculator:
         return variables
     
     def calcular_quincena_completa(self, usuario):
-        """Calcular nómina para todos los trabajadores activos en la quincena"""
-        trabajadores = Trabajador.objects.filter(estado='ACTIVO')
+        """Calcular nómina para todos los trabajadores que pueden trabajar (no retirados)"""
+        # Excluir trabajadores retirados - tanto CONTRATADO como SIN_CONTRATO pueden trabajar
+        trabajadores = Trabajador.objects.exclude(estado=Trabajador.RETIRADO)
         nominas_creadas = []
-        
+
         for trabajador in trabajadores:
             nomina = self.calcular_trabajador(trabajador, usuario)
             if nomina:
                 nominas_creadas.append(nomina)
-        
+
         return nominas_creadas
     
     @transaction.atomic
     def calcular_trabajador(self, trabajador, usuario):
         """Calcular nómina para un trabajador específico"""
-        
+
         # Verificar si ya existe nómina
         nomina, created = Nomina.objects.get_or_create(
             trabajador=trabajador,
             quincena=self.quincena,
             defaults={
-                'estado': 'BORRADOR',
+                'estado': 'PENDIENTE',
                 'created_by': usuario
             }
         )
-        
-        # Si ya existe y está pagada, no recalcular
-        if not created and nomina.estado == 'PAGADA':
+
+        # Si ya existe y está aprobada, no recalcular automáticamente
+        if not created and nomina.estado == 'APROBADA':
             return nomina
-        
+
+        # ===== FIX BUG ADELANTOS DUPLICADOS =====
+        # ANTES de eliminar detalles, revertir cuotas de préstamo vinculadas a esta nómina
+        self._revertir_cuotas_prestamo(nomina)
+
         # Limpiar detalles anteriores si es recálculo
         nomina.detalles.all().delete()
 
@@ -138,11 +143,41 @@ class NominaCalculator:
         nomina.total_devengado = total_devengado
         nomina.total_deducciones = total_deducciones
         nomina.total_neto = total_neto
-        nomina.estado = 'CALCULADA'
+        nomina.estado = 'PENDIENTE'
         nomina.save()
-        
+
         return nomina
-    
+
+    def _revertir_cuotas_prestamo(self, nomina):
+        """
+        Revertir cuotas de préstamo que fueron descontadas por esta nómina.
+        Esto evita el bug de descuentos duplicados al recalcular.
+        """
+        # Buscar cuotas vinculadas a esta nómina
+        cuotas_a_revertir = CuotaPrestamo.objects.filter(
+            nomina=nomina,
+            estado='DESCONTADA'
+        ).select_related('prestamo')
+
+        for cuota in cuotas_a_revertir:
+            prestamo = cuota.prestamo
+
+            # Revertir el saldo del préstamo
+            prestamo.saldo_pendiente += cuota.valor_cuota
+
+            # Si el préstamo estaba PAGADO, volver a ACTIVO
+            if prestamo.estado == 'PAGADO':
+                prestamo.estado = 'ACTIVO'
+
+            prestamo.save()
+
+            # Revertir la cuota a PENDIENTE
+            cuota.estado = 'PENDIENTE'
+            cuota.nomina = None
+            cuota.quincena = None
+            cuota.fecha_descuento = None
+            cuota.save()
+
     def _calcular_labores(self, nomina, registros):
         """Calcular devengos por labores normales (excluyendo festivos que se calculan aparte)"""
         total = Decimal('0.00')
@@ -199,7 +234,7 @@ class NominaCalculator:
             nomina.total_devengado = Decimal('0.00')
             nomina.total_deducciones = Decimal('0.00')
             nomina.total_neto = Decimal('0.00')
-            nomina.estado = 'CALCULADA'
+            nomina.estado = 'PENDIENTE'
             nomina.save()
             return nomina
         
@@ -276,11 +311,11 @@ class NominaCalculator:
         nomina.total_devengado = total_devengado
         nomina.total_deducciones = total_deducciones
         nomina.total_neto = total_neto
-        nomina.estado = 'CALCULADA'
+        nomina.estado = 'PENDIENTE'
         nomina.save()
-        
+
         return nomina
-    
+
     def _calcular_dominicales(self, nomina, trabajador, registros):
         """Calcular dominicales (1 por semana trabajada completa sin ausencias)"""
         total = Decimal('0.00')

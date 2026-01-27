@@ -89,20 +89,73 @@ class TrabajadorViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         return TrabajadorDetailSerializer
     
     @action(detail=True, methods=['post'])
-    def activar(self, request, pk=None):
-        """Activar trabajador"""
+    def retirar(self, request, pk=None):
+        """
+        Retirar un trabajador.
+        Requiere: motivo_retiro (y opcionalmente observaciones_retiro, fecha_retiro)
+        """
+        from django.utils import timezone
+
         trabajador = self.get_object()
-        trabajador.estado = 'ACTIVO'
+
+        if trabajador.estado == Trabajador.RETIRADO:
+            return Response(
+                {'error': 'El trabajador ya está retirado'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar motivo de retiro
+        motivo = request.data.get('motivo_retiro')
+        if not motivo:
+            return Response(
+                {'error': 'Debe indicar el motivo de retiro'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Verificar si tiene adelantos pendientes
+        adelantos_pendientes = trabajador.prestamos.filter(estado='ACTIVO')
+        if adelantos_pendientes.exists():
+            total_pendiente = sum(a.saldo_pendiente for a in adelantos_pendientes)
+            # Solo advertir, no bloquear
+            warning = f'El trabajador tiene adelantos pendientes por ${total_pendiente}'
+        else:
+            warning = None
+
+        # Actualizar trabajador
+        trabajador.estado = Trabajador.RETIRADO
+        trabajador.motivo_retiro = motivo
+        trabajador.observaciones_retiro = request.data.get('observaciones_retiro', '')
+        trabajador.fecha_retiro = request.data.get('fecha_retiro') or timezone.now().date()
         trabajador.save()
+
         serializer = self.get_serializer(trabajador)
-        return Response(serializer.data)
-    
+        response_data = serializer.data
+        if warning:
+            response_data['warning'] = warning
+
+        return Response(response_data)
+
     @action(detail=True, methods=['post'])
-    def inactivar(self, request, pk=None):
-        """Inactivar trabajador"""
+    def reactivar(self, request, pk=None):
+        """
+        Reactivar un trabajador retirado.
+        El trabajador vuelve a estado SIN_CONTRATO.
+        """
         trabajador = self.get_object()
-        trabajador.estado = 'INACTIVO'
+
+        if trabajador.estado != Trabajador.RETIRADO:
+            return Response(
+                {'error': 'Solo se pueden reactivar trabajadores retirados'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        trabajador.estado = Trabajador.SIN_CONTRATO
+        # Limpiar campos de retiro
+        trabajador.fecha_retiro = None
+        trabajador.motivo_retiro = None
+        trabajador.observaciones_retiro = None
         trabajador.save()
+
         serializer = self.get_serializer(trabajador)
         return Response(serializer.data)
 
@@ -146,9 +199,10 @@ class FincaViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def trabajadores(self, request, pk=None):
-        """Obtener trabajadores de una finca"""
+        """Obtener trabajadores activos de una finca (CONTRATADO o SIN_CONTRATO)"""
         finca = self.get_object()
-        trabajadores = finca.trabajadores.filter(estado='ACTIVO')
+        # Excluir trabajadores retirados
+        trabajadores = finca.trabajadores.exclude(estado=Trabajador.RETIRADO)
         serializer = TrabajadorListSerializer(trabajadores, many=True, context={'request': request})
         return Response(serializer.data)
 
@@ -298,21 +352,21 @@ class QuincenaViewSet(viewsets.ModelViewSet):
     def estadisticas(self, request, pk=None):
         """Obtener estadísticas de registros de la quincena"""
         quincena = self.get_object()
-        
-        # Total de trabajadores activos
-        trabajadores_activos = Trabajador.objects.filter(estado='ACTIVO').count()
-        
+
+        # Total de trabajadores que pueden trabajar (no retirados)
+        trabajadores_activos = Trabajador.objects.exclude(estado=Trabajador.RETIRADO).count()
+
         # Trabajadores con al menos un registro en esta quincena
         trabajadores_con_registros = RegistroLabor.objects.filter(
             quincena=quincena
         ).values('trabajador').distinct().count()
-        
+
         # Total de registros
         total_registros = RegistroLabor.objects.filter(quincena=quincena).count()
-        
+
         # Trabajadores sin registros
         trabajadores_sin_registros = trabajadores_activos - trabajadores_con_registros
-        
+
         return Response({
             'trabajadores_activos': trabajadores_activos,
             'trabajadores_con_registros': trabajadores_con_registros,

@@ -126,7 +126,14 @@ class TipoContrato(models.Model):
 
 
 class Trabajador(models.Model):
-    """Trabajadores de la finca"""
+    """
+    Trabajadores de la finca.
+
+    Estados:
+    - CONTRATADO: Tiene contrato activo, aparece en nómina y puede registrar labores
+    - SIN_CONTRATO: No tiene contrato activo, puede trabajar y recibir pago pero sin prestaciones
+    - RETIRADO: Ya no trabaja, solo se mantiene por historial (ley exige 5 años)
+    """
 
     # Tipos de documento
     TIPO_DOCUMENTO_CHOICES = [
@@ -136,14 +143,36 @@ class Trabajador(models.Model):
         ('PEP', 'Permiso Especial de Permanencia'),
     ]
 
+    # Constantes de estado
+    CONTRATADO = 'CONTRATADO'
+    SIN_CONTRATO = 'SIN_CONTRATO'
+    RETIRADO = 'RETIRADO'
+
     # Estados del trabajador
     ESTADO_CHOICES = [
-        ('ACTIVO', 'Activo'),
-        ('INACTIVO', 'Inactivo'),
-        ('RETIRADO', 'Retirado'),
+        (CONTRATADO, 'Contratado'),
+        (SIN_CONTRATO, 'Sin Contrato'),
+        (RETIRADO, 'Retirado'),
     ]
 
-    # NUEVO: Tipos de cuenta bancaria
+    # Motivos de retiro
+    MOTIVO_RENUNCIA = 'RENUNCIA'
+    MOTIVO_DESPIDO_JUSTA_CAUSA = 'DESPIDO_JUSTA_CAUSA'
+    MOTIVO_DESPIDO_SIN_JUSTA_CAUSA = 'DESPIDO_SIN_JUSTA_CAUSA'
+    MOTIVO_MUTUO_ACUERDO = 'MUTUO_ACUERDO'
+    MOTIVO_FIN_CONTRATO = 'FIN_CONTRATO'
+    MOTIVO_OTRO = 'OTRO'
+
+    MOTIVO_RETIRO_CHOICES = [
+        (MOTIVO_RENUNCIA, 'Renuncia Voluntaria'),
+        (MOTIVO_DESPIDO_JUSTA_CAUSA, 'Despido con Justa Causa'),
+        (MOTIVO_DESPIDO_SIN_JUSTA_CAUSA, 'Despido sin Justa Causa'),
+        (MOTIVO_MUTUO_ACUERDO, 'Mutuo Acuerdo'),
+        (MOTIVO_FIN_CONTRATO, 'Finalización de Contrato'),
+        (MOTIVO_OTRO, 'Otro'),
+    ]
+
+    # Tipos de cuenta bancaria
     TIPO_CUENTA_CHOICES = [
         ('AHORRO', 'Cuenta de Ahorros'),
         ('CORRIENTE', 'Cuenta Corriente'),
@@ -205,7 +234,21 @@ class Trabajador(models.Model):
 
     fecha_ingreso = models.DateField()
     fecha_retiro = models.DateField(blank=True, null=True)
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='ACTIVO')
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default=SIN_CONTRATO)
+
+    # Información de retiro
+    motivo_retiro = models.CharField(
+        max_length=30,
+        choices=MOTIVO_RETIRO_CHOICES,
+        blank=True,
+        null=True,
+        verbose_name='Motivo de Retiro'
+    )
+    observaciones_retiro = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Observaciones del Retiro'
+    )
 
     # Información bancaria
     numero_cuenta_bancaria = models.CharField(max_length=100, blank=True, null=True)
