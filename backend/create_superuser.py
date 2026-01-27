@@ -18,6 +18,6 @@ password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'admin123')
 # Crear solo si no existe
 if not User.objects.filter(username=username).exists():
     User.objects.create_superuser(username=username, email=email, password=password)
-    print(f'✅ Superusuario "{username}" creado correctamente')
+    print('Superusuario creado correctamente')
 else:
-    print(f'ℹ️ Superusuario "{username}" ya existe')
+    print('Superusuario ya existe')

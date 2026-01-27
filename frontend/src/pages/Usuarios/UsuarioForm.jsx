@@ -56,7 +56,6 @@ export default function UsuarioForm() {
   const loadRoles = async () => {
     try {
       const data = await usuarioService.getRoles();
-      console.log('Roles cargados:', data); // Debug
       setRoles(data.results || data);
     } catch (error) {
       console.error('Error al cargar roles:', error);
@@ -68,7 +67,6 @@ export default function UsuarioForm() {
     try {
       setLoadingFincas(true);
       const data = await fincaService.getAll();
-      console.log('Fincas cargadas:', data); // Debug
       setFincas(data.results || data);
     } catch (error) {
       console.error('Error al cargar fincas:', error);
