@@ -524,7 +524,7 @@ class NominaSerializer(serializers.ModelSerializer):
             'quincena', 'quincena_info',
             'total_devengado', 'total_deducciones', 'total_neto',
             'estado', 'estado_display',
-            'fecha_calculo', 'fecha_aprobacion', 'fecha_pago',
+            'fecha_calculo', 'fecha_aprobacion',
             'devengos_adicionales', 'descripcion_devengos_adicionales',
             'deducciones_adicionales', 'descripcion_deducciones_adicionales',
             'observaciones', 'detalles',
