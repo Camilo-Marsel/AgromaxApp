@@ -52,7 +52,7 @@ export default function PrestamoForm() {
   const loadTrabajadores = async () => {
     try {
       // Usar endpoint sin paginación para obtener todos los trabajadores
-      const data = await trabajadorService.getAllSimple({ estado: 'ACTIVO' });
+      const data = await trabajadorService.getAllSimple({ estado: 'CONTRATADO' });
       setTrabajadores(data || []);
     } catch (error) {
       console.error('Error al cargar trabajadores:', error);

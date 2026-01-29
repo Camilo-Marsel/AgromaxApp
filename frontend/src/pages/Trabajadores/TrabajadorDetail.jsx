@@ -137,8 +137,10 @@ export default function TrabajadorDetail() {
               <h1 className="text-2xl font-bold">{trabajador.nombre_completo}</h1>
               <span
                 className={`px-3 py-1 text-sm font-semibold rounded-full ${
-                  trabajador.estado === 'ACTIVO'
+                  trabajador.estado === 'CONTRATADO'
                     ? 'bg-green-100 text-green-800'
+                    : trabajador.estado === 'SIN_CONTRATO'
+                    ? 'bg-yellow-100 text-yellow-800'
                     : 'bg-red-100 text-red-800'
                 }`}
               >

@@ -5,8 +5,9 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import quincenaService from '../services/quincenaService';
 import trabajadorService from '../services/trabajadorService';
+import contratoService from '../services/contratoService';
 import toast from 'react-hot-toast';
-import { Calendar, Users, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Calendar, Users, AlertCircle, CheckCircle, Clock, FileText } from 'lucide-react';
 import LoadingSpinner from '../components/Common/LoadingSpinner';
 
 export default function Dashboard() {
@@ -16,6 +17,7 @@ export default function Dashboard() {
   const [quincenaActual, setQuincenaActual] = useState(null);
   const [estadisticas, setEstadisticas] = useState(null);
   const [trabajadoresActivos, setTrabajadoresActivos] = useState(0);
+  const [contratosStats, setContratosStats] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -35,9 +37,18 @@ export default function Dashboard() {
       setEstadisticas(stats);
 
       // Obtener trabajadores activos
-      const trabajadores = await trabajadorService.getAll({ estado: 'ACTIVO' });
+      const trabajadores = await trabajadorService.getAll({ estado: 'CONTRATADO' });
       const trabajadoresArray = trabajadores.results || trabajadores;
       setTrabajadoresActivos(Array.isArray(trabajadoresArray) ? trabajadoresArray.length : 0);
+
+      // Obtener estadísticas de contratos
+      try {
+        const contratosData = await contratoService.getEstadisticas();
+        setContratosStats(contratosData);
+      } catch (err) {
+        console.log('Contratos no disponibles:', err);
+        setContratosStats(null);
+      }
 
     } catch (error) {
       console.error('Error al cargar datos:', error);

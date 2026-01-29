@@ -124,7 +124,7 @@ export default function RegistroLabores() {
 
   const loadTrabajadoresByFinca = async (fincaId) => {
     try {
-      const data = await trabajadorService.getAll({ finca: fincaId, estado: 'ACTIVO' });
+      const data = await trabajadorService.getAll({ finca: fincaId, estado: 'CONTRATADO' });
       setTrabajadores(data.results || data);
     } catch (error) {
       console.error('Error al cargar trabajadores:', error);

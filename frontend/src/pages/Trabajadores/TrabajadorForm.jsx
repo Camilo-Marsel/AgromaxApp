@@ -69,7 +69,7 @@ export default function TrabajadorForm() {
         direccion: data.direccion || '',
         email: data.correo || '', // API usa 'correo', form usa 'email'
         tipo_contrato: data.tipo_contrato || '',
-        estado: data.estado || 'ACTIVO',
+        estado: data.estado || 'SIN_CONTRATO',
         fecha_ingreso: data.fecha_ingreso || '',
         fecha_retiro: data.fecha_retiro || '',
         finca: data.finca || '',
