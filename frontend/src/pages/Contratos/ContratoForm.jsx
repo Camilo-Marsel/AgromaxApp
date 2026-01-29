@@ -84,9 +84,9 @@ export default function ContratoForm() {
 
   const loadTrabajadores = async () => {
     try {
-      // Solo cargar trabajadores CON_CONTRATO activos
+      // Solo cargar trabajadores CON_CONTRATO contratados
       const data = await trabajadorService.getAll({
-        estado: 'ACTIVO',
+        estado: 'CONTRATADO',
       });
 
       // Filtrar solo trabajadores CON_CONTRATO
