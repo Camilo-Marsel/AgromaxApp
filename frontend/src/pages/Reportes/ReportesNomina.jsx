@@ -20,9 +20,8 @@ export default function ReportesNomina() {
   const [quincenaSeleccionada, setQuincenaSeleccionada] = useState('');
   const [fincaSeleccionada, setFincaSeleccionada] = useState('');
   const [estadosSeleccionados, setEstadosSeleccionados] = useState({
-    CALCULADA: true,
+    PENDIENTE: true,
     APROBADA: true,
-    PAGADA: true,
   });
 
   useEffect(() => {
@@ -222,11 +221,11 @@ export default function ReportesNomina() {
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={estadosSeleccionados.CALCULADA}
-                onChange={() => handleEstadoChange('CALCULADA')}
+                checked={estadosSeleccionados.PENDIENTE}
+                onChange={() => handleEstadoChange('PENDIENTE')}
                 className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
               />
-              <span className="text-sm">Calculadas</span>
+              <span className="text-sm">Pendientes</span>
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -236,15 +235,6 @@ export default function ReportesNomina() {
                 className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
               />
               <span className="text-sm">Aprobadas</span>
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={estadosSeleccionados.PAGADA}
-                onChange={() => handleEstadoChange('PAGADA')}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-              />
-              <span className="text-sm">Pagadas</span>
             </label>
           </div>
         </div>

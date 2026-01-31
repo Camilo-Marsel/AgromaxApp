@@ -7,7 +7,7 @@ import nominaService from '../../services/nominaService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Download, Edit2, Save, X, CheckCircle, DollarSign, Mail } from 'lucide-react';
+import { ArrowLeft, Download, Edit2, Save, X, CheckCircle, Mail } from 'lucide-react';
 
 export default function NominaDetail() {
   const navigate = useNavigate();
@@ -19,7 +19,6 @@ export default function NominaDetail() {
   const [guardandoAjustes, setGuardandoAjustes] = useState(false);
   const [confirmAprobar, setConfirmAprobar] = useState(false);
   const [confirmRechazar, setConfirmRechazar] = useState(false);
-  const [confirmPagar, setConfirmPagar] = useState(false);
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [procesando, setProcesando] = useState(false);
   const [enviandoCorreo, setEnviandoCorreo] = useState(false);
@@ -128,20 +127,6 @@ export default function NominaDetail() {
     }
   };
 
-  const handleMarcarPagada = async () => {
-    try {
-      setProcesando(true);
-      await nominaService.marcarPagada(id);
-      toast.success('Nómina marcada como pagada');
-      setConfirmPagar(false);
-      await loadNomina();
-    } catch (error) {
-      console.error('Error al marcar como pagada:', error);
-      toast.error('Error al marcar como pagada');
-    } finally {
-      setProcesando(false);
-    }
-  };
 
   const handleEnviarCorreo = async () => {
     if (!nomina.trabajador_info?.correo) {
@@ -233,7 +218,7 @@ export default function NominaDetail() {
           </button>
 
           {/* Botones según estado */}
-          {nomina.estado === 'CALCULADA' && (
+          {nomina.estado === 'PENDIENTE' && (
             <button
               onClick={() => setConfirmAprobar(true)}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
@@ -244,22 +229,13 @@ export default function NominaDetail() {
           )}
 
           {nomina.estado === 'APROBADA' && (
-            <>
-              <button
-                onClick={() => setConfirmRechazar(true)}
-                className="flex items-center gap-2 bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700"
-              >
-                <X className="w-5 h-5" />
-                Rechazar
-              </button>
-              <button
-                onClick={() => setConfirmPagar(true)}
-                className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
-              >
-                <DollarSign className="w-5 h-5" />
-                Marcar Pagada
-              </button>
-            </>
+            <button
+              onClick={() => setConfirmRechazar(true)}
+              className="flex items-center gap-2 bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700"
+            >
+              <X className="w-5 h-5" />
+              Rechazar
+            </button>
           )}
         </div>
       </div>
@@ -286,10 +262,8 @@ export default function NominaDetail() {
             <p className="text-sm text-gray-600">Estado</p>
             <span
               className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                nomina.estado === 'PAGADA'
+                nomina.estado === 'APROBADA'
                   ? 'bg-green-100 text-green-800'
-                  : nomina.estado === 'APROBADA'
-                  ? 'bg-blue-100 text-blue-800'
                   : 'bg-yellow-100 text-yellow-800'
               }`}
             >
@@ -300,7 +274,7 @@ export default function NominaDetail() {
       </div>
 
       {/* Ajustes Manuales */}
-      {nomina.estado === 'CALCULADA' && (
+      {nomina.estado === 'PENDIENTE' && (
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Ajustes Manuales</h2>
@@ -543,7 +517,7 @@ export default function NominaDetail() {
         title="Rechazar Nómina"
         message={
           <div className="space-y-3">
-            <p>¿Está seguro que desea rechazar esta nómina? Regresará al estado CALCULADA.</p>
+            <p>¿Está seguro que desea rechazar esta nómina? Regresará al estado PENDIENTE.</p>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Motivo del rechazo (opcional):
@@ -560,16 +534,6 @@ export default function NominaDetail() {
         }
         confirmText={procesando ? "Rechazando..." : "Rechazar"}
         type="warning"
-        disabled={procesando}
-      />
-
-      <ConfirmDialog
-        isOpen={confirmPagar}
-        onClose={() => setConfirmPagar(false)}
-        onConfirm={handleMarcarPagada}
-        title="Marcar como Pagada"
-        message="¿Confirma que esta nómina ya fue pagada al trabajador? Esta acción es permanente."
-        confirmText={procesando ? "Procesando..." : "Confirmar Pago"}
         disabled={procesando}
       />
 

@@ -48,12 +48,6 @@ const nominaService = {
     return response.data;
   },
 
-  // Marcar como pagada
-  marcarPagada: async (id) => {
-    const response = await api.post(`/nominas/${id}/marcar_pagada/`);
-    return response.data;
-  },
-
   descargarPDF: async (nominaId) => {
     const response = await api.get(`/nominas/${nominaId}/descargar_pdf/`, {
         responseType: 'blob', // IMPORTANTE: para archivos binarios
@@ -128,15 +122,6 @@ const nominaService = {
     return response.data;
   },
 
-  // Marcar pagadas masivo
-  marcarPagadasMasivo: async (quincenaId, fincaId = null) => {
-    const response = await api.post('/nominas/marcar_pagadas_masivo/', {
-      quincena_id: quincenaId,
-      finca_id: fincaId,
-    });
-    return response.data;
-  },
-
   // Descargar colillas consolidadas (PDF con todas las colillas)
   descargarColillasConsolidadas: async (params) => {
     const response = await api.get('/nominas/descargar_colillas_consolidadas/', {
@@ -153,7 +138,7 @@ const nominaService = {
   },
 
   // Enviar recibos masivos por correo electrónico
-  enviarRecibosMasivo: async (quincenaId, fincaId = null, estados = ['PAGADA']) => {
+  enviarRecibosMasivo: async (quincenaId, fincaId = null, estados = ['APROBADA']) => {
     const response = await api.post('/nominas/enviar_recibos_masivo/', {
       quincena_id: quincenaId,
       finca_id: fincaId,
