@@ -493,6 +493,11 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
     # AGREGAR esto para desactivar paginación (mostrar todas):
     pagination_class = None
 
+    def get_queryset(self):
+        return super().get_queryset().exclude(
+            trabajador__estado=Trabajador.RETIRADO
+        )
+
     @action(detail=False, methods=['get'])
     def exportar_excel_quincena(self, request):
         """Exportar lista de pagos de una quincena a Excel"""
