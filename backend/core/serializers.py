@@ -323,17 +323,22 @@ class LaborCreateUpdateSerializer(serializers.ModelSerializer):
             'codigo', 'nombre', 'descripcion', 'unidad_medida',
             'es_especial', 'solo_con_contrato', 'activa'
         ]
-    
-    def validate_codigo(self, value):
-        """Validar que el código sea único"""
-        instance = getattr(self, 'instance', None)
-        if instance and instance.codigo == value:
-            return value
-        
-        if Labor.objects.filter(codigo=value).exists():
-            raise serializers.ValidationError("Ya existe una labor con este código")
-        
-        return value
+        extra_kwargs = {
+            'codigo': {'read_only': True},
+        }
+
+    def create(self, validated_data):
+        """Generar código automático al crear: LAB001, LAB002, etc."""
+        last = Labor.objects.order_by('-codigo').first()
+        if last and last.codigo.startswith('LAB'):
+            try:
+                num = int(last.codigo[3:]) + 1
+            except ValueError:
+                num = Labor.objects.count() + 1
+        else:
+            num = 1
+        validated_data['codigo'] = f'LAB{num:03d}'
+        return super().create(validated_data)
 
 
 class ListaPreciosSerializer(serializers.ModelSerializer):

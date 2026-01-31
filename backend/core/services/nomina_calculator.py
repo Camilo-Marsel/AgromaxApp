@@ -83,9 +83,12 @@ class NominaCalculator:
         
         # Calcular devengos BASE (sin auxilio de transporte)
         base_deducible = Decimal('0.00')
-        
-        # 1. Calcular labores normales
-        base_deducible += self._calcular_labores(nomina, registros)
+        total_incapacidad = Decimal('0.00')
+
+        # 1. Calcular labores normales (incapacidad médica se separa: exenta de deducciones)
+        labores_normal, labores_incapacidad = self._calcular_labores(nomina, registros)
+        base_deducible += labores_normal
+        total_incapacidad += labores_incapacidad
         
         # 2. Calcular dominicales (solo con contrato)
         if trabajador.tipo_contrato.aplica_dominicales:
@@ -111,8 +114,8 @@ class NominaCalculator:
                 valor_total=devengos_adicionales
             )
         
-        # TOTAL DEVENGADO = base + auxilio + adicionales
-        total_devengado = base_deducible + auxilio_transporte + devengos_adicionales
+        # TOTAL DEVENGADO = base + incapacidad + auxilio + adicionales
+        total_devengado = base_deducible + total_incapacidad + auxilio_transporte + devengos_adicionales
         
         # ========== DEDUCCIONES ==========
         total_deducciones = Decimal('0.00')
@@ -179,12 +182,19 @@ class NominaCalculator:
             cuota.save()
 
     def _calcular_labores(self, nomina, registros):
-        """Calcular devengos por labores normales (excluyendo festivos que se calculan aparte)"""
-        total = Decimal('0.00')
-        
+        """
+        Calcular devengos por labores normales (excluyendo festivos que se calculan aparte).
+
+        Retorna tupla (total_normal, total_incapacidad):
+        - total_normal: suma a base_deducible (salud/pensión aplican)
+        - total_incapacidad: exento de deducciones de ley (salud/pensión NO aplican)
+        """
+        total_normal = Decimal('0.00')
+        total_incapacidad = Decimal('0.00')
+
         # Filtrar festivos porque se calculan en _calcular_festivos()
         registros_labores = registros.exclude(labor__nombre='Festivo')
-        
+
         # Agrupar registros por labor
         labores_dict = {}
         for registro in registros_labores:
@@ -197,19 +207,24 @@ class NominaCalculator:
                 }
             labores_dict[labor_id]['cantidad'] += registro.cantidad
             labores_dict[labor_id]['registros'].append(registro)
-        
+
         # Calcular valor de cada labor
         for labor_id, data in labores_dict.items():
             labor = data['labor']
             cantidad = data['cantidad']
-            
+
             # Obtener precio vigente
             precio = self._get_precio_vigente(labor)
-            
+
             if precio:
                 valor_total = cantidad * precio
-                total += valor_total
-                
+
+                # Incapacidad Médica es exenta de deducciones de ley
+                if labor.nombre == 'Incapacidad Médica':
+                    total_incapacidad += valor_total
+                else:
+                    total_normal += valor_total
+
                 # Crear detalle
                 DetalleNomina.objects.create(
                     nomina=nomina,
@@ -221,15 +236,15 @@ class NominaCalculator:
                     valor_unitario=precio,
                     valor_total=valor_total
                 )
-        
-        return total
+
+        return total_normal, total_incapacidad
     
     def _calcular_administrativo(self, nomina, trabajador):
         """Calcular nómina para trabajador administrativo con salario fijo"""
-        
+
         # Salario base quincenal
         salario_quincenal = trabajador.salario_quincenal or Decimal('0.00')
-        
+
         if salario_quincenal <= 0:
             nomina.total_devengado = Decimal('0.00')
             nomina.total_deducciones = Decimal('0.00')
@@ -237,7 +252,7 @@ class NominaCalculator:
             nomina.estado = 'PENDIENTE'
             nomina.save()
             return nomina
-        
+
         # 1. Devengo: Salario Base
         DetalleNomina.objects.create(
             nomina=nomina,
@@ -248,9 +263,21 @@ class NominaCalculator:
             valor_unitario=salario_quincenal,
             valor_total=salario_quincenal
         )
-        
+
         base_deducible = salario_quincenal
-        
+
+        # 1b. Labores adicionales (si el administrativo tiene registros de labor)
+        total_incapacidad = Decimal('0.00')
+        registros = RegistroLabor.objects.filter(
+            trabajador=trabajador,
+            quincena=self.quincena
+        ).select_related('labor', 'labor__unidad_medida')
+
+        if registros.exists():
+            labores_normal, labores_incapacidad = self._calcular_labores(nomina, registros)
+            base_deducible += labores_normal
+            total_incapacidad += labores_incapacidad
+
         # 2. Auxilio de transporte
         auxilio_transporte = Decimal('0.00')
         if trabajador.tipo_contrato.aplica_auxilio_transporte:
@@ -280,12 +307,12 @@ class NominaCalculator:
             )
         
         # Calcular total devengado
-        total_devengado = base_deducible + auxilio_transporte + devengos_adicionales
-        
+        total_devengado = base_deducible + total_incapacidad + auxilio_transporte + devengos_adicionales
+
         # ========== DEDUCCIONES ==========
         total_deducciones = Decimal('0.00')
-        
-        # 4. Deducciones de ley
+
+        # 4. Deducciones de ley (sobre base SIN incapacidad ni auxilio)
         if trabajador.tipo_contrato.aplica_deducciones:
             total_deducciones += self._calcular_deducciones_ley(nomina, base_deducible)
         
@@ -363,8 +390,8 @@ class NominaCalculator:
         que hagan perder el dominical.
         
         REGLAS:
-        - AUSENCIA o PERMISO NO REMUNERADO: Pierde el dominical
-        - INCAPACIDAD: NO pierde el dominical (es justificada)
+        - Ausencia No Justificada o Permiso No Remunerado: Pierde el dominical
+        - Incapacidad Médica: NO pierde el dominical (es justificada)
         """
         # Obtener días laborables de la semana (lunes a sábado)
         dias_laborables = []
@@ -400,11 +427,11 @@ class NominaCalculator:
             # Verificar si tiene AUSENCIA o PERMISO NO REMUNERADO
             registros_del_dia = registros_dict[dia]
             for registro in registros_del_dia:
-                if registro.labor.nombre in ['Ausencia', 'AUSENCIA', 'Permiso No Remunerado', 'PERMISO NO REMUNERADO']:
+                if registro.labor.nombre in ['Ausencia No Justificada', 'Permiso No Remunerado']:
                     # Estas labores hacen perder el dominical
                     return False
-            
-            # Si tiene INCAPACIDAD, no pierde el dominical (continuar verificando otros días)
+
+            # Si tiene Incapacidad Médica, no pierde el dominical (continuar verificando otros días)
         
         return True
     
@@ -472,8 +499,8 @@ class NominaCalculator:
 
         REGLAS:
         - Solo cuenta días donde el trabajador tiene registros de labor
-        - INCAPACIDAD: Solo pierde auxilio de ese día
-        - AUSENCIA/PERMISO NO REMUNERADO: Pierde auxilio de ese día + auxilio del domingo de esa semana
+        - Incapacidad Médica: Solo pierde auxilio de ese día
+        - Ausencia No Justificada/Permiso No Remunerado: Pierde auxilio de ese día + auxilio del domingo de esa semana
         - Días sin ningún registro: No se cuentan como trabajados
         """
         auxilio_quincenal = self.variables.get(VariablesNomina.AUXILIO_TRANSPORTE, Decimal('0.00'))
@@ -493,14 +520,14 @@ class NominaCalculator:
         # Obtener días únicos donde tiene CUALQUIER registro
         dias_con_registro = set(registros.values_list('fecha', flat=True).distinct())
 
-        # Obtener días con INCAPACIDAD
+        # Obtener días con Incapacidad Médica
         dias_incapacidad = set(registros.filter(
-            labor__nombre='INCAPACIDAD'
+            labor__nombre='Incapacidad Médica'
         ).values_list('fecha', flat=True).distinct())
 
-        # Obtener días con AUSENCIA o PERMISO NO REMUNERADO (pierden dominical)
+        # Obtener días con Ausencia o Permiso No Remunerado (pierden dominical)
         dias_ausencia_permiso = set(registros.filter(
-            labor__nombre__in=['Ausencia', 'AUSENCIA', 'Permiso No Remunerado', 'PERMISO NO REMUNERADO']
+            labor__nombre__in=['Ausencia No Justificada', 'Permiso No Remunerado']
         ).values_list('fecha', flat=True).distinct())
 
         # Calcular días trabajados efectivos

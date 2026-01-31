@@ -110,20 +110,19 @@ export default function LaborForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Código *
-              </label>
-              <input
-                type="text"
-                {...register('codigo', { required: 'Este campo es requerido' })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Ej: LAB001"
-              />
-              {errors.codigo && (
-                <span className="text-red-500 text-sm">{errors.codigo.message}</span>
-              )}
-            </div>
+            {isEditing && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Código
+                </label>
+                <input
+                  type="text"
+                  {...register('codigo')}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-500"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
