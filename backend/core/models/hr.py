@@ -412,6 +412,12 @@ class Contrato(models.Model):
         verbose_name='Observaciones'
     )
 
+    recibe_auxilio_transporte = models.BooleanField(
+        default=True,
+        verbose_name='Recibe Auxilio de Transporte',
+        help_text='Indica si el trabajador recibe auxilio de transporte en este contrato'
+    )
+
     # Auditoría
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de Creación')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Fecha de Actualización')

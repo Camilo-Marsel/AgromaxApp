@@ -29,6 +29,7 @@ export default function ContratoForm() {
   } = useForm({
     defaultValues: {
       tipo_contrato: 'TERMINO_INDEFINIDO',
+      recibe_auxilio_transporte: true,
     },
   });
 
@@ -396,6 +397,23 @@ export default function ContratoForm() {
               {errors.salario_pactado && (
                 <span className="text-red-500 text-sm">{errors.salario_pactado.message}</span>
               )}
+            </div>
+
+            {/* Auxilio de Transporte */}
+            <div className="md:col-span-2">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  {...register('recibe_auxilio_transporte')}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  Recibe Auxilio de Transporte
+                </span>
+              </label>
+              <p className="text-xs text-gray-500 mt-1 ml-7">
+                Desmarque si el trabajador no recibe auxilio de transporte en este contrato
+              </p>
             </div>
 
             {/* Duración calculada */}

@@ -16,6 +16,7 @@ from .models import (
     PORCENTAJE_PRIMA, PORCENTAJE_VACACIONES,
 )
 from decimal import Decimal
+from datetime import date
 
 # ============================================================================
 # AUTENTICACIÓN
@@ -266,7 +267,12 @@ class TrabajadorCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'salario_quincenal': 'El salario quincenal es requerido para trabajadores administrativos'
             })
-        
+
+        # Auto-set fecha_retiro cuando el estado cambia a RETIRADO
+        estado = data.get('estado')
+        if estado == Trabajador.RETIRADO and not data.get('fecha_retiro'):
+            data['fecha_retiro'] = date.today()
+
         return data
     
     def validate_numero_documento(self, value):
@@ -717,7 +723,7 @@ class ContratoListSerializer(serializers.ModelSerializer):
             'fecha_inicio', 'fecha_fin', 'cargo', 'salario_pactado',
             'estado', 'estado_display',
             'motivo_finalizacion', 'motivo_finalizacion_display',
-            'fecha_liquidacion',
+            'fecha_liquidacion', 'recibe_auxilio_transporte',
             # Properties calculadas
             'duracion_meses', 'duracion_dias', 'dias_restantes',
             'esta_por_vencer', 'esta_vencido', 'progreso_contrato',
@@ -760,7 +766,7 @@ class ContratoDetailSerializer(serializers.ModelSerializer):
             'fecha_inicio', 'fecha_fin', 'cargo', 'salario_pactado',
             'estado', 'estado_display',
             'motivo_finalizacion', 'motivo_finalizacion_display',
-            'fecha_liquidacion', 'observaciones',
+            'fecha_liquidacion', 'observaciones', 'recibe_auxilio_transporte',
             # Properties calculadas
             'duracion_meses', 'duracion_dias', 'dias_restantes',
             'esta_por_vencer', 'esta_vencido', 'progreso_contrato',
@@ -780,7 +786,7 @@ class ContratoCreateUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'trabajador', 'tipo_contrato',
             'fecha_inicio', 'fecha_fin', 'cargo', 'salario_pactado',
-            'estado', 'observaciones'
+            'estado', 'observaciones', 'recibe_auxilio_transporte'
         ]
         read_only_fields = ['id']
 

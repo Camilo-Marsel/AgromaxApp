@@ -5,7 +5,8 @@ from django.db import transaction
 from django.utils import timezone
 from core.models import (
     Trabajador, Quincena, RegistroLabor, Nomina, DetalleNomina,
-    VariablesNomina, ListaPrecios, Prestamo, CuotaPrestamo, Labor
+    VariablesNomina, ListaPrecios, Prestamo, CuotaPrestamo, Labor,
+    Contrato
 )
 from datetime import timedelta
 
@@ -32,7 +33,21 @@ class NominaCalculator:
                 variables[nombre] = var.valor
         
         return variables
-    
+
+    def _trabajador_recibe_auxilio(self, trabajador):
+        """Verificar si el trabajador recibe auxilio de transporte.
+        Chequea tanto el TipoContrato global como el contrato activo individual."""
+        if not trabajador.tipo_contrato.aplica_auxilio_transporte:
+            return False
+        # Si tiene contrato activo, respetar la configuración del contrato
+        contrato_activo = Contrato.objects.filter(
+            trabajador=trabajador,
+            estado=Contrato.ACTIVO
+        ).first()
+        if contrato_activo is not None:
+            return contrato_activo.recibe_auxilio_transporte
+        return True
+
     def calcular_quincena_completa(self, usuario):
         """Calcular nómina para todos los trabajadores que pueden trabajar (no retirados)"""
         # Excluir trabajadores retirados - tanto CONTRATADO como SIN_CONTRATO pueden trabajar
@@ -100,7 +115,7 @@ class NominaCalculator:
         
         # 4. Auxilio de transporte
         auxilio_transporte = Decimal('0.00')
-        if trabajador.tipo_contrato.aplica_auxilio_transporte:
+        if self._trabajador_recibe_auxilio(trabajador):
             auxilio_transporte = self._calcular_auxilio_transporte(nomina)
         
         # 5. AJUSTES MANUALES - DEVENGOS ADICIONALES
@@ -280,7 +295,7 @@ class NominaCalculator:
 
         # 2. Auxilio de transporte
         auxilio_transporte = Decimal('0.00')
-        if trabajador.tipo_contrato.aplica_auxilio_transporte:
+        if self._trabajador_recibe_auxilio(trabajador):
             auxilio_quincenal = self.variables.get(VariablesNomina.AUXILIO_TRANSPORTE, Decimal('0.00'))
             
             if auxilio_quincenal > 0:
