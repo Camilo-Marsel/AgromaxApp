@@ -33,6 +33,14 @@ const pilaService = {
     return response.data;
   },
 
+  // Exportar PILA a Excel
+  exportarExcel: async (id) => {
+    const response = await api.get(`/pila/${id}/exportar_excel/`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
   // Eliminar PILA
   delete: async (id) => {
     const response = await api.delete(`/pila/${id}/`);

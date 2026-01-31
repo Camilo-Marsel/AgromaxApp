@@ -7,7 +7,7 @@ import LoadingSpinner from '../../../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, CheckCircle, Calendar, Users, DollarSign,
-  FileText, Building2
+  FileText, Building2, Download
 } from 'lucide-react';
 
 export default function PILADetail() {
@@ -61,6 +61,24 @@ export default function PILADetail() {
     }
   };
 
+  const handleExportarExcel = async () => {
+    try {
+      const blob = await pilaService.exportarExcel(id);
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `PILA_${pila?.mes}_${pila?.año}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Excel exportado correctamente');
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      toast.error('Error al exportar Excel');
+    }
+  };
+
   const formatMoney = (value) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -105,15 +123,25 @@ export default function PILADetail() {
           </div>
         </div>
 
-        {pila.estado !== 'PAGADA' && (
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowPagarModal(true)}
-            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+            onClick={handleExportarExcel}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
           >
-            <CheckCircle className="w-5 h-5" />
-            Registrar Pago
+            <Download className="w-5 h-5" />
+            Exportar Excel
           </button>
-        )}
+
+          {pila.estado !== 'PAGADA' && (
+            <button
+              onClick={() => setShowPagarModal(true)}
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+            >
+              <CheckCircle className="w-5 h-5" />
+              Registrar Pago
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Estado y Resumen */}

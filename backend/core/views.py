@@ -1680,8 +1680,13 @@ class PILAViewSet(viewsets.ModelViewSet):
 
         for nomina in nominas:
             trab_id = nomina.trabajador_id
-            # IBC = total devengado (sin auxilio de transporte para > 2 SMMLV)
-            ibc = nomina.total_devengado
+            # IBC = total devengado MENOS auxilio de transporte
+            # (el auxilio NO forma parte del IBC según la ley colombiana)
+            auxilio = DetalleNomina.objects.filter(
+                nomina=nomina,
+                concepto='AUXILIO_TRANSPORTE'
+            ).aggregate(total=Sum('valor_total'))['total'] or Decimal('0')
+            ibc = nomina.total_devengado - auxilio
             trabajadores_ibc[trab_id]['ibc'] += ibc
             trabajadores_ibc[trab_id]['dias'] += 15  # Cada quincena = 15 días
             trabajadores_ibc[trab_id]['nominas'].append(nomina)
@@ -1803,6 +1808,116 @@ class PILAViewSet(viewsets.ModelViewSet):
             'total_pendiente': total_pendiente,
             'porcentajes': porcentajes
         })
+
+    @action(detail=True, methods=['get'])
+    def exportar_excel(self, request, pk=None):
+        """Exportar PILA a Excel"""
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from io import BytesIO
+
+        pila = self.get_object()
+        detalles = pila.detalles.select_related('trabajador').order_by(
+            'trabajador__apellidos', 'trabajador__nombres'
+        )
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "PILA"
+
+        # Estilos
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        title_font = Font(bold=True, size=14, color="1F4E78")
+        border = Border(
+            left=Side(style='thin'), right=Side(style='thin'),
+            top=Side(style='thin'), bottom=Side(style='thin')
+        )
+        center = Alignment(horizontal='center', vertical='center')
+        right = Alignment(horizontal='right', vertical='center')
+
+        meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+        # Título
+        ws.merge_cells('A1:I1')
+        cell = ws['A1']
+        cell.value = f"PILA - {meses[pila.mes]} {pila.año}"
+        cell.font = title_font
+        cell.alignment = center
+
+        # Encabezados
+        headers = ['Trabajador', 'Documento', 'IBC', 'Días', 'Salud (8.5%)',
+                   'Pensión (12%)', 'ARL (0.522%)', 'Caja (4%)', 'Total Aportes']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = center
+            cell.border = border
+
+        # Datos
+        row = 4
+        for detalle in detalles:
+            t = detalle.trabajador
+            ws.cell(row=row, column=1, value=t.nombre_completo).border = border
+            ws.cell(row=row, column=2, value=t.numero_documento).border = border
+
+            for col, val in [(3, detalle.ibc), (5, detalle.aporte_salud),
+                             (6, detalle.aporte_pension), (7, detalle.aporte_arl),
+                             (8, detalle.aporte_caja), (9, detalle.total_aportes)]:
+                c = ws.cell(row=row, column=col, value=float(val))
+                c.number_format = '$#,##0'
+                c.alignment = right
+                c.border = border
+
+            c = ws.cell(row=row, column=4, value=detalle.dias_cotizados)
+            c.alignment = center
+            c.border = border
+
+            row += 1
+
+        # Totales
+        total_font = Font(bold=True)
+        total_fill = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
+
+        ws.cell(row=row, column=1, value="TOTALES").font = total_font
+        ws.cell(row=row, column=1).fill = total_fill
+        ws.cell(row=row, column=1).border = border
+
+        for col, val in [(3, pila.total_ibc), (5, pila.total_salud),
+                         (6, pila.total_pension), (7, pila.total_arl),
+                         (8, pila.total_caja), (9, pila.total_aportes)]:
+            c = ws.cell(row=row, column=col, value=float(val))
+            c.number_format = '$#,##0'
+            c.font = total_font
+            c.fill = total_fill
+            c.alignment = right
+            c.border = border
+
+        # Columnas vacías con borde en totales
+        for col in [2, 4]:
+            ws.cell(row=row, column=col).fill = total_fill
+            ws.cell(row=row, column=col).border = border
+
+        # Anchos
+        anchos = {'A': 35, 'B': 18, 'C': 18, 'D': 8, 'E': 16,
+                  'F': 16, 'G': 16, 'H': 16, 'I': 18}
+        for col_letter, ancho in anchos.items():
+            ws.column_dimensions[col_letter].width = ancho
+
+        # Generar response
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        filename = f"PILA_{meses[pila.mes]}_{pila.año}.xlsx"
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
 
 # ============================================================================
