@@ -179,8 +179,8 @@ class RegistroLabor(models.Model):
     fecha = models.DateField()
     cantidad = models.DecimalField(
         max_digits=10,
-        decimal_places=2,
-        validators=[MinValueValidator(Decimal('0.01'))],
+        decimal_places=4,
+        validators=[MinValueValidator(Decimal('0.0001'))],
         help_text="Cantidad según unidad de medida"
     )
     observaciones = models.TextField(blank=True)

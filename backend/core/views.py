@@ -401,19 +401,26 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def crear_multiples(self, request):
-        """Crear múltiples registros de labor (para labores tipo DÍA con múltiples fechas)"""
+        """Crear múltiples registros de labor (para labores tipo DÍA con múltiples fechas).
+
+        Soporta dos modos:
+        - Sin cantidad_total: cada registro tiene cantidad=1 (labores tipo DÍA)
+        - Con cantidad_total: la cantidad se reparte equitativamente entre los días válidos
+          (ej: Desmache con 3.5 hectáreas en 5 días = 0.7 por día)
+        """
         trabajador_id = request.data.get('trabajador')
         labor_id = request.data.get('labor')
         fechas = request.data.get('fechas', [])  # Lista de fechas
         quincena_id = request.data.get('quincena')
         observaciones = request.data.get('observaciones', '')
-        
+        cantidad_total = request.data.get('cantidad_total')  # Opcional: cantidad total a repartir
+
         if not all([trabajador_id, labor_id, fechas, quincena_id]):
             return Response(
                 {'error': 'Faltan campos requeridos'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         try:
             trabajador = Trabajador.objects.get(id=trabajador_id)
             labor = Labor.objects.get(id=labor_id)
@@ -423,20 +430,21 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
                 {'error': 'Trabajador, Labor o Quincena no encontrados'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
-        registros_creados = []
+
+        # Primero validar todas las fechas para saber cuántas son válidas
+        from datetime import datetime as dt
+        from decimal import Decimal, ROUND_DOWN
+
+        fechas_validas = []
         errores = []
-        
+
         for fecha_str in fechas:
-            from datetime import datetime
-            fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-            
-            # Validar domingo
+            fecha = dt.strptime(fecha_str, '%Y-%m-%d').date()
+
             if fecha.weekday() == 6:
                 errores.append(f"{fecha_str}: No se puede registrar en domingo")
                 continue
-            
-            # Validar duplicado
+
             if RegistroLabor.objects.filter(
                 trabajador=trabajador,
                 fecha=fecha,
@@ -444,27 +452,52 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
             ).exists():
                 errores.append(f"{fecha_str}: Ya existe un registro para este día")
                 continue
-            
-            # Crear registro
+
+            fechas_validas.append(fecha)
+
+        if not fechas_validas:
+            return Response({
+                'message': 'No se crearon registros',
+                'registros': [],
+                'errores': errores
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Calcular cantidad por día
+        if cantidad_total is not None:
+            total = Decimal(str(cantidad_total))
+            n = len(fechas_validas)
+            cantidad_por_dia = (total / n).quantize(Decimal('0.0001'), rounding=ROUND_DOWN)
+            # Ajustar residuo en el último día para que sume exactamente
+            residuo = total - (cantidad_por_dia * n)
+        else:
+            cantidad_por_dia = Decimal('1')
+            residuo = Decimal('0')
+
+        # Crear registros
+        registros_creados = []
+        for i, fecha in enumerate(fechas_validas):
+            cantidad = cantidad_por_dia
+            if i == len(fechas_validas) - 1:
+                cantidad += residuo  # Último día absorbe el residuo
+
             registro = RegistroLabor.objects.create(
                 trabajador=trabajador,
                 labor=labor,
                 fecha=fecha,
                 quincena=quincena,
-                cantidad=1,  # Para labores tipo DÍA siempre es 1
+                cantidad=cantidad,
                 observaciones=observaciones,
                 created_by=request.user
             )
             registros_creados.append(registro)
-        
-        # Serializar respuesta
+
         serializer = self.get_serializer(registros_creados, many=True)
-        
+
         return Response({
             'message': f'{len(registros_creados)} registros creados correctamente',
             'registros': serializer.data,
             'errores': errores
-        }, status=status.HTTP_201_CREATED if registros_creados else status.HTTP_400_BAD_REQUEST)
+        }, status=status.HTTP_201_CREATED)
 
 # ============================================================================
 # NÓMINA

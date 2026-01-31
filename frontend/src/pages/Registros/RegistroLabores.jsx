@@ -37,6 +37,7 @@ export default function RegistroLabores() {
   // Comportamiento dinámico
   const [laborSeleccionada, setLaborSeleccionada] = useState(null);
   const [esTipoDia, setEsTipoDia] = useState(false);
+  const [esDesmache, setEsDesmache] = useState(false);
   const [fechasSeleccionadas, setFechasSeleccionadas] = useState([]);
   
   // Confirm dialog
@@ -72,14 +73,15 @@ export default function RegistroLabores() {
         'Fumigación',
         'Repique',
         'Permiso Remunerado',
-        'Permiso No Remunerado',  // Agregado
-        'Ausencia',
-        'Ausencia No Justificada', // Agregado por si tiene nombre completo
-        'Incapacidad',
-        'Oficios Varios'
+        'Permiso No Remunerado',
+        'Ausencia No Justificada',
+        'Incapacidad Médica',
+        'Oficios Varios',
+        'Desmache',
       ];
       setEsTipoDia(labor && laboresTipoDia.includes(labor.nombre));
-      
+      setEsDesmache(labor && labor.nombre === 'Desmache');
+
       // Limpiar fechas cuando cambia de labor
       setFechasSeleccionadas([]);
     }
@@ -159,8 +161,35 @@ export default function RegistroLabores() {
     try {
       setSubmitting(true);
 
-      if (esTipoDia) {
-        // Labores tipo DÍA: crear múltiples registros
+      if (esDesmache) {
+        // Desmache: múltiples fechas + cantidad total repartida
+        if (fechasSeleccionadas.length === 0) {
+          toast.error('Seleccione al menos una fecha');
+          return;
+        }
+        if (!data.cantidad) {
+          toast.error('Ingrese la cantidad total de hectáreas');
+          return;
+        }
+
+        const payload = {
+          trabajador: data.trabajador,
+          labor: data.labor,
+          fechas: fechasSeleccionadas,
+          quincena: quincenaActual.id,
+          observaciones: data.observaciones || '',
+          cantidad_total: data.cantidad,
+        };
+
+        const result = await registroLaborService.crearMultiples(payload);
+
+        if (result.errores && result.errores.length > 0) {
+          result.errores.forEach((error) => toast.error(error));
+        }
+
+        toast.success(result.message);
+      } else if (esTipoDia) {
+        // Labores tipo DÍA: crear múltiples registros (cantidad=1 cada uno)
         if (fechasSeleccionadas.length === 0) {
           toast.error('Seleccione al menos una fecha');
           return;
@@ -175,11 +204,11 @@ export default function RegistroLabores() {
         };
 
         const result = await registroLaborService.crearMultiples(payload);
-        
+
         if (result.errores && result.errores.length > 0) {
           result.errores.forEach((error) => toast.error(error));
         }
-        
+
         toast.success(result.message);
       } else {
         // Labores por UNIDAD/HECTÁREA/METRO: crear un registro
@@ -225,6 +254,7 @@ export default function RegistroLabores() {
       setFechasSeleccionadas([]);
       setLaborSeleccionada(null);
       setEsTipoDia(false);
+      setEsDesmache(false);
     } catch (error) {
       console.error('Error al crear registro:', error);
       if (error.response?.data) {
@@ -355,53 +385,43 @@ export default function RegistroLabores() {
               )}
             </div>
 
-            {/* Fecha o Fechas según tipo de labor - MODIFICADO */}
+            {/* Fecha o Fechas según tipo de labor */}
             {laborSeleccionada && (
-              <>
-                {esTipoDia ? (
-                  // Selector múltiple de fechas
-                  <MultipleDatePicker
-                    quincena={quincenaActual}
-                    onSelectionChange={setFechasSeleccionadas}
-                    registrosExistentes={registrosExistentes}
-                    registrosDetallados={registrosDetallados}
-                    laborActualNombre={laborSeleccionada?.nombre || ''}
-                    singleSelection={false}
-                  />
-                ) : (
-                  // Selector SINGLE de fecha
-                  <MultipleDatePicker
-                    quincena={quincenaActual}
-                    onSelectionChange={setFechasSeleccionadas}
-                    registrosExistentes={registrosExistentes}
-                    registrosDetallados={registrosDetallados}
-                    laborActualNombre={laborSeleccionada?.nombre || ''}
-                    singleSelection={true}
-                  />
-                )}
-              </>
+              <MultipleDatePicker
+                quincena={quincenaActual}
+                onSelectionChange={setFechasSeleccionadas}
+                registrosExistentes={registrosExistentes}
+                registrosDetallados={registrosDetallados}
+                laborActualNombre={laborSeleccionada?.nombre || ''}
+                singleSelection={!esTipoDia && !esDesmache}
+              />
             )}
 
-            {/* Cantidad (solo si NO es tipo día) */}
-            {!esTipoDia && laborSeleccionada && (
+            {/* Cantidad (para labores no-día y para Desmache) */}
+            {(!esTipoDia || esDesmache) && laborSeleccionada && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cantidad *
+                  {esDesmache ? 'Cantidad Total (hectáreas) *' : 'Cantidad *'}
                 </label>
                 <input
                   type="text"
                   inputMode="decimal"
                   {...register('cantidad', {
-                    required: !esTipoDia,
+                    required: !esTipoDia || esDesmache,
                     pattern: {
-                      value: /^\d+(\.\d{1,2})?$/,
-                      message: 'Ingrese un número válido (ej: 1, 1.5, 2.75)'
+                      value: /^\d+(\.\d{1,4})?$/,
+                      message: 'Ingrese un número válido (ej: 1, 1.5, 2.2654)'
                     }
                   })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ingrese la cantidad"
+                  placeholder={esDesmache ? 'Ej: 2.2654 (total de hectáreas en los días seleccionados)' : 'Ingrese la cantidad'}
                   onWheel={(e) => e.target.blur()}
                 />
+                {esDesmache && fechasSeleccionadas.length > 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Se repartirá entre {fechasSeleccionadas.length} día{fechasSeleccionadas.length > 1 ? 's' : ''} seleccionado{fechasSeleccionadas.length > 1 ? 's' : ''}
+                  </p>
+                )}
                 {errors.cantidad && (
                   <span className="text-red-500 text-sm mt-1">{errors.cantidad.message}</span>
                 )}
