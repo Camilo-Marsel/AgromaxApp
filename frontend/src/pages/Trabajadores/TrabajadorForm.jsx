@@ -98,6 +98,13 @@ export default function TrabajadorForm() {
         data.salario_quincenal = null;
       }
 
+      // Limpiar fecha_retiro si no es RETIRADO (evitar enviar string vacío)
+      if (data.estado !== 'RETIRADO') {
+        data.fecha_retiro = null;
+      } else if (!data.fecha_retiro) {
+        data.fecha_retiro = null; // El backend auto-asignará la fecha actual
+      }
+
       // Mapear campo email a correo para el backend
       const submitData = {
         ...data,

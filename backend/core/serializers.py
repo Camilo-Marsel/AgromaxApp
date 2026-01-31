@@ -249,6 +249,8 @@ class TrabajadorDetailSerializer(serializers.ModelSerializer):
 
 
 class TrabajadorCreateUpdateSerializer(serializers.ModelSerializer):
+    fecha_retiro = serializers.DateField(required=False, allow_null=True, default=None)
+
     class Meta:
         model = Trabajador
         fields = [
