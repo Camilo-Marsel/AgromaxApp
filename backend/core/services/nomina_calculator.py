@@ -589,9 +589,13 @@ class NominaCalculator:
         if len(domingos_perdidos) > 0:
             descuentos_texto.append(f'{len(domingos_perdidos)} domingo(s) perdido(s)')
 
-        descripcion = f'Auxilio de Transporte ({dias_a_pagar}/{dias_totales_quincena} días)'
-        if descuentos_texto:
-            descripcion += f' - Desc: {", ".join(descuentos_texto)}'
+        # TODO: Días mostrados tienen error de lógica - los domingos no se cuentan en dias_con_registro
+        # pero sí se incluyen en dias_totales_quincena, lo que hace que siempre falten domingos.
+        # Se oculta el conteo de días hasta corregir el cálculo.
+        # descripcion = f'Auxilio de Transporte ({dias_a_pagar}/{dias_totales_quincena} días)'
+        # if descuentos_texto:
+        #     descripcion += f' - Desc: {", ".join(descuentos_texto)}'
+        descripcion = 'Auxilio de Transporte'
 
         DetalleNomina.objects.create(
             nomina=nomina,
