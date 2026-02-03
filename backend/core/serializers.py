@@ -864,7 +864,7 @@ class TrabajadorPILASerializer(serializers.ModelSerializer):
     """Serializer simplificado de trabajador para PILA"""
     class Meta:
         model = Trabajador
-        fields = ['id', 'nombres', 'apellidos', 'numero_documento', 'nombre_completo']
+        fields = ['id', 'nombres', 'apellidos', 'numero_documento', 'nombre_completo', 'finca']
 
 
 class DetallePILASerializer(serializers.ModelSerializer):
@@ -886,12 +886,14 @@ class PILAListSerializer(serializers.ModelSerializer):
     """Serializer para listado de PILA"""
     periodo_display = serializers.CharField(read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    tipo_display = serializers.CharField(source='get_tipo_display', read_only=True)
     num_trabajadores = serializers.SerializerMethodField()
 
     class Meta:
         model = PILA
         fields = [
-            'id', 'mes', 'año', 'periodo_display',
+            'id', 'mes', 'año', 'tipo', 'tipo_display',
+            'quincena', 'periodo_display',
             'total_ibc', 'total_salud', 'total_pension',
             'total_arl', 'total_caja', 'total_aportes',
             'estado', 'estado_display', 'fecha_pago',
@@ -906,13 +908,15 @@ class PILADetailSerializer(serializers.ModelSerializer):
     """Serializer para detalle de PILA con todos los aportes"""
     periodo_display = serializers.CharField(read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    tipo_display = serializers.CharField(source='get_tipo_display', read_only=True)
     detalles = DetallePILASerializer(many=True, read_only=True)
     created_by_info = UsuarioSerializer(source='created_by', read_only=True)
 
     class Meta:
         model = PILA
         fields = [
-            'id', 'mes', 'año', 'periodo_display',
+            'id', 'mes', 'año', 'tipo', 'tipo_display',
+            'quincena', 'periodo_display',
             'total_ibc', 'total_salud', 'total_pension',
             'total_arl', 'total_caja', 'total_aportes',
             'estado', 'estado_display', 'fecha_pago',
@@ -928,14 +932,21 @@ class PILACreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PILA
-        fields = ['mes', 'año', 'observaciones']
+        fields = ['mes', 'año', 'tipo', 'quincena', 'observaciones']
 
     def validate(self, data):
-        # Verificar que no exista una PILA para este periodo
-        if PILA.objects.filter(mes=data['mes'], año=data['año']).exists():
-            raise serializers.ValidationError(
-                f"Ya existe una PILA para {data['mes']:02d}/{data['año']}"
-            )
+        tipo = data.get('tipo', 'MES')
+        if tipo == 'MES':
+            if PILA.objects.filter(mes=data['mes'], año=data['año'], tipo='MES').exists():
+                raise serializers.ValidationError(
+                    f"Ya existe una PILA mensual para {data['mes']:02d}/{data['año']}"
+                )
+        elif tipo == 'QUINCENA':
+            quincena = data.get('quincena')
+            if quincena and PILA.objects.filter(quincena=quincena, tipo='QUINCENA').exists():
+                raise serializers.ValidationError(
+                    f"Ya existe una PILA para esa quincena"
+                )
         return data
 
 

@@ -550,17 +550,24 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Obtener nóminas de la quincena (cualquier estado)
+        # Obtener nóminas de la quincena, excluyendo retirados
         nominas = self.queryset.filter(
             quincena=quincena,
             estado__in=['PENDIENTE', 'APROBADA']
-        ).select_related('trabajador', 'quincena').order_by('trabajador__apellidos', 'trabajador__nombres')
-        # Obtener filtro opcional de finca desde query params
-        finca_id = request.query_params.get('finca')
+        ).exclude(
+            trabajador__estado='RETIRADO'
+        ).select_related('trabajador', 'quincena')
 
-        if finca_id:
+        # Filtro de fincas: soporta multi-finca (fincas=1,2,3) y single (finca=1)
+        fincas_param = request.query_params.get('fincas', '')
+        finca_id = request.query_params.get('finca', '')
+
+        if fincas_param:
+            fincas_ids = [int(f) for f in fincas_param.split(',') if f.strip()]
+            nominas = nominas.filter(trabajador__finca__id__in=fincas_ids)
+        elif finca_id:
             nominas = nominas.filter(trabajador__finca__id=finca_id)
-    
+
         nominas = nominas.order_by('trabajador__apellidos', 'trabajador__nombres')
 
         if not nominas.exists():
@@ -1606,7 +1613,7 @@ class PILAViewSet(viewsets.ModelViewSet):
     queryset = PILA.objects.all()
     permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['año', 'mes', 'estado']
+    filterset_fields = ['año', 'mes', 'estado', 'tipo']
     ordering = ['-año', '-mes']
 
     def get_serializer_class(self):
@@ -1622,11 +1629,22 @@ class PILAViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def calcular(self, request):
         """
-        Calcular PILA para un mes específico basado en las nóminas.
-        Requiere: mes, año
+        Calcular PILA basado en las nóminas aprobadas.
+        Parámetros:
+          - tipo: 'MES' (default) o 'QUINCENA'
+          - mes, año: requeridos siempre
+          - quincena_id: requerido si tipo='QUINCENA'
+          - fincas: lista opcional de IDs de finca para filtrar
         """
+        from django.db.models import Sum
+        from decimal import Decimal
+        from collections import defaultdict
+
         mes = request.data.get('mes')
         año = request.data.get('año')
+        tipo = request.data.get('tipo', 'MES')
+        quincena_id = request.data.get('quincena_id')
+        fincas_ids = request.data.get('fincas', [])
 
         if not mes or not año:
             return Response(
@@ -1634,35 +1652,70 @@ class PILAViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Verificar si ya existe
-        if PILA.objects.filter(mes=mes, año=año).exists():
-            return Response(
-                {'error': f'Ya existe una PILA para {mes:02d}/{año}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Validar fincas contra permisos del usuario
+        if fincas_ids:
+            user = request.user
+            if not user.es_administrador:
+                fincas_permitidas = set(user.fincas_asignadas.values_list('id', flat=True))
+                fincas_solicitadas = set(int(f) for f in fincas_ids)
+                if not fincas_solicitadas.issubset(fincas_permitidas):
+                    return Response(
+                        {'error': 'No tiene permisos para algunas fincas seleccionadas'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
 
-        # Obtener nóminas del mes (usando quincenas del mes)
-        from django.db.models import Sum
-        from decimal import Decimal
+        if tipo == 'QUINCENA':
+            # Calcular por quincena individual
+            if not quincena_id:
+                return Response(
+                    {'error': 'Se requiere quincena_id para cálculo quincenal'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            try:
+                quincena_obj = Quincena.objects.get(id=quincena_id)
+            except Quincena.DoesNotExist:
+                return Response(
+                    {'error': 'Quincena no encontrada'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
-        # Buscar quincenas del mes
-        quincenas = Quincena.objects.filter(mes=mes, año=año)
+            if PILA.objects.filter(quincena=quincena_obj, tipo='QUINCENA').exists():
+                return Response(
+                    {'error': f'Ya existe una PILA para esa quincena'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        if not quincenas.exists():
-            return Response(
-                {'error': f'No hay quincenas para {mes:02d}/{año}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            quincenas_list = [quincena_obj]
+            dias_por_quincena = 15
+        else:
+            # Calcular por mes completo
+            if PILA.objects.filter(mes=mes, año=año, tipo='MES').exists():
+                return Response(
+                    {'error': f'Ya existe una PILA mensual para {mes:02d}/{año}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        # Obtener nóminas aprobadas de esas quincenas
+            quincenas_list = list(Quincena.objects.filter(mes=mes, año=año))
+            if not quincenas_list:
+                return Response(
+                    {'error': f'No hay quincenas para {mes:02d}/{año}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            dias_por_quincena = 15
+
+        # Obtener nóminas aprobadas
         nominas = Nomina.objects.filter(
-            quincena__in=quincenas,
+            quincena__in=quincenas_list,
             estado='APROBADA'
         ).select_related('trabajador', 'quincena')
 
+        # Filtrar por fincas si se especificaron
+        if fincas_ids:
+            nominas = nominas.filter(trabajador__finca__id__in=fincas_ids)
+
         if not nominas.exists():
             return Response(
-                {'error': f'No hay nóminas aprobadas para {mes:02d}/{año}'},
+                {'error': 'No hay nóminas aprobadas para el período seleccionado'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1670,25 +1723,24 @@ class PILAViewSet(viewsets.ModelViewSet):
         pila = PILA.objects.create(
             mes=mes,
             año=año,
+            tipo=tipo,
+            quincena=quincenas_list[0] if tipo == 'QUINCENA' else None,
             estado='CALCULADA',
             created_by=request.user
         )
 
-        # Agrupar nóminas por trabajador y calcular IBC del mes
-        from collections import defaultdict
+        # Agrupar nóminas por trabajador y calcular IBC
         trabajadores_ibc = defaultdict(lambda: {'ibc': Decimal('0'), 'dias': 0, 'nominas': []})
 
         for nomina in nominas:
             trab_id = nomina.trabajador_id
-            # IBC = total devengado MENOS auxilio de transporte
-            # (el auxilio NO forma parte del IBC según la ley colombiana)
             auxilio = DetalleNomina.objects.filter(
                 nomina=nomina,
                 concepto='AUXILIO_TRANSPORTE'
             ).aggregate(total=Sum('valor_total'))['total'] or Decimal('0')
             ibc = nomina.total_devengado - auxilio
             trabajadores_ibc[trab_id]['ibc'] += ibc
-            trabajadores_ibc[trab_id]['dias'] += 15  # Cada quincena = 15 días
+            trabajadores_ibc[trab_id]['dias'] += dias_por_quincena
             trabajadores_ibc[trab_id]['nominas'].append(nomina)
 
         # Crear detalles por trabajador
@@ -1698,18 +1750,18 @@ class PILAViewSet(viewsets.ModelViewSet):
         total_arl = Decimal('0')
         total_caja = Decimal('0')
 
+        max_dias = 15 if tipo == 'QUINCENA' else 30
+
         for trab_id, data in trabajadores_ibc.items():
             ibc = data['ibc']
-            dias = min(data['dias'], 30)  # Máximo 30 días
+            dias = min(data['dias'], max_dias)
 
-            # Calcular aportes
             aporte_salud = ibc * PORCENTAJE_SALUD_EMPLEADOR
             aporte_pension = ibc * PORCENTAJE_PENSION_EMPLEADOR
             aporte_arl = ibc * PORCENTAJE_ARL
             aporte_caja = ibc * PORCENTAJE_CAJA_COMPENSACION
             total_trabajador = aporte_salud + aporte_pension + aporte_arl + aporte_caja
 
-            # Crear detalle
             DetallePILA.objects.create(
                 pila=pila,
                 trabajador_id=trab_id,
@@ -1720,10 +1772,9 @@ class PILAViewSet(viewsets.ModelViewSet):
                 aporte_arl=aporte_arl,
                 aporte_caja=aporte_caja,
                 total_aportes=total_trabajador,
-                nomina=data['nominas'][-1]  # Última nómina del mes
+                nomina=data['nominas'][-1]
             )
 
-            # Acumular totales
             total_ibc += ibc
             total_salud += aporte_salud
             total_pension += aporte_pension
@@ -1741,7 +1792,7 @@ class PILAViewSet(viewsets.ModelViewSet):
 
         serializer = PILADetailSerializer(pila)
         return Response({
-            'message': f'PILA calculada para {mes:02d}/{año} con {len(trabajadores_ibc)} trabajadores',
+            'message': f'PILA calculada con {len(trabajadores_ibc)} trabajadores',
             'pila': serializer.data
         }, status=status.HTTP_201_CREATED)
 
@@ -1811,15 +1862,22 @@ class PILAViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def exportar_excel(self, request, pk=None):
-        """Exportar PILA a Excel"""
+        """Exportar PILA a Excel. Acepta ?fincas=1,2,3 para filtrar por fincas."""
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
         from io import BytesIO
+        from decimal import Decimal
 
         pila = self.get_object()
         detalles = pila.detalles.select_related('trabajador').order_by(
             'trabajador__apellidos', 'trabajador__nombres'
         )
+
+        # Filtrar por fincas si se especificaron
+        fincas_param = request.query_params.get('fincas', '')
+        if fincas_param:
+            fincas_ids = [int(f) for f in fincas_param.split(',') if f.strip()]
+            detalles = detalles.filter(trabajador__finca__id__in=fincas_ids)
 
         wb = Workbook()
         ws = wb.active
@@ -1842,13 +1900,13 @@ class PILAViewSet(viewsets.ModelViewSet):
         # Título
         ws.merge_cells('A1:I1')
         cell = ws['A1']
-        cell.value = f"PILA - {meses[pila.mes]} {pila.año}"
+        cell.value = f"PILA - {pila.periodo_display}"
         cell.font = title_font
         cell.alignment = center
 
         # Encabezados
         headers = ['Trabajador', 'Documento', 'IBC', 'Días', 'Salud (8.5%)',
-                   'Pensión (12%)', 'ARL (0.522%)', 'Caja (4%)', 'Total Aportes']
+                   'Pensión (12%)', 'ARL (1.044%)', 'Caja (4%)', 'Total Aportes']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=3, column=col, value=header)
             cell.font = header_font
@@ -1856,8 +1914,15 @@ class PILAViewSet(viewsets.ModelViewSet):
             cell.alignment = center
             cell.border = border
 
-        # Datos
+        # Datos y totales calculados sobre detalles filtrados
         row = 4
+        sum_ibc = Decimal('0')
+        sum_salud = Decimal('0')
+        sum_pension = Decimal('0')
+        sum_arl = Decimal('0')
+        sum_caja = Decimal('0')
+        sum_total = Decimal('0')
+
         for detalle in detalles:
             t = detalle.trabajador
             ws.cell(row=row, column=1, value=t.nombre_completo).border = border
@@ -1875,6 +1940,13 @@ class PILAViewSet(viewsets.ModelViewSet):
             c.alignment = center
             c.border = border
 
+            sum_ibc += detalle.ibc
+            sum_salud += detalle.aporte_salud
+            sum_pension += detalle.aporte_pension
+            sum_arl += detalle.aporte_arl
+            sum_caja += detalle.aporte_caja
+            sum_total += detalle.total_aportes
+
             row += 1
 
         # Totales
@@ -1885,9 +1957,9 @@ class PILAViewSet(viewsets.ModelViewSet):
         ws.cell(row=row, column=1).fill = total_fill
         ws.cell(row=row, column=1).border = border
 
-        for col, val in [(3, pila.total_ibc), (5, pila.total_salud),
-                         (6, pila.total_pension), (7, pila.total_arl),
-                         (8, pila.total_caja), (9, pila.total_aportes)]:
+        for col, val in [(3, sum_ibc), (5, sum_salud),
+                         (6, sum_pension), (7, sum_arl),
+                         (8, sum_caja), (9, sum_total)]:
             c = ws.cell(row=row, column=col, value=float(val))
             c.number_format = '$#,##0'
             c.font = total_font
@@ -1895,7 +1967,6 @@ class PILAViewSet(viewsets.ModelViewSet):
             c.alignment = right
             c.border = border
 
-        # Columnas vacías con borde en totales
         for col in [2, 4]:
             ws.cell(row=row, column=col).fill = total_fill
             ws.cell(row=row, column=col).border = border

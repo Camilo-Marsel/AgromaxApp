@@ -15,9 +15,9 @@ const pilaService = {
     return response.data;
   },
 
-  // Calcular PILA para un mes específico
-  calcular: async (mes, año) => {
-    const response = await api.post('/pila/calcular/', { mes, año });
+  // Calcular PILA (mensual o quincenal, con filtro de fincas opcional)
+  calcular: async (params) => {
+    const response = await api.post('/pila/calcular/', params);
     return response.data;
   },
 
@@ -33,9 +33,14 @@ const pilaService = {
     return response.data;
   },
 
-  // Exportar PILA a Excel
-  exportarExcel: async (id) => {
+  // Exportar PILA a Excel (con filtro de fincas opcional)
+  exportarExcel: async (id, fincas = []) => {
+    const params = {};
+    if (fincas.length > 0) {
+      params.fincas = fincas.join(',');
+    }
     const response = await api.get(`/pila/${id}/exportar_excel/`, {
+      params,
       responseType: 'blob',
     });
     return response.data;

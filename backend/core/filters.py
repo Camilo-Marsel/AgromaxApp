@@ -47,11 +47,12 @@ class NominaFilter(filters.FilterSet):
     quincena = filters.NumberFilter(field_name='quincena__id')
     trabajador = filters.NumberFilter(field_name='trabajador__id')
     finca = filters.NumberFilter(field_name='trabajador__finca__id')
+    fincas = filters.BaseInFilter(field_name='trabajador__finca__id', lookup_expr='in')
     estado = filters.ChoiceFilter(choices=Nomina.ESTADO_CHOICES)
 
     class Meta:
         model = Nomina
-        fields = ['quincena', 'trabajador', 'finca', 'estado']
+        fields = ['quincena', 'trabajador', 'finca', 'fincas', 'estado']
 
 
 class PrestamoFilter(filters.FilterSet):

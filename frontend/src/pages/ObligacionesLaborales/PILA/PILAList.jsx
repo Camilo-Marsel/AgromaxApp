@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import pilaService from '../../../services/pilaService';
+import fincaService from '../../../services/fincaService';
+import quincenaService from '../../../services/quincenaService';
 import LoadingSpinner from '../../../components/Common/LoadingSpinner';
 import ConfirmDialog from '../../../components/Common/ConfirmDialog';
 import toast from 'react-hot-toast';
@@ -20,12 +22,27 @@ export default function PILAList() {
   const [showCalcularModal, setShowCalcularModal] = useState(false);
   const [mesCalcular, setMesCalcular] = useState(new Date().getMonth() + 1);
   const [añoCalcular, setAñoCalcular] = useState(new Date().getFullYear());
+  const [tipoCalcular, setTipoCalcular] = useState('MES');
+  const [quincenaCalcular, setQuincenaCalcular] = useState('');
+  const [quincenasDisponibles, setQuincenasDisponibles] = useState([]);
+  const [fincas, setFincas] = useState([]);
+  const [fincasSeleccionadas, setFincasSeleccionadas] = useState([]);
   const [calculando, setCalculando] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
 
   useEffect(() => {
     loadData();
   }, [filtroAño]);
+
+  useEffect(() => {
+    loadFincas();
+  }, []);
+
+  useEffect(() => {
+    if (tipoCalcular === 'QUINCENA') {
+      loadQuincenas();
+    }
+  }, [mesCalcular, añoCalcular, tipoCalcular]);
 
   const loadData = async () => {
     try {
@@ -44,12 +61,51 @@ export default function PILAList() {
     }
   };
 
+  const loadFincas = async () => {
+    try {
+      const data = await fincaService.getAll();
+      setFincas(data.results || data);
+    } catch (error) {
+      console.error('Error al cargar fincas:', error);
+    }
+  };
+
+  const loadQuincenas = async () => {
+    try {
+      const data = await quincenaService.getAll({ mes: mesCalcular, año: añoCalcular });
+      const lista = data.results || data;
+      setQuincenasDisponibles(lista);
+      if (lista.length > 0) {
+        setQuincenaCalcular(lista[0].id);
+      } else {
+        setQuincenaCalcular('');
+      }
+    } catch (error) {
+      console.error('Error al cargar quincenas:', error);
+      setQuincenasDisponibles([]);
+    }
+  };
+
   const handleCalcular = async () => {
     try {
       setCalculando(true);
-      await pilaService.calcular(mesCalcular, añoCalcular);
-      toast.success(`PILA calculada para ${mesCalcular}/${añoCalcular}`);
+      const params = {
+        mes: mesCalcular,
+        año: añoCalcular,
+        tipo: tipoCalcular,
+        fincas: fincasSeleccionadas,
+      };
+      if (tipoCalcular === 'QUINCENA') {
+        if (!quincenaCalcular) {
+          toast.error('Seleccione una quincena');
+          return;
+        }
+        params.quincena_id = quincenaCalcular;
+      }
+      await pilaService.calcular(params);
+      toast.success('PILA calculada correctamente');
       setShowCalcularModal(false);
+      setFincasSeleccionadas([]);
       loadData();
     } catch (error) {
       console.error('Error al calcular PILA:', error);
@@ -70,6 +126,14 @@ export default function PILAList() {
       console.error('Error al eliminar PILA:', error);
       toast.error('Error al eliminar PILA');
     }
+  };
+
+  const toggleFinca = (fincaId) => {
+    setFincasSeleccionadas((prev) =>
+      prev.includes(fincaId)
+        ? prev.filter((id) => id !== fincaId)
+        : [...prev, fincaId]
+    );
   };
 
   const formatMoney = (value) => {
@@ -155,9 +219,6 @@ export default function PILAList() {
               </p>
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-3">
-            * Empresa exonerada de SENA e ICBF. ARL Nivel I (0.522%)
-          </p>
         </div>
       )}
 
@@ -216,6 +277,9 @@ export default function PILAList() {
                     Periodo
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Tipo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     IBC Total
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -239,9 +303,18 @@ export default function PILAList() {
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-gray-400" />
                         <span className="font-medium">
-                          {meses[pila.mes]} {pila.año}
+                          {pila.periodo_display}
                         </span>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        pila.tipo === 'QUINCENA'
+                          ? 'bg-purple-100 text-purple-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {pila.tipo_display}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatMoney(pila.total_ibc)}
@@ -308,14 +381,44 @@ export default function PILAList() {
       {/* Modal Calcular PILA */}
       {showCalcularModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
             <h3 className="text-lg font-semibold mb-4">Calcular PILA</h3>
             <p className="text-sm text-gray-600 mb-4">
-              Seleccione el mes y año para calcular los aportes de seguridad social
-              basados en las nóminas aprobadas.
+              Seleccione el tipo de cálculo y el período para calcular los aportes
+              de seguridad social basados en las nóminas aprobadas.
             </p>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            {/* Tipo de cálculo */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tipo de cálculo
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="MES"
+                    checked={tipoCalcular === 'MES'}
+                    onChange={(e) => setTipoCalcular(e.target.value)}
+                    className="text-blue-600"
+                  />
+                  <span className="text-sm">Mensual</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="QUINCENA"
+                    checked={tipoCalcular === 'QUINCENA'}
+                    onChange={(e) => setTipoCalcular(e.target.value)}
+                    className="text-blue-600"
+                  />
+                  <span className="text-sm">Quincenal</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Mes y Año */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Mes
@@ -346,16 +449,73 @@ export default function PILAList() {
               </div>
             </div>
 
+            {/* Selector de quincena */}
+            {tipoCalcular === 'QUINCENA' && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quincena
+                </label>
+                {quincenasDisponibles.length > 0 ? (
+                  <select
+                    value={quincenaCalcular}
+                    onChange={(e) => setQuincenaCalcular(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    {quincenasDisponibles.map((q) => (
+                      <option key={q.id} value={q.id}>
+                        Quincena {q.numero} ({q.fecha_inicio} - {q.fecha_fin})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm text-yellow-600">
+                    No hay quincenas para {meses[mesCalcular]} {añoCalcular}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Filtro de fincas */}
+            {fincas.length > 0 && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Fincas (opcional - vacío = todas)
+                </label>
+                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-1">
+                  {fincas.map((finca) => (
+                    <label key={finca.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={fincasSeleccionadas.includes(finca.id)}
+                        onChange={() => toggleFinca(finca.id)}
+                        className="text-blue-600 rounded"
+                      />
+                      <span className="text-sm">{finca.nombre}</span>
+                    </label>
+                  ))}
+                </div>
+                {fincasSeleccionadas.length > 0 && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    {fincasSeleccionadas.length} finca(s) seleccionada(s)
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setShowCalcularModal(false)}
+                onClick={() => {
+                  setShowCalcularModal(false);
+                  setFincasSeleccionadas([]);
+                  setTipoCalcular('MES');
+                }}
                 className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCalcular}
-                disabled={calculando}
+                disabled={calculando || (tipoCalcular === 'QUINCENA' && !quincenaCalcular)}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
               >
                 {calculando ? (

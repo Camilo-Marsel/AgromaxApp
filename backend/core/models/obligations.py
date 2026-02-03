@@ -12,13 +12,13 @@ from decimal import Decimal
 
 class PILA(models.Model):
     """
-    Registro mensual de aportes a seguridad social.
+    Registro de aportes a seguridad social (mensual o quincenal).
     Se calcula basado en el IBC (Ingreso Base de Cotización) de cada trabajador.
 
     Porcentajes empresa (exonerada de SENA e ICBF):
     - Salud: 8.5%
     - Pensión: 12%
-    - ARL: 0.522% (nivel I)
+    - ARL: 1.044% (nivel II)
     - Caja de Compensación: 4%
     """
 
@@ -28,9 +28,23 @@ class PILA(models.Model):
         ('PAGADA', 'Pagada'),
     ]
 
+    TIPO_CHOICES = [
+        ('MES', 'Mensual'),
+        ('QUINCENA', 'Quincenal'),
+    ]
+
     # Periodo
     mes = models.IntegerField(validators=[MinValueValidator(1)])
     año = models.IntegerField(validators=[MinValueValidator(2020)])
+    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default='MES')
+    quincena = models.ForeignKey(
+        'Quincena',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pilas',
+        help_text='Quincena específica (solo para tipo QUINCENA)'
+    )
 
     # Totales consolidados
     total_ibc = models.DecimalField(
@@ -47,7 +61,7 @@ class PILA(models.Model):
     )
     total_arl = models.DecimalField(
         max_digits=15, decimal_places=2, default=Decimal('0'),
-        help_text='Total aporte ARL (0.522%)'
+        help_text='Total aporte ARL (1.044%)'
     )
     total_caja = models.DecimalField(
         max_digits=15, decimal_places=2, default=Decimal('0'),
@@ -81,17 +95,27 @@ class PILA(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=['mes', 'año'],
-                name='unique_pila_periodo'
+                condition=models.Q(tipo='MES'),
+                name='unique_pila_mes'
+            ),
+            models.UniqueConstraint(
+                fields=['quincena'],
+                condition=models.Q(tipo='QUINCENA') & ~models.Q(quincena=None),
+                name='unique_pila_quincena'
             )
         ]
 
     def __str__(self):
+        if self.tipo == 'QUINCENA' and self.quincena:
+            return f"PILA Q{self.quincena.numero} {self.mes:02d}/{self.año}"
         return f"PILA {self.mes:02d}/{self.año}"
 
     @property
     def periodo_display(self):
         meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+        if self.tipo == 'QUINCENA' and self.quincena:
+            return f"Q{self.quincena.numero} - {meses[self.mes]} {self.año}"
         return f"{meses[self.mes]} {self.año}"
 
 
@@ -322,7 +346,7 @@ class ResumenPrestaciones(models.Model):
 # Porcentajes de Seguridad Social (empleador)
 PORCENTAJE_SALUD_EMPLEADOR = Decimal('0.085')      # 8.5%
 PORCENTAJE_PENSION_EMPLEADOR = Decimal('0.12')     # 12%
-PORCENTAJE_ARL = Decimal('0.00522')                # 0.522% (Nivel I)
+PORCENTAJE_ARL = Decimal('0.01044')                # 1.044% (Nivel II)
 PORCENTAJE_CAJA_COMPENSACION = Decimal('0.04')     # 4%
 
 # Porcentajes de Prestaciones Sociales

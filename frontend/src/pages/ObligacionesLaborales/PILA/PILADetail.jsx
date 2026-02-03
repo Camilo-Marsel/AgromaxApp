@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import pilaService from '../../../services/pilaService';
+import fincaService from '../../../services/fincaService';
 import LoadingSpinner from '../../../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
 import {
@@ -19,10 +20,36 @@ export default function PILADetail() {
   const [fechaPago, setFechaPago] = useState(new Date().toISOString().split('T')[0]);
   const [numeroPlanilla, setNumeroPlanilla] = useState('');
   const [procesando, setProcesando] = useState(false);
+  const [fincas, setFincas] = useState([]);
+  const [fincasSeleccionadas, setFincasSeleccionadas] = useState([]);
 
   useEffect(() => {
     loadPila();
+    loadFincas();
   }, [id]);
+
+  const loadFincas = async () => {
+    try {
+      const data = await fincaService.getAll();
+      setFincas(data.results || data);
+    } catch (error) {
+      console.error('Error al cargar fincas:', error);
+    }
+  };
+
+  const toggleFinca = (fincaId) => {
+    setFincasSeleccionadas((prev) =>
+      prev.includes(fincaId)
+        ? prev.filter((fid) => fid !== fincaId)
+        : [...prev, fincaId]
+    );
+  };
+
+  const detallesFiltrados = fincasSeleccionadas.length > 0
+    ? (pila?.detalles || []).filter((d) =>
+        fincasSeleccionadas.includes(d.trabajador_info?.finca)
+      )
+    : pila?.detalles || [];
 
   const loadPila = async () => {
     try {
@@ -63,7 +90,7 @@ export default function PILADetail() {
 
   const handleExportarExcel = async () => {
     try {
-      const blob = await pilaService.exportarExcel(id);
+      const blob = await pilaService.exportarExcel(id, fincasSeleccionadas);
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement('a');
       link.href = url;
@@ -115,7 +142,7 @@ export default function PILADetail() {
           </button>
           <div>
             <h1 className="text-2xl font-bold">
-              PILA {meses[pila.mes]} {pila.año}
+              PILA {pila.periodo_display}
             </h1>
             <p className="text-gray-600">
               Detalle de aportes de seguridad social
@@ -205,7 +232,7 @@ export default function PILADetail() {
             </p>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600">ARL (0.522%)</p>
+            <p className="text-sm text-gray-600">ARL (1.044%)</p>
             <p className="text-xl font-bold text-gray-800">
               {formatMoney(pila.total_arl)}
             </p>
@@ -251,9 +278,46 @@ export default function PILADetail() {
         </div>
       )}
 
+      {/* Filtro de Fincas */}
+      {fincas.length > 1 && (
+        <div className="bg-white p-4 rounded-lg shadow">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Filtrar por fincas
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {fincas.map((finca) => (
+              <label key={finca.id} className="flex items-center gap-1.5 cursor-pointer bg-gray-50 px-3 py-1.5 rounded-full border hover:bg-gray-100">
+                <input
+                  type="checkbox"
+                  checked={fincasSeleccionadas.includes(finca.id)}
+                  onChange={() => toggleFinca(finca.id)}
+                  className="text-blue-600 rounded"
+                />
+                <span className="text-sm">{finca.nombre}</span>
+              </label>
+            ))}
+            {fincasSeleccionadas.length > 0 && (
+              <button
+                onClick={() => setFincasSeleccionadas([])}
+                className="text-xs text-blue-600 hover:underline px-2"
+              >
+                Limpiar filtro
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Tabla de Detalles por Trabajador */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-lg font-semibold mb-4">Aportes por Trabajador</h2>
+        <h2 className="text-lg font-semibold mb-4">
+          Aportes por Trabajador
+          {fincasSeleccionadas.length > 0 && (
+            <span className="text-sm font-normal text-gray-500 ml-2">
+              ({detallesFiltrados.length} de {pila.detalles?.length || 0} trabajadores)
+            </span>
+          )}
+        </h2>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -285,7 +349,7 @@ export default function PILADetail() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {pila.detalles?.map((detalle) => (
+              {detallesFiltrados.map((detalle) => (
                 <tr key={detalle.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">

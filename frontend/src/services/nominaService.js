@@ -55,10 +55,12 @@ const nominaService = {
     return response.data;
   },
 
-  // Exportar lista de pagos a Excel
-  exportarExcelQuincena: async (quincenaId, fincaId = '') => {
+  // Exportar lista de pagos a Excel (soporta finca single o fincas multi como array)
+  exportarExcelQuincena: async (quincenaId, fincaId = '', fincasIds = []) => {
   const params = { quincena: quincenaId };
-  if (fincaId) {
+  if (fincasIds.length > 0) {
+    params.fincas = fincasIds.join(',');
+  } else if (fincaId) {
     params.finca = fincaId;
   }
   
