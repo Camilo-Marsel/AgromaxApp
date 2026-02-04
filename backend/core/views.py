@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from .services.nomina_calculator import NominaCalculator
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponse
 from .services.pdf_generator import generar_comprobante_pdf
 from .services.excel_generator import ExcelGenerator
 from rest_framework.filters import SearchFilter 
@@ -1754,6 +1754,9 @@ class PILAViewSet(viewsets.ModelViewSet):
 
         for trab_id, data in trabajadores_ibc.items():
             ibc = data['ibc']
+            # Saltar trabajadores con IBC 0 (retirados sin devengos reales)
+            if ibc <= 0:
+                continue
             dias = min(data['dias'], max_dias)
 
             aporte_salud = ibc * PORCENTAJE_SALUD_EMPLEADOR
