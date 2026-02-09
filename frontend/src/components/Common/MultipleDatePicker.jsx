@@ -46,50 +46,50 @@ export default function MultipleDatePicker({
       
       const tieneRegistro = laboresEnFecha.length > 0;
       
-      // Pares de labores que pueden coexistir (debe coincidir con el backend)
-      const PARES_PERMITIDOS = [
-        ['Resiembra CabezaToro', 'Siembra Nueva'],
-      ];
+      // Labores especiales que pueden agregarse como "adicionales" (debe coincidir con el backend)
+      const LABORES_ADICIONALES = ['Control', 'Resiembra CabezaToro', 'Siembra Nueva'];
 
       // LÓGICA DE DESHABILITACIÓN:
-      // 1. Domingos siempre deshabilitados
-      // 2. Si la labor actual es "Control", NUNCA deshabilitar (puede agregarse siempre)
-      // 3. Si la fecha tiene labores:
-      //    - Si solo tiene "Control", permitir agregar cualquier labor
-      //    - Si las labores forman un par permitido, permitir
-      //    - Si tiene otras labores (no Control), solo permitir agregar "Control"
+      // Regla: Máximo 1 labor normal + cualquier combinación de labores adicionales
+      //
+      // Ejemplos válidos:
+      // - Día Básico (1 normal)
+      // - Día Básico + Control (1 normal + 1 adicional)
+      // - Día Básico + Resiembra CabezaToro + Siembra Nueva (1 normal + 2 adicionales)
+      // - Control + Resiembra CabezaToro + Siembra Nueva (3 adicionales)
 
       let disabled = isDomingo;
       let mensajeTooltip = '';
 
       if (!isDomingo && tieneRegistro) {
-        const soloTieneControl = laboresEnFecha.every(l => l === 'Control');
-        const tieneOtrasLabores = laboresEnFecha.some(l => l !== 'Control');
+        // Clasificar labores existentes
+        const laboresNormalesExistentes = laboresEnFecha.filter(l => !LABORES_ADICIONALES.includes(l));
+        const laboresAdicionalesExistentes = laboresEnFecha.filter(l => LABORES_ADICIONALES.includes(l));
 
-        if (laborActualNombre === 'Control') {
-          // Control SIEMPRE puede agregarse
-          disabled = false;
-          mensajeTooltip = tieneRegistro ? `Tiene: ${laboresEnFecha.join(', ')}` : dateStr;
-        } else {
-          // Verificar si la combinación actual + existente forma un par permitido
-          const laboresSet = [laborActualNombre, ...laboresEnFecha.filter(l => l !== 'Control')];
-          const esPar = PARES_PERMITIDOS.some(par => {
-            return laboresSet.length === par.length &&
-                   laboresSet.every(l => par.includes(l));
-          });
-
-          if (esPar) {
-            // Es un par permitido, puede agregarse
-            disabled = false;
-            mensajeTooltip = `Tiene: ${laboresEnFecha.join(', ')}. Par permitido.`;
-          } else if (soloTieneControl) {
-            // Solo tiene Control, puede agregar esta labor
-            disabled = false;
-            mensajeTooltip = `Tiene Control. Puede agregar otra labor.`;
-          } else if (tieneOtrasLabores) {
-            // Tiene otras labores y no es un par permitido
+        // Si la labor actual es adicional
+        if (LABORES_ADICIONALES.includes(laborActualNombre)) {
+          // Verificar que no esté duplicada
+          if (laboresEnFecha.includes(laborActualNombre)) {
             disabled = true;
-            mensajeTooltip = `Ya tiene: ${laboresEnFecha.join(', ')}. Solo puede agregar Control.`;
+            mensajeTooltip = `Ya tiene ${laborActualNombre} registrado.`;
+          } else {
+            // Puede agregarse
+            disabled = false;
+            mensajeTooltip = laboresEnFecha.length > 0
+              ? `Tiene: ${laboresEnFecha.join(', ')}. Puede agregar ${laborActualNombre}.`
+              : dateStr;
+          }
+        } else {
+          // Es una labor normal, verificar que no haya otra labor normal
+          if (laboresNormalesExistentes.length > 0) {
+            disabled = true;
+            mensajeTooltip = `Ya tiene: ${laboresNormalesExistentes[0]}. Solo puede agregar labores adicionales (Control, Resiembra, Siembra Nueva).`;
+          } else {
+            // No hay labores normales, puede agregarse
+            disabled = false;
+            mensajeTooltip = laboresAdicionalesExistentes.length > 0
+              ? `Tiene: ${laboresAdicionalesExistentes.join(', ')}. Puede agregar esta labor.`
+              : dateStr;
           }
         }
       } else if (isDomingo) {
