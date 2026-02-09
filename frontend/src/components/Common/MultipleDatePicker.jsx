@@ -46,33 +46,50 @@ export default function MultipleDatePicker({
       
       const tieneRegistro = laboresEnFecha.length > 0;
       
+      // Pares de labores que pueden coexistir (debe coincidir con el backend)
+      const PARES_PERMITIDOS = [
+        ['Resiembra CabezaToro', 'Siembra Nueva'],
+      ];
+
       // LÓGICA DE DESHABILITACIÓN:
       // 1. Domingos siempre deshabilitados
       // 2. Si la labor actual es "Control", NUNCA deshabilitar (puede agregarse siempre)
       // 3. Si la fecha tiene labores:
       //    - Si solo tiene "Control", permitir agregar cualquier labor
+      //    - Si las labores forman un par permitido, permitir
       //    - Si tiene otras labores (no Control), solo permitir agregar "Control"
-      
+
       let disabled = isDomingo;
       let mensajeTooltip = '';
-      
+
       if (!isDomingo && tieneRegistro) {
         const soloTieneControl = laboresEnFecha.every(l => l === 'Control');
         const tieneOtrasLabores = laboresEnFecha.some(l => l !== 'Control');
-        
+
         if (laborActualNombre === 'Control') {
           // Control SIEMPRE puede agregarse
           disabled = false;
           mensajeTooltip = tieneRegistro ? `Tiene: ${laboresEnFecha.join(', ')}` : dateStr;
         } else {
-          // Otras labores solo si la fecha está vacía o solo tiene Control
-          if (tieneOtrasLabores) {
-            disabled = true;
-            mensajeTooltip = `Ya tiene: ${laboresEnFecha.join(', ')}. Solo puede agregar Control.`;
-          } else {
+          // Verificar si la combinación actual + existente forma un par permitido
+          const laboresSet = [laborActualNombre, ...laboresEnFecha.filter(l => l !== 'Control')];
+          const esPar = PARES_PERMITIDOS.some(par => {
+            return laboresSet.length === par.length &&
+                   laboresSet.every(l => par.includes(l));
+          });
+
+          if (esPar) {
+            // Es un par permitido, puede agregarse
+            disabled = false;
+            mensajeTooltip = `Tiene: ${laboresEnFecha.join(', ')}. Par permitido.`;
+          } else if (soloTieneControl) {
             // Solo tiene Control, puede agregar esta labor
             disabled = false;
             mensajeTooltip = `Tiene Control. Puede agregar otra labor.`;
+          } else if (tieneOtrasLabores) {
+            // Tiene otras labores y no es un par permitido
+            disabled = true;
+            mensajeTooltip = `Ya tiene: ${laboresEnFecha.join(', ')}. Solo puede agregar Control.`;
           }
         }
       } else if (isDomingo) {
