@@ -103,6 +103,9 @@ export default function LaboresList() {
                 Unidad de Medida
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Precio Actual
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Estado
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -113,7 +116,7 @@ export default function LaboresList() {
           <tbody className="bg-white divide-y divide-gray-200">
             {laboresFiltradas.length === 0 ? (
               <tr>
-                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
                   No se encontraron labores
                 </td>
               </tr>
@@ -128,6 +131,18 @@ export default function LaboresList() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {labor.unidad_medida_info?.nombre_display}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {labor.precio_actual !== null && labor.precio_actual !== undefined ? (
+                      <span className="font-semibold text-green-600">
+                        ${Number(labor.precio_actual).toLocaleString('es-CO', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </span>
+                    ) : (
+                      <span className="text-red-600 font-semibold">Sin precio</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span

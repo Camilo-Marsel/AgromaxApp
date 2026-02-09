@@ -171,6 +171,64 @@ export default function LaborForm() {
               />
             </div>
 
+            {/* Campos de precio solo al crear (no al editar) */}
+            {!isEditing && (
+              <>
+                <div className="border-t pt-4 mt-4">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                    Precio Inicial
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Define el precio inicial de esta labor. Podrás actualizarlo después desde la gestión de precios.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Precio *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        {...register('precio_inicial', {
+                          required: 'El precio inicial es obligatorio',
+                          min: { value: 0, message: 'El precio no puede ser negativo' }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0.00"
+                      />
+                      {errors.precio_inicial && (
+                        <span className="text-red-500 text-sm">{errors.precio_inicial.message}</span>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">
+                        Puedes usar 0 para labores sin remuneración
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Vigencia desde *
+                      </label>
+                      <input
+                        type="date"
+                        {...register('fecha_inicio_vigencia_precio', {
+                          required: 'La fecha de vigencia es obligatoria'
+                        })}
+                        defaultValue={new Date().toISOString().split('T')[0]}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      {errors.fecha_inicio_vigencia_precio && (
+                        <span className="text-red-500 text-sm">
+                          {errors.fecha_inicio_vigencia_precio.message}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
             <div>
               <label className="flex items-center gap-2">
                 <input

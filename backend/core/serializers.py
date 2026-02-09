@@ -325,18 +325,56 @@ class LaborListSerializer(serializers.ModelSerializer):
 
 
 class LaborCreateUpdateSerializer(serializers.ModelSerializer):
+    # Campos adicionales para crear el precio inicial (solo en creación)
+    precio_inicial = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        write_only=True,
+        help_text="Precio inicial de la labor (obligatorio al crear)"
+    )
+    fecha_inicio_vigencia_precio = serializers.DateField(
+        required=False,
+        write_only=True,
+        help_text="Fecha desde cuando es válido el precio (obligatorio al crear)"
+    )
+
     class Meta:
         model = Labor
         fields = [
             'codigo', 'nombre', 'descripcion', 'unidad_medida',
-            'es_especial', 'solo_con_contrato', 'activa'
+            'es_especial', 'solo_con_contrato', 'activa',
+            'precio_inicial', 'fecha_inicio_vigencia_precio'
         ]
         extra_kwargs = {
             'codigo': {'read_only': True},
         }
 
+    def validate(self, data):
+        """Validar que al crear una labor se incluya el precio"""
+        # Solo validar en creación (no en actualización)
+        if not self.instance:  # Es creación
+            if 'precio_inicial' not in data or data['precio_inicial'] is None:
+                raise serializers.ValidationError({
+                    'precio_inicial': 'El precio inicial es obligatorio al crear una labor.'
+                })
+            if 'fecha_inicio_vigencia_precio' not in data or data['fecha_inicio_vigencia_precio'] is None:
+                raise serializers.ValidationError({
+                    'fecha_inicio_vigencia_precio': 'La fecha de inicio de vigencia del precio es obligatoria al crear una labor.'
+                })
+            if data['precio_inicial'] < 0:
+                raise serializers.ValidationError({
+                    'precio_inicial': 'El precio no puede ser negativo.'
+                })
+        return data
+
     def create(self, validated_data):
-        """Generar código automático al crear: LAB001, LAB002, etc."""
+        """Generar código automático y crear precio inicial"""
+        # Extraer datos del precio
+        precio_inicial = validated_data.pop('precio_inicial')
+        fecha_inicio_vigencia_precio = validated_data.pop('fecha_inicio_vigencia_precio')
+
+        # Generar código automático: LAB001, LAB002, etc.
         last = Labor.objects.order_by('-codigo').first()
         if last and last.codigo.startswith('LAB'):
             try:
@@ -346,7 +384,21 @@ class LaborCreateUpdateSerializer(serializers.ModelSerializer):
         else:
             num = 1
         validated_data['codigo'] = f'LAB{num:03d}'
-        return super().create(validated_data)
+
+        # Crear la labor
+        labor = super().create(validated_data)
+
+        # Crear el precio inicial automáticamente
+        from core.models import ListaPrecios
+        ListaPrecios.objects.create(
+            labor=labor,
+            precio=precio_inicial,
+            fecha_inicio_vigencia=fecha_inicio_vigencia_precio,
+            fecha_fin_vigencia=None,  # Sin fecha de fin = vigente indefinidamente
+            created_by=self.context['request'].user
+        )
+
+        return labor
 
 
 class ListaPreciosSerializer(serializers.ModelSerializer):
