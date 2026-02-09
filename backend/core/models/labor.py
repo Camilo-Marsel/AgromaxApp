@@ -222,8 +222,15 @@ class RegistroLabor(models.Model):
         if not (self.quincena.fecha_inicio <= self.fecha <= self.quincena.fecha_fin):
             raise ValidationError('La fecha debe estar dentro de la quincena')
 
+        # Pares de labores que pueden coexistir en el mismo día
+        PARES_PERMITIDOS = [
+            {'Resiembra CabezaToro', 'Siembra Nueva'},
+        ]
+
         # Validar duplicados: NO permitir múltiples labores el mismo día
-        # EXCEPCIÓN: "Control" SÍ puede coexistir con otras labores
+        # EXCEPCIONES:
+        # 1. "Control" SÍ puede coexistir con otras labores
+        # 2. Pares específicos definidos en PARES_PERMITIDOS
         registros_mismo_dia = RegistroLabor.objects.filter(
             trabajador=self.trabajador,
             fecha=self.fecha,
@@ -239,10 +246,11 @@ class RegistroLabor(models.Model):
             labores_existentes = list(registros_mismo_dia.values_list('labor__nombre', flat=True))
             labor_actual = self.labor.nombre
 
-            # LÓGICA CORREGIDA:
+            # LÓGICA DE VALIDACIÓN:
             # - Control puede coexistir con cualquier labor
             # - Cualquier labor puede coexistir con Control
-            # - Dos labores diferentes (no Control) NO pueden coexistir
+            # - Pares específicos pueden coexistir entre sí
+            # - Dos labores diferentes (no Control, no pares permitidos) NO pueden coexistir
 
             # Caso 1: Si estamos agregando Control, siempre está permitido
             if labor_actual == 'Control':
@@ -261,14 +269,27 @@ class RegistroLabor(models.Model):
                     )
                 # Si solo existe Control, permitir agregar esta labor
 
-            # Caso 3: No existe Control, verificar que no haya otra labor
+            # Caso 3: No existe Control, verificar si es un par permitido
             else:
                 if labores_existentes:
-                    # Ya existe otra labor (no Control), solo permitir agregar Control
-                    raise ValidationError(
-                        f'Ya existe un registro de {labores_existentes[0]} para este día. '
-                        f'Solo puede agregar Control como labor adicional.'
+                    # Verificar si la combinación actual + existente forma un par permitido
+                    labores_set = {labor_actual, *labores_existentes}
+
+                    # Verificar si algún par permitido coincide exactamente con las labores presentes
+                    es_par_permitido = any(
+                        labores_set == par_permitido
+                        for par_permitido in PARES_PERMITIDOS
                     )
+
+                    if es_par_permitido:
+                        # Es un par permitido, continuar
+                        pass
+                    else:
+                        # No es un par permitido ni Control, mostrar error
+                        raise ValidationError(
+                            f'Ya existe un registro de {labores_existentes[0]} para este día. '
+                            f'Solo puede agregar Control como labor adicional.'
+                        )
 
     def save(self, *args, **kwargs):
         self.clean()
