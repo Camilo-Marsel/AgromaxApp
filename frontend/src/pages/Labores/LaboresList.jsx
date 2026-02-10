@@ -7,7 +7,7 @@ import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import SearchBar from '../../components/Common/SearchBar';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import toast from 'react-hot-toast';
-import { Plus, Edit, Trash2, DollarSign } from 'lucide-react';
+import { Plus, Edit, Trash2, DollarSign, FileSpreadsheet } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function LaboresList() {
@@ -47,6 +47,38 @@ export default function LaboresList() {
     }
   };
 
+  const handleExportarExcel = async () => {
+    try {
+      const response = await laborService.exportarExcel();
+
+      // Crear URL del blob y descargar
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+
+      // Extraer nombre del archivo del header o usar uno por defecto
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'Listado_Labores.xlsx';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Archivo descargado correctamente');
+    } catch (error) {
+      console.error('Error al exportar:', error);
+      toast.error('Error al exportar listado');
+    }
+  };
+
   const laboresFiltradas = labores.filter((labor) => {
     const searchLower = search.toLowerCase();
     return (
@@ -68,15 +100,25 @@ export default function LaboresList() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Labores</h1>
-        {canModify() && (
+        <div className="flex gap-3">
           <button
-            onClick={() => navigate('/labores/nueva')}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            onClick={handleExportarExcel}
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+            title="Exportar listado a Excel"
           >
-            <Plus className="w-5 h-5" />
-            Nueva Labor
+            <FileSpreadsheet className="w-5 h-5" />
+            Exportar Excel
           </button>
-        )}
+          {canModify() && (
+            <button
+              onClick={() => navigate('/labores/nueva')}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            >
+              <Plus className="w-5 h-5" />
+              Nueva Labor
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Búsqueda */}

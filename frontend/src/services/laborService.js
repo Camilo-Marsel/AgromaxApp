@@ -38,6 +38,14 @@ const laborService = {
     const response = await api.get('/unidades-medida/');
     return response.data;
   },
+
+  // Exportar labores a Excel
+  exportarExcel: async () => {
+    const response = await api.get('/labores/exportar-excel/', {
+      responseType: 'blob' // Importante para descargar archivos
+    });
+    return response;
+  },
 };
 
 export default laborService;
