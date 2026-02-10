@@ -21,7 +21,7 @@ export default function NominaList() {
   const [quincenas, setQuincenas] = useState([]);
   const [fincas, setFincas] = useState([]);
   const [quincenaSeleccionada, setQuincenaSeleccionada] = useState(null);
-  const [fincaSeleccionada, setFincaSeleccionada] = useState('');
+  const [fincasSeleccionadas, setFincasSeleccionadas] = useState([]);
   const [nominas, setNominas] = useState([]);
   const [nominasFiltradas, setNominasFiltradas] = useState([]);
   const [search, setSearch] = useState('');
@@ -45,9 +45,9 @@ export default function NominaList() {
 
   useEffect(() => {
     if (quincenaSeleccionada) {
-      loadNominas(quincenaSeleccionada, fincaSeleccionada);
+      loadNominas(quincenaSeleccionada, fincasSeleccionadas);
     }
-  }, [quincenaSeleccionada, fincaSeleccionada]);
+  }, [quincenaSeleccionada, fincasSeleccionadas]);
 
   // Filtrar nóminas por búsqueda
   useEffect(() => {
@@ -92,18 +92,18 @@ export default function NominaList() {
     }
   };
 
-  const loadNominas = async (quincenaId, fincaId = '') => {
+  const loadNominas = async (quincenaId, fincasIds = []) => {
     try {
       const params = { quincena: quincenaId };
-      if (fincaId) {
-        params.finca = fincaId;
+      if (fincasIds.length > 0) {
+        params.fincas = fincasIds.join(',');
       }
-      
+
       const data = await nominaService.getAll(params);
       const nominasArray = data.results || data;
       setNominas(nominasArray);
       setNominasFiltradas(nominasArray);
-      
+
       calcularResumen(nominasArray);
     } catch (error) {
       console.error('Error al cargar nóminas:', error);
@@ -132,7 +132,7 @@ export default function NominaList() {
       toast.success(result.message);
 
       // Recargar nóminas
-      await loadNominas(quincenaSeleccionada, fincaSeleccionada);
+      await loadNominas(quincenaSeleccionada, fincasSeleccionadas);
     } catch (error) {
       console.error('Error al calcular nómina:', error);
       toast.error('Error al calcular nómina');
@@ -147,11 +147,11 @@ export default function NominaList() {
       setProcesandoMasivo(true);
       const result = await nominaService.aprobarMasivo(
         quincenaSeleccionada,
-        fincaSeleccionada || null
+        fincasSeleccionadas.length > 0 ? fincasSeleccionadas.join(',') : null
       );
       toast.success(result.message);
       setConfirmAprobarMasivo(false);
-      await loadNominas(quincenaSeleccionada, fincaSeleccionada);
+      await loadNominas(quincenaSeleccionada, fincasSeleccionadas);
     } catch (error) {
       console.error('Error al aprobar masivo:', error);
       const errorMsg = error.response?.data?.error || 'Error al aprobar nóminas';
@@ -169,8 +169,11 @@ export default function NominaList() {
 
     try {
       setExportando(true);
-      // Si hay filtro de finca, pasarlo al exportador
-      await nominaService.exportarExcelQuincena(quincenaSeleccionada, fincaSeleccionada);
+      // Si hay filtros de fincas, pasarlos al exportador
+      await nominaService.exportarExcelQuincena(
+        quincenaSeleccionada,
+        fincasSeleccionadas.length > 0 ? fincasSeleccionadas.join(',') : null
+      );
       toast.success('Excel generado correctamente');
     } catch (error) {
       console.error('Error al exportar Excel:', error);
@@ -185,7 +188,7 @@ export default function NominaList() {
       setEnviandoCorreos(true);
       const result = await nominaService.enviarRecibosMasivo(
         quincenaSeleccionada,
-        fincaSeleccionada || null,
+        fincasSeleccionadas.length > 0 ? fincasSeleccionadas.join(',') : null,
         estadosEnvioCorreo
       );
 
@@ -299,23 +302,44 @@ export default function NominaList() {
             </select>
           </div>
 
-          {/* Selector de Finca (Opcional) */}
+          {/* Selector de Fincas (Multi-selección) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Finca (Opcional)
+              Fincas (Opcional - puede seleccionar varias)
             </label>
-            <select
-              value={fincaSeleccionada}
-              onChange={(e) => setFincaSeleccionada(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todas las fincas</option>
+            <div className="border border-gray-300 rounded-md p-3 max-h-32 overflow-y-auto bg-white">
+              <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={fincasSeleccionadas.length === 0}
+                  onChange={() => setFincasSeleccionadas([])}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm font-semibold">Todas las fincas</span>
+              </label>
               {fincas.map((finca) => (
-                <option key={finca.id} value={finca.id}>
-                  {finca.nombre}
-                </option>
+                <label key={finca.id} className="flex items-center gap-2 mb-1 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                  <input
+                    type="checkbox"
+                    checked={fincasSeleccionadas.includes(finca.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFincasSeleccionadas([...fincasSeleccionadas, finca.id]);
+                      } else {
+                        setFincasSeleccionadas(fincasSeleccionadas.filter(id => id !== finca.id));
+                      }
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm">{finca.nombre}</span>
+                </label>
               ))}
-            </select>
+            </div>
+            {fincasSeleccionadas.length > 0 && (
+              <p className="mt-1 text-xs text-gray-600">
+                {fincasSeleccionadas.length} finca{fincasSeleccionadas.length > 1 ? 's' : ''} seleccionada{fincasSeleccionadas.length > 1 ? 's' : ''}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -425,9 +449,9 @@ export default function NominaList() {
               <p className="text-sm font-medium text-blue-900">
                 {nominasFiltradas.filter(n => n.estado === 'PENDIENTE').length} nómina(s) serán aprobadas
               </p>
-              {fincaSeleccionada && (
+              {fincasSeleccionadas.length > 0 && (
                 <p className="text-xs text-blue-700 mt-1">
-                  Solo de la finca seleccionada
+                  Solo de {fincasSeleccionadas.length} finca{fincasSeleccionadas.length > 1 ? 's' : ''} seleccionada{fincasSeleccionadas.length > 1 ? 's' : ''}
                 </p>
               )}
             </div>
@@ -484,9 +508,9 @@ export default function NominaList() {
               <p className="text-sm font-medium text-indigo-900">
                 {nominasConCorreo.length} trabajador(es) con correo registrado recibirán su recibo
               </p>
-              {fincaSeleccionada && (
+              {fincasSeleccionadas.length > 0 && (
                 <p className="text-xs text-indigo-700 mt-1">
-                  Solo de la finca seleccionada
+                  Solo de {fincasSeleccionadas.length} finca{fincasSeleccionadas.length > 1 ? 's' : ''} seleccionada{fincasSeleccionadas.length > 1 ? 's' : ''}
                 </p>
               )}
               {nominasFiltradas.filter(n => estadosEnvioCorreo.includes(n.estado) && !n.trabajador_info?.correo).length > 0 && (

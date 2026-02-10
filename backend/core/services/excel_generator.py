@@ -169,13 +169,36 @@ class ExcelGenerator:
         output = BytesIO()
         self.wb.save(output)
         output.seek(0)
-        
-        filename = f"Lista_Pagos_Q{self.quincena.numero}_{self.quincena.mes}_{self.quincena.año}.xlsx"
-        
+
+        # Generar nombre descriptivo del archivo
+        meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+        mes_nombre = meses[self.quincena.mes - 1]
+
+        # Determinar rango de fechas de la quincena
+        if self.quincena.numero == 1:
+            rango = f"1-15_{mes_nombre}"
+        else:
+            rango = f"16-{self.quincena.fecha_fin.day}_{mes_nombre}"
+
+        # Obtener fincas únicas de las nóminas
+        fincas = set([n.trabajador.finca.nombre for n in self.nominas if n.trabajador and n.trabajador.finca])
+
+        # Construir nombre del archivo
+        if len(fincas) == 1:
+            # Una sola finca
+            finca_nombre = list(fincas)[0].replace(' ', '_')
+            filename = f"Nomina_{finca_nombre}_{rango}_{self.quincena.año}.xlsx"
+        elif len(fincas) > 1:
+            # Múltiples fincas
+            filename = f"Nomina_MultiFinca_{rango}_{self.quincena.año}.xlsx"
+        else:
+            # Sin fincas (no debería pasar)
+            filename = f"Nomina_{rango}_{self.quincena.año}.xlsx"
+
         response = HttpResponse(
             output.getvalue(),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
+
         return response
