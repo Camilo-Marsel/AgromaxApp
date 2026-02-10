@@ -199,7 +199,9 @@ export default function NominaList() {
       toast.success('Reporte detallado generado correctamente');
     } catch (error) {
       console.error('Error al exportar reporte detallado:', error);
-      toast.error('Error al generar reporte. Verifique que haya nóminas calculadas.');
+      // Mostrar mensaje de error específico si está disponible
+      const errorMsg = error.message || error.response?.data?.detail || error.response?.data?.error || 'Error al generar reporte';
+      toast.error(errorMsg);
     } finally {
       setExportando(false);
     }

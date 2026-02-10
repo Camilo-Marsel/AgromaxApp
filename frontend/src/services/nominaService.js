@@ -110,45 +110,62 @@ const nominaService = {
       params.fincas = fincasIdsString;
     }
 
-    const response = await api.get('/nominas/exportar-detallado/', {
-      params,
-      responseType: 'blob',
-    });
+    try {
+      const response = await api.get('/nominas/exportar-detallado/', {
+        params,
+        responseType: 'blob',
+      });
 
-    // Crear URL y descargar
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
+      // Crear URL y descargar
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
 
-    // Extraer nombre del archivo de los headers si está disponible
-    const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
-    let filename = `Reporte_Detallado_Quincena.xlsx`;
+      // Extraer nombre del archivo de los headers si está disponible
+      const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+      let filename = `Reporte_Detallado_Quincena.xlsx`;
 
-    if (contentDisposition) {
-      // Try filename="name"
-      let filenameMatch = contentDisposition.match(/filename="(.+)"/);
-      if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1];
-      } else {
-        // Try RFC5987 filename*=UTF-8''name.ext
-        filenameMatch = contentDisposition.match(/filename\*=UTF-8''(.+)$/i);
+      if (contentDisposition) {
+        // Try filename="name"
+        let filenameMatch = contentDisposition.match(/filename="(.+)"/);
         if (filenameMatch && filenameMatch[1]) {
-          try {
-            filename = decodeURIComponent(filenameMatch[1]);
-          } catch (e) {
-            filename = filenameMatch[1];
+          filename = filenameMatch[1];
+        } else {
+          // Try RFC5987 filename*=UTF-8''name.ext
+          filenameMatch = contentDisposition.match(/filename\*=UTF-8''(.+)$/i);
+          if (filenameMatch && filenameMatch[1]) {
+            try {
+              filename = decodeURIComponent(filenameMatch[1]);
+            } catch (e) {
+              filename = filenameMatch[1];
+            }
           }
         }
       }
+
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      return response;
+    } catch (error) {
+      // Si hay error y la respuesta es blob, intentar leer el mensaje de error
+      if (error.response && error.response.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const errorData = JSON.parse(text);
+          console.error('Error detallado del servidor:', errorData);
+          // Relanzar con el mensaje detallado
+          throw new Error(errorData.detail || errorData.error || 'Error al generar reporte');
+        } catch (parseError) {
+          // Si no se puede parsear, relanzar error original
+          console.error('No se pudo parsear error del servidor:', parseError);
+        }
+      }
+      throw error;
     }
-
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-
-    return response;
   },
 
   // Aprobar masivo
