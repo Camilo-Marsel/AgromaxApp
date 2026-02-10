@@ -4,6 +4,7 @@
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from django.http import HttpResponse
+from django.db.models import Sum
 from io import BytesIO
 from decimal import Decimal
 
@@ -104,7 +105,6 @@ class NominaDetalladoExcelGenerator:
     def _agregar_datos(self):
         """Agregar datos de nóminas con cálculos detallados"""
         from core.models import DetalleNomina, RegistroLabor
-        from django.db.models import Sum
 
         row = 4
 
