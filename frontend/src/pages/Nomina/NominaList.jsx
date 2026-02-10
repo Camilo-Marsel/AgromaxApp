@@ -9,7 +9,7 @@ import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import SearchBar from '../../components/Common/SearchBar';
 import toast from 'react-hot-toast';
-import { Calculator, Eye, AlertCircle, Download, CheckCircle, Mail } from 'lucide-react';
+import { Calculator, Eye, AlertCircle, Download, CheckCircle, Mail, FileText } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function NominaList() {
@@ -178,6 +178,28 @@ export default function NominaList() {
     } catch (error) {
       console.error('Error al exportar Excel:', error);
       toast.error('Error al generar Excel. Verifique que haya nóminas calculadas.');
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  const handleExportarDetallado = async () => {
+    if (!quincenaSeleccionada) {
+      toast.error('No hay quincena seleccionada');
+      return;
+    }
+
+    try {
+      setExportando(true);
+      // Si hay filtros de fincas, pasarlos al exportador
+      await nominaService.exportarDetalladoQuincena(
+        quincenaSeleccionada,
+        fincasSeleccionadas.length > 0 ? fincasSeleccionadas.join(',') : null
+      );
+      toast.success('Reporte detallado generado correctamente');
+    } catch (error) {
+      console.error('Error al exportar reporte detallado:', error);
+      toast.error('Error al generar reporte. Verifique que haya nóminas calculadas.');
     } finally {
       setExportando(false);
     }
@@ -399,6 +421,26 @@ export default function NominaList() {
                   <>
                     <Download className="w-5 h-5" />
                     Exportar Excel
+                  </>
+                )}
+              </button>
+
+              {/* Botón Reporte Detallado */}
+              <button
+                onClick={handleExportarDetallado}
+                disabled={exportando || nominasFiltradas.length === 0}
+                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+                title="Exportar reporte detallado con IBC, auxilio, deducciones, etc."
+              >
+                {exportando ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    Exportando...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-5 h-5" />
+                    Reporte Detallado
                   </>
                 )}
               </button>

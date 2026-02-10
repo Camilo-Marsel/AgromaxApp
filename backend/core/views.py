@@ -688,6 +688,57 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         generator = ExcelGenerator(nominas, quincena)
         return generator.generar_lista_pagos()
 
+    @action(detail=False, methods=['get'], url_path='exportar-detallado')
+    def exportar_detallado_quincena(self, request):
+        """Exportar reporte detallado de nómina (uso interno) a Excel"""
+        from .services.nomina_detallado_excel import NominaDetalladoExcelGenerator
+
+        quincena_id = request.query_params.get('quincena')
+
+        if not quincena_id:
+            return Response(
+                {'error': 'Se requiere el parámetro quincena'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            quincena = Quincena.objects.get(id=quincena_id)
+        except Quincena.DoesNotExist:
+            return Response(
+                {'error': 'Quincena no encontrada'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Obtener nóminas de la quincena, excluyendo retirados
+        nominas = self.queryset.filter(
+            quincena=quincena,
+            estado__in=['PENDIENTE', 'APROBADA']
+        ).exclude(
+            trabajador__estado='RETIRADO'
+        ).select_related('trabajador', 'trabajador__finca', 'quincena')
+
+        # Filtro de fincas: soporta multi-finca (fincas=1,2,3) y single (finca=1)
+        fincas_param = request.query_params.get('fincas', '')
+        finca_id = request.query_params.get('finca', '')
+
+        if fincas_param:
+            fincas_ids = [int(f) for f in fincas_param.split(',') if f.strip()]
+            nominas = nominas.filter(trabajador__finca__id__in=fincas_ids)
+        elif finca_id:
+            nominas = nominas.filter(trabajador__finca__id=finca_id)
+
+        nominas = nominas.order_by('trabajador__apellidos', 'trabajador__nombres')
+
+        if not nominas.exists():
+            return Response(
+                {'error': 'No hay nóminas calculadas para esta quincena'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Generar Excel detallado
+        generator = NominaDetalladoExcelGenerator(nominas, quincena)
+        return generator.generar()
+
     @action(detail=False, methods=['post'])
     def calcular_quincena(self, request):
         """Calcular nómina para toda la quincena"""

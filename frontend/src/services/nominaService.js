@@ -103,6 +103,54 @@ const nominaService = {
     return response;
   },
 
+  // Exportar reporte detallado a Excel (uso interno)
+  exportarDetalladoQuincena: async (quincenaId, fincasIdsString = null) => {
+    const params = { quincena: quincenaId };
+    if (fincasIdsString) {
+      params.fincas = fincasIdsString;
+    }
+
+    const response = await api.get('/nominas/exportar-detallado/', {
+      params,
+      responseType: 'blob',
+    });
+
+    // Crear URL y descargar
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+
+    // Extraer nombre del archivo de los headers si está disponible
+    const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+    let filename = `Reporte_Detallado_Quincena.xlsx`;
+
+    if (contentDisposition) {
+      // Try filename="name"
+      let filenameMatch = contentDisposition.match(/filename="(.+)"/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1];
+      } else {
+        // Try RFC5987 filename*=UTF-8''name.ext
+        filenameMatch = contentDisposition.match(/filename\*=UTF-8''(.+)$/i);
+        if (filenameMatch && filenameMatch[1]) {
+          try {
+            filename = decodeURIComponent(filenameMatch[1]);
+          } catch (e) {
+            filename = filenameMatch[1];
+          }
+        }
+      }
+    }
+
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+    return response;
+  },
+
   // Aprobar masivo
   aprobarMasivo: async (quincenaId, fincaId = null) => {
     const response = await api.post('/nominas/aprobar_masivo/', {
