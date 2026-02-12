@@ -155,6 +155,13 @@ class Command(BaseCommand):
                 'solo_con_contrato': False,
             },
             {
+                'codigo': 'LAB009',
+                'nombre': 'Amarre 3 pitas',
+                'unidad_medida': unidad_unidad,
+                'es_especial': False,
+                'solo_con_contrato': False,
+            },
+            {
                 'codigo': 'LAB-HORAS',
                 'nombre': 'Horas Trabajadas',
                 'unidad_medida': unidad_horas,
@@ -210,6 +217,7 @@ class Command(BaseCommand):
             ('LAB006', Decimal('500')),     # Embolse por unidad
             ('LAB007', Decimal('500')),     # Desflore por unidad
             ('LAB008', Decimal('300')),     # Amarre por unidad
+            ('LAB009', Decimal('400')),     # Amarre 3 pitas por unidad
         ]
         
         for codigo, precio in precios_iniciales:
