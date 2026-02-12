@@ -47,7 +47,7 @@ export default function MultipleDatePicker({
       const tieneRegistro = laboresEnFecha.length > 0;
       
       // Labores especiales que pueden agregarse como "adicionales" (debe coincidir con el backend)
-      const LABORES_ADICIONALES = ['Control', 'Resiembra CabezaToro', 'Siembra Nueva'];
+      const LABORES_ADICIONALES = ['Control', 'Resiembra CabezaToro', 'Siembra Nueva', 'Amarre', 'Amarre 3 pitas'];
 
       // LÓGICA DE DESHABILITACIÓN:
       // Regla: Máximo 1 labor normal + cualquier combinación de labores adicionales
@@ -83,7 +83,7 @@ export default function MultipleDatePicker({
           // Es una labor normal, verificar que no haya otra labor normal
           if (laboresNormalesExistentes.length > 0) {
             disabled = true;
-            mensajeTooltip = `Ya tiene: ${laboresNormalesExistentes[0]}. Solo puede agregar labores adicionales (Control, Resiembra, Siembra Nueva).`;
+            mensajeTooltip = `Ya tiene: ${laboresNormalesExistentes[0]}. Solo puede agregar labores adicionales (Control, Resiembra, Siembra Nueva, Amarre, Amarre 3 pitas).`;
           } else {
             // No hay labores normales, puede agregarse
             disabled = false;
