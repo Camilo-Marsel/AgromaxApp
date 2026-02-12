@@ -225,7 +225,7 @@ class RegistroLabor(models.Model):
             raise ValidationError('La fecha debe estar dentro de la quincena')
 
         # Labores especiales que pueden agregarse como "adicionales" a cualquier día
-        LABORES_ADICIONALES = ['Control', 'Resiembra CabezaToro', 'Siembra Nueva']
+        LABORES_ADICIONALES = ['Control', 'Resiembra CabezaToro', 'Siembra Nueva', 'Amarre', 'Amarre 3 pitas']
 
         # Validar duplicados: NO permitir múltiples labores "normales" el mismo día
         # EXCEPCIÓN: Las labores adicionales pueden agregarse libremente
@@ -238,6 +238,7 @@ class RegistroLabor(models.Model):
         # - Día Básico + Resiembra CabezaToro + Siembra Nueva (1 normal + 2 adicionales)
         # - Control + Resiembra CabezaToro + Siembra Nueva (3 adicionales)
         # - Resiembra CabezaToro + Siembra Nueva (2 adicionales)
+        # - Día Básico + Amarre + Amarre 3 pitas (1 normal + 2 adicionales)
 
         registros_mismo_dia = RegistroLabor.objects.filter(
             trabajador=self.trabajador,
@@ -273,7 +274,7 @@ class RegistroLabor(models.Model):
                     # Ya existe una labor normal, no permitir otra
                     raise ValidationError(
                         f'Ya existe un registro de {labores_normales_existentes[0]} para este día. '
-                        f'Solo puede agregar labores adicionales (Control, Resiembra CabezaToro, Siembra Nueva).'
+                        f'Solo puede agregar labores adicionales (Control, Resiembra CabezaToro, Siembra Nueva, Amarre, Amarre 3 pitas).'
                     )
                 # Si no hay labores normales, permitir agregar esta
                 pass

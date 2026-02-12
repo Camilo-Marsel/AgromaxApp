@@ -556,6 +556,9 @@ class RegistroLaborCreateUpdateSerializer(serializers.ModelSerializer):
             )
 
         # Validaciones específicas para "Horas Trabajadas"
+        # Lista de labores adicionales que pueden combinarse libremente
+        LABORES_ADICIONALES = ['Control', 'Resiembra CabezaToro', 'Siembra Nueva', 'Amarre', 'Amarre 3 pitas']
+
         if labor and labor.nombre == 'Horas Trabajadas':
             # Validación 1: No más de 8 horas por día
             if cantidad > 8:
@@ -564,31 +567,38 @@ class RegistroLaborCreateUpdateSerializer(serializers.ModelSerializer):
                     "Si trabajó horas extras, debe registrarlas con otra labor."
                 )
 
-            # Validación 2: No se puede combinar con otras labores el mismo día
-            # Verificar si ya existen otros registros para este trabajador en esta fecha
+            # Validación 2: No se puede combinar con otras labores NORMALES
+            # Pero SÍ puede combinarse con labores adicionales
             registros_existentes = RegistroLabor.objects.filter(
                 trabajador=trabajador,
                 fecha=fecha,
                 quincena=quincena
-            )
+            ).select_related('labor')
 
             # Si estamos editando, excluir el registro actual
             if self.instance:
                 registros_existentes = registros_existentes.exclude(pk=self.instance.pk)
 
             if registros_existentes.exists():
-                # Verificar si alguno de los registros existentes es "Horas Trabajadas" o no
+                # Verificar si hay otra "Horas Trabajadas"
                 tiene_horas = registros_existentes.filter(labor__nombre='Horas Trabajadas').exists()
-                tiene_otras = registros_existentes.exclude(labor__nombre='Horas Trabajadas').exists()
-
-                if tiene_horas or tiene_otras:
+                if tiene_horas:
                     raise serializers.ValidationError(
-                        f"No se puede combinar 'Horas Trabajadas' con otras labores el mismo día. "
-                        f"El trabajador ya tiene registros para el {fecha.strftime('%d/%m/%Y')}."
+                        f"Ya existe un registro de 'Horas Trabajadas' para el {fecha.strftime('%d/%m/%Y')}."
                     )
 
-        # Validación inversa: Si se intenta registrar otra labor y ya existe "Horas Trabajadas" ese día
-        if labor and labor.nombre != 'Horas Trabajadas':
+                # Verificar si hay labores normales (no adicionales)
+                labores_normales = registros_existentes.exclude(labor__nombre__in=LABORES_ADICIONALES)
+                if labores_normales.exists():
+                    labor_normal = labores_normales.first().labor.nombre
+                    raise serializers.ValidationError(
+                        f"No se puede combinar 'Horas Trabajadas' con '{labor_normal}' (labor normal). "
+                        f"Solo puede combinarse con labores adicionales."
+                    )
+                # Si solo hay labores adicionales, permitir (no hacer nada)
+
+        # Validación inversa: Si se intenta registrar otra labor normal y ya existe "Horas Trabajadas"
+        if labor and labor.nombre != 'Horas Trabajadas' and labor.nombre not in LABORES_ADICIONALES:
             registros_horas = RegistroLabor.objects.filter(
                 trabajador=trabajador,
                 fecha=fecha,
@@ -603,8 +613,9 @@ class RegistroLaborCreateUpdateSerializer(serializers.ModelSerializer):
             if registros_horas.exists():
                 raise serializers.ValidationError(
                     f"El trabajador ya tiene registrado 'Horas Trabajadas' para el {fecha.strftime('%d/%m/%Y')}. "
-                    f"No se pueden combinar con otras labores."
+                    f"No se pueden combinar con otras labores normales."
                 )
+        # Si es una labor adicional, la validación se maneja en el modelo RegistroLabor.clean()
 
         return data
 
