@@ -539,19 +539,73 @@ class RegistroLaborCreateUpdateSerializer(serializers.ModelSerializer):
         """Validaciones de negocio"""
         quincena = data.get('quincena')
         fecha = data.get('fecha')
-        
+        labor = data.get('labor')
+        cantidad = data.get('cantidad')
+        trabajador = data.get('trabajador')
+
         # Validar que la fecha esté dentro de la quincena
         if fecha < quincena.fecha_inicio or fecha > quincena.fecha_fin:
             raise serializers.ValidationError(
                 f"La fecha debe estar entre {quincena.fecha_inicio} y {quincena.fecha_fin}"
             )
-        
+
         # Validar que la quincena permita registro
         if not quincena.puede_registrar:
             raise serializers.ValidationError(
                 "Esta quincena ya no permite registros (fecha límite superada)"
             )
-        
+
+        # Validaciones específicas para "Horas Trabajadas"
+        if labor and labor.nombre == 'Horas Trabajadas':
+            # Validación 1: No más de 8 horas por día
+            if cantidad > 8:
+                raise serializers.ValidationError(
+                    "No se pueden registrar más de 8 horas por día. "
+                    "Si trabajó horas extras, debe registrarlas con otra labor."
+                )
+
+            # Validación 2: No se puede combinar con otras labores el mismo día
+            # Verificar si ya existen otros registros para este trabajador en esta fecha
+            registros_existentes = RegistroLabor.objects.filter(
+                trabajador=trabajador,
+                fecha=fecha,
+                quincena=quincena
+            )
+
+            # Si estamos editando, excluir el registro actual
+            if self.instance:
+                registros_existentes = registros_existentes.exclude(pk=self.instance.pk)
+
+            if registros_existentes.exists():
+                # Verificar si alguno de los registros existentes es "Horas Trabajadas" o no
+                tiene_horas = registros_existentes.filter(labor__nombre='Horas Trabajadas').exists()
+                tiene_otras = registros_existentes.exclude(labor__nombre='Horas Trabajadas').exists()
+
+                if tiene_horas or tiene_otras:
+                    raise serializers.ValidationError(
+                        f"No se puede combinar 'Horas Trabajadas' con otras labores el mismo día. "
+                        f"El trabajador ya tiene registros para el {fecha.strftime('%d/%m/%Y')}."
+                    )
+
+        # Validación inversa: Si se intenta registrar otra labor y ya existe "Horas Trabajadas" ese día
+        if labor and labor.nombre != 'Horas Trabajadas':
+            registros_horas = RegistroLabor.objects.filter(
+                trabajador=trabajador,
+                fecha=fecha,
+                quincena=quincena,
+                labor__nombre='Horas Trabajadas'
+            )
+
+            # Si estamos editando, excluir el registro actual
+            if self.instance:
+                registros_horas = registros_horas.exclude(pk=self.instance.pk)
+
+            if registros_horas.exists():
+                raise serializers.ValidationError(
+                    f"El trabajador ya tiene registrado 'Horas Trabajadas' para el {fecha.strftime('%d/%m/%Y')}. "
+                    f"No se pueden combinar con otras labores."
+                )
+
         return data
 
 

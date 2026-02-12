@@ -60,6 +60,7 @@ class Command(BaseCommand):
             (UnidadMedida.UNIDAD, 'Medida en unidades (matas, plantas, etc.)'),
             (UnidadMedida.HECTAREA, 'Medida en hectáreas'),
             (UnidadMedida.METRO, 'Medida en metros lineales'),
+            (UnidadMedida.HORAS, 'Medida en horas trabajadas'),
         ]
         
         for nombre, descripcion in unidades:
@@ -94,6 +95,7 @@ class Command(BaseCommand):
         self.stdout.write('Creando labores especiales...')
         unidad_dia = UnidadMedida.objects.get(nombre=UnidadMedida.DIA)
         unidad_unidad = UnidadMedida.objects.get(nombre=UnidadMedida.UNIDAD)
+        unidad_horas = UnidadMedida.objects.get(nombre=UnidadMedida.HORAS)
         
         labores_especiales = [
             {
@@ -149,6 +151,13 @@ class Command(BaseCommand):
                 'codigo': 'LAB008',
                 'nombre': 'Amarre',
                 'unidad_medida': unidad_unidad,
+                'es_especial': False,
+                'solo_con_contrato': False,
+            },
+            {
+                'codigo': 'LAB-HORAS',
+                'nombre': 'Horas Trabajadas',
+                'unidad_medida': unidad_horas,
                 'es_especial': False,
                 'solo_con_contrato': False,
             },

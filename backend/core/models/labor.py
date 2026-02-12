@@ -15,12 +15,14 @@ class UnidadMedida(models.Model):
     UNIDAD = 'UNIDAD'
     HECTAREA = 'HECTAREA'
     METRO = 'METRO'
+    HORAS = 'HORAS'
 
     UNIDAD_CHOICES = [
         (DIA, 'Día'),
         (UNIDAD, 'Unidad'),
         (HECTAREA, 'Hectárea'),
         (METRO, 'Metro'),
+        (HORAS, 'Horas'),
     ]
 
     nombre = models.CharField(max_length=20, choices=UNIDAD_CHOICES, unique=True)

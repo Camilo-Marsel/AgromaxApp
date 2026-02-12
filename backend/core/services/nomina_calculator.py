@@ -229,7 +229,20 @@ class NominaCalculator:
             cantidad = data['cantidad']
 
             # Obtener precio vigente
-            precio = self._get_precio_vigente(labor)
+            # Caso especial: "Horas Trabajadas" calcula precio desde "Día Básico"
+            if labor.nombre == 'Horas Trabajadas':
+                labor_dia_basico = self._get_labor_dia_basico()
+                if labor_dia_basico:
+                    precio_dia_basico = self._get_precio_vigente(labor_dia_basico)
+                    if precio_dia_basico:
+                        # Precio por hora = precio_dia / 8 horas
+                        precio = (precio_dia_basico / 8).quantize(Decimal('0.01'))
+                    else:
+                        precio = None
+                else:
+                    precio = None
+            else:
+                precio = self._get_precio_vigente(labor)
 
             if precio:
                 valor_total = cantidad * precio
@@ -545,20 +558,45 @@ class NominaCalculator:
             labor__nombre__in=['Ausencia No Justificada', 'Permiso No Remunerado']
         ).values_list('fecha', flat=True).distinct())
 
-        # Calcular días trabajados efectivos
-        dias_trabajados = len(dias_con_registro)
+        # Calcular días trabajados efectivos (puede ser fraccionario)
+        # Si un día solo tiene "Horas Trabajadas", cuenta como fracción (horas/8)
+        # Si tiene otras labores, cuenta como 1 día completo
+        dias_trabajados = Decimal('0.00')
+
+        for fecha in dias_con_registro:
+            registros_dia = registros.filter(fecha=fecha)
+
+            # Verificar si SOLO tiene "Horas Trabajadas" ese día
+            solo_horas = registros_dia.filter(labor__nombre='Horas Trabajadas').exists()
+            tiene_otras = registros_dia.exclude(labor__nombre='Horas Trabajadas').exists()
+
+            if solo_horas and not tiene_otras:
+                # Sumar todas las horas trabajadas ese día y dividir entre 8
+                total_horas = registros_dia.filter(
+                    labor__nombre='Horas Trabajadas'
+                ).aggregate(total=Sum('cantidad'))['total'] or Decimal('0')
+
+                # Contar como fracción del día (máximo 1 día)
+                fraccion_dia = min(total_horas / 8, Decimal('1'))
+                dias_trabajados += fraccion_dia
+            else:
+                # Día completo (tiene otras labores o no tiene horas trabajadas)
+                dias_trabajados += Decimal('1')
+
+        # Redondear a 2 decimales para evitar problemas de precisión
+        dias_trabajados = dias_trabajados.quantize(Decimal('0.01'))
 
         # Calcular días a descontar del auxilio
-        dias_descuento = 0
+        dias_descuento = Decimal('0')
         domingos_perdidos = set()
 
         # 1. Descontar días de INCAPACIDAD (solo ese día)
-        dias_descuento += len(dias_incapacidad)
+        dias_descuento += Decimal(len(dias_incapacidad))
 
         # 2. Descontar días de AUSENCIA/PERMISO + sus domingos
         for fecha in dias_ausencia_permiso:
             # Descontar el día mismo
-            dias_descuento += 1
+            dias_descuento += Decimal('1')
 
             # Encontrar el domingo de esa semana
             domingo = self._get_domingo_de_semana(fecha)
@@ -567,7 +605,7 @@ class NominaCalculator:
             if (self.quincena.fecha_inicio <= domingo <= self.quincena.fecha_fin
                 and domingo not in domingos_perdidos):
                 domingos_perdidos.add(domingo)
-                dias_descuento += 1
+                dias_descuento += Decimal('1')
 
         # Calcular días a pagar: días trabajados - descuentos
         dias_a_pagar = dias_trabajados - dias_descuento
