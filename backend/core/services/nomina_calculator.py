@@ -522,11 +522,14 @@ class NominaCalculator:
     
     def _calcular_auxilio_transporte(self, nomina):
         """
-        Calcular auxilio de transporte QUINCENAL proporcional a días REALMENTE trabajados.
+        Calcular auxilio de transporte QUINCENAL proporcional a días LABORABLES trabajados.
         Base: $100,000 quincenal completo.
 
-        REGLAS:
-        - Solo cuenta días donde el trabajador tiene registros de labor
+        REGLAS (OPCIÓN B - Proporcional a días laborables):
+        - Base de cálculo: días laborables (total días - domingos)
+        - Si trabajó todos los días laborables → auxilio completo
+        - Si faltó algún día laborable → proporcional
+        - Domingos NO cuentan en la base (no afectan el auxilio si no se trabajan)
         - Incapacidad Médica: Solo pierde auxilio de ese día
         - Ausencia No Justificada/Permiso No Remunerado: Pierde auxilio de ese día + auxilio del domingo de esa semana
         - Días sin ningún registro: No se cuentan como trabajados
@@ -538,6 +541,12 @@ class NominaCalculator:
 
         # Contar días TOTALES de la quincena (incluyendo domingos)
         dias_totales_quincena = (self.quincena.fecha_fin - self.quincena.fecha_inicio).days + 1
+
+        # Contar domingos en la quincena
+        domingos_en_quincena = self._contar_domingos_en_quincena()
+
+        # Calcular días LABORABLES (sin domingos) - BASE para el auxilio
+        dias_laborables = dias_totales_quincena - domingos_en_quincena
 
         # Obtener TODOS los registros del trabajador en esta quincena
         registros = RegistroLabor.objects.filter(
@@ -614,8 +623,10 @@ class NominaCalculator:
         if dias_a_pagar <= 0:
             return Decimal('0.00')
 
-        # Calcular auxilio proporcional basado en días totales de la quincena
-        valor_dia = auxilio_quincenal / dias_totales_quincena
+        # OPCIÓN B: Calcular auxilio proporcional basado en días LABORABLES (sin domingos)
+        # Si trabajó todos los días laborables, recibe auxilio completo
+        # Si faltó algún día laborable, recibe proporcional
+        valor_dia = auxilio_quincenal / dias_laborables
         auxilio_proporcional = (valor_dia * dias_a_pagar).quantize(Decimal('0.01'))
 
         # Preparar descripción detallada
@@ -791,3 +802,15 @@ class NominaCalculator:
     def _get_labor_dia_basico(self):
         """Obtener labor de día básico"""
         return Labor.objects.filter(codigo='LAB001').first()
+
+    def _contar_domingos_en_quincena(self):
+        """Contar cuántos domingos hay en la quincena"""
+        domingos = 0
+        fecha_actual = self.quincena.fecha_inicio
+
+        while fecha_actual <= self.quincena.fecha_fin:
+            if fecha_actual.weekday() == 6:  # 6 = Domingo
+                domingos += 1
+            fecha_actual += timedelta(days=1)
+
+        return domingos
