@@ -549,6 +549,13 @@ class RegistroLaborCreateUpdateSerializer(serializers.ModelSerializer):
                 f"La fecha debe estar entre {quincena.fecha_inicio} y {quincena.fecha_fin}"
             )
 
+        # Validar que "Domingo extra" solo se registre en domingos
+        if labor and labor.nombre == 'Domingo extra':
+            if fecha.weekday() != 6:  # 6 = domingo en Python
+                raise serializers.ValidationError(
+                    "La labor 'Domingo extra' solo puede registrarse en días domingo."
+                )
+
         # Validar que la quincena permita registro
         if not quincena.puede_registrar:
             raise serializers.ValidationError(

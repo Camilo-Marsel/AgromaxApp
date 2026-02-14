@@ -49,19 +49,39 @@ export default function MultipleDatePicker({
       // Labores especiales que pueden agregarse como "adicionales" (debe coincidir con el backend)
       const LABORES_ADICIONALES = ['Control', 'Resiembra CabezaToro', 'Siembra Nueva', 'Amarre', 'Amarre 3 pitas'];
 
+      // Labores que SOLO pueden registrarse en domingos
+      const LABORES_SOLO_DOMINGOS = ['Domingo extra'];
+
       // LÓGICA DE DESHABILITACIÓN:
       // Regla: Máximo 1 labor normal + cualquier combinación de labores adicionales
-      //
-      // Ejemplos válidos:
-      // - Día Básico (1 normal)
-      // - Día Básico + Control (1 normal + 1 adicional)
-      // - Día Básico + Resiembra CabezaToro + Siembra Nueva (1 normal + 2 adicionales)
-      // - Control + Resiembra CabezaToro + Siembra Nueva (3 adicionales)
+      // Excepción: "Domingo extra" solo se puede registrar en domingos
 
-      let disabled = isDomingo;
+      const esLaborSoloDomingos = LABORES_SOLO_DOMINGOS.includes(laborActualNombre);
+
+      let disabled = false;
       let mensajeTooltip = '';
 
-      if (!isDomingo && tieneRegistro) {
+      // Lógica especial para labores que solo van en domingos
+      if (esLaborSoloDomingos) {
+        if (!isDomingo) {
+          // No es domingo → deshabilitar
+          disabled = true;
+          mensajeTooltip = `${laborActualNombre} solo puede registrarse en domingos.`;
+        } else if (laboresEnFecha.includes(laborActualNombre)) {
+          // Ya tiene esta labor registrada en este domingo
+          disabled = true;
+          mensajeTooltip = `Ya tiene ${laborActualNombre} registrado.`;
+        } else {
+          disabled = false;
+          mensajeTooltip = laboresEnFecha.length > 0
+            ? `Tiene: ${laboresEnFecha.join(', ')}. Puede agregar ${laborActualNombre}.`
+            : `Domingo - Puede registrar ${laborActualNombre}`;
+        }
+      } else if (isDomingo) {
+        // Labor normal en domingo → deshabilitar
+        disabled = true;
+        mensajeTooltip = 'Domingo - No disponible para esta labor';
+      } else if (!isDomingo && tieneRegistro) {
         // Clasificar labores existentes
         const laboresNormalesExistentes = laboresEnFecha.filter(l => !LABORES_ADICIONALES.includes(l));
         const laboresAdicionalesExistentes = laboresEnFecha.filter(l => LABORES_ADICIONALES.includes(l));
@@ -92,8 +112,6 @@ export default function MultipleDatePicker({
               : dateStr;
           }
         }
-      } else if (isDomingo) {
-        mensajeTooltip = 'Domingo - No disponible';
       } else {
         mensajeTooltip = dateStr;
       }
@@ -182,7 +200,8 @@ export default function MultipleDatePicker({
             disabled={dia.disabled}
             className={`
               p-2 rounded-md text-xs font-medium border transition-colors
-              ${dia.isDomingo ? 'bg-red-50 text-red-400 cursor-not-allowed border-red-200' : ''}
+              ${dia.isDomingo && dia.disabled ? 'bg-red-50 text-red-400 cursor-not-allowed border-red-200' : ''}
+              ${dia.isDomingo && !dia.disabled ? 'bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100' : ''}
               ${dia.tieneRegistro && dia.disabled ? 'bg-orange-50 text-orange-400 cursor-not-allowed border-orange-200' : ''}
               ${dia.tieneRegistro && !dia.disabled ? 'bg-yellow-50 text-yellow-700 border-yellow-300' : ''}
               ${selectedDates.includes(dia.fecha) ? 'bg-blue-600 text-white border-blue-600' : ''}

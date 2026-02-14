@@ -98,12 +98,10 @@ class NominaCalculator:
         
         # Calcular devengos BASE (sin auxilio de transporte)
         base_deducible = Decimal('0.00')
-        total_incapacidad = Decimal('0.00')
 
-        # 1. Calcular labores normales (incapacidad médica se separa: exenta de deducciones)
+        # 1. Calcular labores normales (incapacidad médica TAMBIÉN paga deducciones - Decreto 780/2016)
         labores_normal, labores_incapacidad = self._calcular_labores(nomina, registros)
-        base_deducible += labores_normal
-        total_incapacidad += labores_incapacidad
+        base_deducible += labores_normal + labores_incapacidad
         
         # 2. Calcular dominicales (solo con contrato)
         if trabajador.tipo_contrato.aplica_dominicales:
@@ -129,8 +127,8 @@ class NominaCalculator:
                 valor_total=devengos_adicionales
             )
         
-        # TOTAL DEVENGADO = base + incapacidad + auxilio + adicionales
-        total_devengado = base_deducible + total_incapacidad + auxilio_transporte + devengos_adicionales
+        # TOTAL DEVENGADO = base + auxilio + adicionales
+        total_devengado = base_deducible + auxilio_transporte + devengos_adicionales
         
         # ========== DEDUCCIONES ==========
         total_deducciones = Decimal('0.00')
@@ -229,14 +227,18 @@ class NominaCalculator:
             cantidad = data['cantidad']
 
             # Obtener precio vigente
-            # Caso especial: "Horas Trabajadas" calcula precio desde "Día Básico"
-            if labor.nombre == 'Horas Trabajadas':
+            # Caso especial: Labores con precio dinámico desde "Día Básico"
+            if labor.nombre in ('Horas Trabajadas', 'Domingo extra'):
                 labor_dia_basico = self._get_labor_dia_basico()
                 if labor_dia_basico:
                     precio_dia_basico = self._get_precio_vigente(labor_dia_basico)
                     if precio_dia_basico:
-                        # Precio por hora = precio_dia / 8 horas
-                        precio = (precio_dia_basico / 8).quantize(Decimal('0.01'))
+                        if labor.nombre == 'Horas Trabajadas':
+                            # Precio por hora = precio_dia / 8 horas
+                            precio = (precio_dia_basico / 8).quantize(Decimal('0.01'))
+                        elif labor.nombre == 'Domingo extra':
+                            # Recargo dominical: 180% del día básico (Ley 2466/2025, Ene-Jun 2026: 80%)
+                            precio = (precio_dia_basico * Decimal('1.80')).quantize(Decimal('0.01'))
                     else:
                         precio = None
                 else:
@@ -247,11 +249,9 @@ class NominaCalculator:
             if precio:
                 valor_total = cantidad * precio
 
-                # Incapacidad Médica es exenta de deducciones de ley
-                if labor.nombre == 'Incapacidad Médica':
-                    total_incapacidad += valor_total
-                else:
-                    total_normal += valor_total
+                # Todas las labores (incluyendo incapacidad) pagan deducciones de ley
+                # Decreto 780/2016 Art. 3.2.1.10: durante incapacidad se aporta salud y pensión
+                total_normal += valor_total
 
                 # Crear detalle
                 DetalleNomina.objects.create(
@@ -295,7 +295,6 @@ class NominaCalculator:
         base_deducible = salario_quincenal
 
         # 1b. Labores adicionales (si el administrativo tiene registros de labor)
-        total_incapacidad = Decimal('0.00')
         registros = RegistroLabor.objects.filter(
             trabajador=trabajador,
             quincena=self.quincena
@@ -303,8 +302,7 @@ class NominaCalculator:
 
         if registros.exists():
             labores_normal, labores_incapacidad = self._calcular_labores(nomina, registros)
-            base_deducible += labores_normal
-            total_incapacidad += labores_incapacidad
+            base_deducible += labores_normal + labores_incapacidad
 
         # 2. Auxilio de transporte
         auxilio_transporte = Decimal('0.00')
@@ -335,12 +333,12 @@ class NominaCalculator:
             )
         
         # Calcular total devengado
-        total_devengado = base_deducible + total_incapacidad + auxilio_transporte + devengos_adicionales
+        total_devengado = base_deducible + auxilio_transporte + devengos_adicionales
 
         # ========== DEDUCCIONES ==========
         total_deducciones = Decimal('0.00')
 
-        # 4. Deducciones de ley (sobre base SIN incapacidad ni auxilio)
+        # 4. Deducciones de ley (sobre base SIN auxilio)
         if trabajador.tipo_contrato.aplica_deducciones:
             total_deducciones += self._calcular_deducciones_ley(nomina, base_deducible)
         
