@@ -372,26 +372,43 @@ class NominaCalculator:
     def _calcular_dominicales(self, nomina, trabajador, registros):
         """Calcular dominicales (1 por semana trabajada completa sin ausencias)"""
         total = Decimal('0.00')
-        
+
         # Obtener precio de día básico
         labor_dia_basico = self._get_labor_dia_basico()
         if not labor_dia_basico:
             return total
-        
+
         precio_dia_basico = self._get_precio_vigente(labor_dia_basico)
         if not precio_dia_basico:
             return total
-        
+
         # Obtener semanas de la quincena
         semanas = self._get_semanas_quincena()
         dominicales = 0
-        
+
+        # Obtener registros de la quincena ANTERIOR (para domingos al inicio)
+        # Solo si el primer domingo tiene días laborables fuera de esta quincena
+        registros_quincena_anterior = None
+        if semanas:
+            primera_semana = semanas[0]
+            if primera_semana['inicio'] < self.quincena.fecha_inicio:
+                # La semana del primer domingo empieza antes de la quincena
+                # Necesitamos registros de la quincena anterior
+                registros_quincena_anterior = RegistroLabor.objects.filter(
+                    trabajador=trabajador,
+                    fecha__gte=primera_semana['inicio'],
+                    fecha__lt=self.quincena.fecha_inicio
+                ).select_related('labor')
+
         for semana in semanas:
             # Verificar que el domingo esté DENTRO de la quincena
             if semana['domingo'] > self.quincena.fecha_fin:
-                continue  # Skip esta semana
-            
-            if self._tiene_semana_completa(trabajador, semana, registros):
+                continue
+
+            # Pasar registros de quincena anterior si la semana cruza quincenas
+            regs_anteriores = registros_quincena_anterior if semana['inicio'] < self.quincena.fecha_inicio else None
+
+            if self._tiene_semana_completa(trabajador, semana, registros, regs_anteriores):
                 dominicales += 1
         
         if dominicales > 0:
@@ -410,55 +427,64 @@ class NominaCalculator:
         
         return total
     
-    def _tiene_semana_completa(self, trabajador, semana, registros):
+    def _tiene_semana_completa(self, trabajador, semana, registros, registros_quincena_anterior=None):
         """
-        Verificar si trabajó toda la semana (lunes a sábado) sin ausencias 
+        Verificar si trabajó toda la semana (lunes a sábado) sin ausencias
         que hagan perder el dominical.
-        
-        REGLAS:
-        - Ausencia No Justificada o Permiso No Remunerado: Pierde el dominical
-        - Incapacidad Médica: NO pierde el dominical (es justificada)
+
+        REGLAS (Art. 173 CST):
+        - Ausencia No Justificada: Pierde el dominical (sin justa causa)
+        - Permiso No Remunerado: NO pierde el dominical (empleador lo autorizó = justa causa)
+        - Incapacidad Médica: NO pierde el dominical (justa causa)
         """
         # Obtener días laborables de la semana (lunes a sábado)
         dias_laborables = []
         current = semana['inicio']
-        
+
         # Recorrer hasta el sábado (fin de semana['fin'])
         while current <= semana['fin']:
             # 0=lunes, 5=sábado, 6=domingo
             if current.weekday() < 6:  # Lunes a sábado
-                # Solo contar días que están dentro de la quincena
-                if self.quincena.fecha_inicio <= current <= self.quincena.fecha_fin:
-                    dias_laborables.append(current)
+                dias_laborables.append(current)
             current += timedelta(days=1)
-        
-        # Si no hay días laborables en la quincena, no hay dominical
+
+        # Si no hay días laborables, no hay dominical
         if len(dias_laborables) == 0:
             return False
-        
-        # Verificar registros de cada día laboral
+
+        # Construir diccionario de registros para esta semana
+        # Combinar registros de la quincena actual y la anterior (si aplica)
         registros_dict = {}
         for registro in registros:
             if semana['inicio'] <= registro.fecha <= semana['fin']:
                 if registro.fecha not in registros_dict:
                     registros_dict[registro.fecha] = []
                 registros_dict[registro.fecha].append(registro)
-        
+
+        # Incluir registros de la quincena anterior (para domingos al inicio)
+        if registros_quincena_anterior:
+            for registro in registros_quincena_anterior:
+                if semana['inicio'] <= registro.fecha <= semana['fin']:
+                    if registro.fecha not in registros_dict:
+                        registros_dict[registro.fecha] = []
+                    registros_dict[registro.fecha].append(registro)
+
         # Verificar cada día laborable
         for dia in dias_laborables:
             if dia not in registros_dict:
                 # No hay ningún registro ese día = AUSENCIA no justificada
                 return False
-            
-            # Verificar si tiene AUSENCIA o PERMISO NO REMUNERADO
+
+            # Solo "Ausencia No Justificada" hace perder el dominical
             registros_del_dia = registros_dict[dia]
             for registro in registros_del_dia:
-                if registro.labor.nombre in ['Ausencia No Justificada', 'Permiso No Remunerado']:
-                    # Estas labores hacen perder el dominical
+                if registro.labor.nombre == 'Ausencia No Justificada':
+                    # Única labor que hace perder el dominical (sin justa causa)
                     return False
 
-            # Si tiene Incapacidad Médica, no pierde el dominical (continuar verificando otros días)
-        
+            # Permiso No Remunerado: NO pierde dominical (justa causa, Art. 173 CST)
+            # Incapacidad Médica: NO pierde dominical (justa causa)
+
         return True
     
     def _get_semanas_quincena(self):
@@ -529,7 +555,8 @@ class NominaCalculator:
         - Si faltó algún día laborable → proporcional
         - Domingos NO cuentan en la base (no afectan el auxilio si no se trabajan)
         - Incapacidad Médica: Solo pierde auxilio de ese día
-        - Ausencia No Justificada/Permiso No Remunerado: Pierde auxilio de ese día + auxilio del domingo de esa semana
+        - Ausencia No Justificada: Pierde auxilio de ese día + auxilio del domingo de esa semana
+        - Permiso No Remunerado: NO pierde el auxilio del domingo (justa causa, Art. 173 CST)
         - Días sin ningún registro: No se cuentan como trabajados
         """
         auxilio_quincenal = self.variables.get(VariablesNomina.AUXILIO_TRANSPORTE, Decimal('0.00'))
@@ -560,9 +587,9 @@ class NominaCalculator:
             labor__nombre='Incapacidad Médica'
         ).values_list('fecha', flat=True).distinct())
 
-        # Obtener días con Ausencia o Permiso No Remunerado (pierden dominical)
+        # Obtener días con Ausencia No Justificada (pierde auxilio y domingo)
         dias_ausencia_permiso = set(registros.filter(
-            labor__nombre__in=['Ausencia No Justificada', 'Permiso No Remunerado']
+            labor__nombre='Ausencia No Justificada'
         ).values_list('fecha', flat=True).distinct())
 
         # Calcular días trabajados efectivos (puede ser fraccionario)
@@ -632,7 +659,7 @@ class NominaCalculator:
         if len(dias_incapacidad) > 0:
             descuentos_texto.append(f'{len(dias_incapacidad)} incapacidad(es)')
         if len(dias_ausencia_permiso) > 0:
-            descuentos_texto.append(f'{len(dias_ausencia_permiso)} ausencia(s)/permiso(s)')
+            descuentos_texto.append(f'{len(dias_ausencia_permiso)} ausencia(s)')
         if len(domingos_perdidos) > 0:
             descuentos_texto.append(f'{len(domingos_perdidos)} domingo(s) perdido(s)')
 
