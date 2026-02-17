@@ -245,7 +245,10 @@ export default function NominaList() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `comprobante_${nomina.trabajador_info?.numero_documento}_Q${nomina.quincena_info?.numero}.pdf`;
+      const meses = {1:'Enero',2:'Febrero',3:'Marzo',4:'Abril',5:'Mayo',6:'Junio',7:'Julio',8:'Agosto',9:'Septiembre',10:'Octubre',11:'Noviembre',12:'Diciembre'};
+      const nombre = (nomina.trabajador_info?.nombre_completo || 'trabajador').replace(/\s+/g, '_');
+      const mes = meses[nomina.quincena_info?.mes] || `Mes${nomina.quincena_info?.mes}`;
+      link.download = `Colilla_${nombre}_${mes}_${nomina.quincena_info?.año}_Q${nomina.quincena_info?.numero}.pdf`;
       document.body.appendChild(link);
       link.click();
 
