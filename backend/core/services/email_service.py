@@ -62,9 +62,9 @@ class EmailService:
             nombre_mes = EmailService.MESES.get(quincena.mes, f"Mes {quincena.mes}")
             periodo = f"Q{quincena.numero} - {nombre_mes} {quincena.año}"
 
-            # Nombre del archivo PDF
-            safe_periodo = f"Q{quincena.numero}_{nombre_mes}_{quincena.año}"
-            filename = f'recibo_pago_{trabajador.numero_documento}_{safe_periodo}.pdf'
+            # Nombre del archivo PDF con nombre del trabajador
+            nombre_limpio = trabajador.nombre_completo.replace(' ', '_')
+            filename = f'Colilla_{nombre_limpio}_{nombre_mes}_{quincena.año}_Q{quincena.numero}.pdf'
 
             # Leer el PDF y convertir a base64
             pdf_buffer.seek(0)

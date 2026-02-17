@@ -1002,8 +1002,12 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         # Generar PDF
         pdf_buffer = generar_comprobante_pdf(nomina)
 
-        # Nombre del archivo
-        filename = f"comprobante_nomina_{nomina.trabajador.numero_documento}_{nomina.quincena.año}_{nomina.quincena.mes}_Q{nomina.quincena.numero}.pdf"
+        # Nombre del archivo con nombre del trabajador
+        meses = {1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio',
+                 7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'}
+        nombre_limpio = nomina.trabajador.nombre_completo.replace(' ', '_')
+        mes_nombre = meses.get(nomina.quincena.mes, f'Mes{nomina.quincena.mes}')
+        filename = f"Colilla_{nombre_limpio}_{mes_nombre}_{nomina.quincena.año}_Q{nomina.quincena.numero}.pdf"
 
         # Retornar como descarga
         response = FileResponse(pdf_buffer, content_type='application/pdf')
@@ -1242,8 +1246,9 @@ class PrestamoViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         # Generar PDF
         pdf_buffer = generar_autorizacion_pdf(prestamo)
         
-        # Nombre del archivo
-        filename = f"autorizacion_prestamo_{prestamo.id}_{prestamo.trabajador.numero_documento}.pdf"
+        # Nombre del archivo con nombre del trabajador
+        nombre_limpio = prestamo.trabajador.nombre_completo.replace(' ', '_')
+        filename = f"Autorizacion_Prestamo_{nombre_limpio}_{prestamo.id}.pdf"
         
         # Retornar como descarga
         response = FileResponse(pdf_buffer, content_type='application/pdf')
@@ -1267,8 +1272,9 @@ class PrestamoViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         # Generar PDF
         pdf_buffer = generar_paz_y_salvo_pdf(prestamo)
         
-        # Nombre del archivo
-        filename = f"paz_y_salvo_prestamo_{prestamo.id}_{prestamo.trabajador.numero_documento}.pdf"
+        # Nombre del archivo con nombre del trabajador
+        nombre_limpio = prestamo.trabajador.nombre_completo.replace(' ', '_')
+        filename = f"Paz_y_Salvo_{nombre_limpio}_{prestamo.id}.pdf"
         
         # Retornar como descarga
         response = FileResponse(pdf_buffer, content_type='application/pdf')
