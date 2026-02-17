@@ -503,11 +503,11 @@ class NominaCalculator:
                 lunes = current - timedelta(days=6)
                 sabado = current - timedelta(days=1)
                 
-                # Ajustar inicio si el lunes está antes de la quincena
-                inicio_ajustado = max(lunes, self.quincena.fecha_inicio)
-                
+                # Usar el lunes real (no recortar al inicio de quincena)
+                # _tiene_semana_completa usará registros_quincena_anterior
+                # para verificar días laborables fuera de esta quincena
                 semanas.append({
-                    'inicio': inicio_ajustado,
+                    'inicio': lunes,
                     'fin': sabado,  # Sábado (no incluir domingo en la verificación)
                     'domingo': current  # El domingo a pagar
                 })
