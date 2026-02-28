@@ -1,17 +1,20 @@
 // frontend/src/pages/Nomina/NominaDetail.jsx
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import nominaService from '../../services/nominaService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Download, Edit2, Save, X, CheckCircle, Mail } from 'lucide-react';
+import { ArrowLeft, Download, Edit2, Save, X, CheckCircle, Mail, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function NominaDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { state } = useLocation();
+  const nominaIds = state?.nominaIds || null;
+  const currentIndex = state?.currentIndex ?? -1;
   
   const [nomina, setNomina] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -180,6 +183,7 @@ export default function NominaDetail() {
           <button
             onClick={() => navigate('/nomina')}
             className="p-2 hover:bg-gray-100 rounded-md"
+            title="Volver a la lista"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -189,6 +193,34 @@ export default function NominaDetail() {
               {nomina.trabajador_info?.nombre_completo} - Quincena {nomina.quincena_info?.numero}
             </p>
           </div>
+          {/* Navegación anterior/siguiente (solo si viene desde la lista filtrada) */}
+          {nominaIds && (
+            <div className="flex items-center gap-1 ml-2">
+              <button
+                onClick={() => navigate(`/nomina/${nominaIds[currentIndex - 1]}`, {
+                  state: { nominaIds, currentIndex: currentIndex - 1 }
+                })}
+                disabled={currentIndex <= 0}
+                className="p-1.5 rounded-md hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Anterior"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <span className="text-sm text-gray-500 px-1 whitespace-nowrap">
+                {currentIndex + 1} de {nominaIds.length}
+              </span>
+              <button
+                onClick={() => navigate(`/nomina/${nominaIds[currentIndex + 1]}`, {
+                  state: { nominaIds, currentIndex: currentIndex + 1 }
+                })}
+                disabled={currentIndex >= nominaIds.length - 1}
+                className="p-1.5 rounded-md hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Siguiente"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2">

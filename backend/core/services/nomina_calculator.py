@@ -110,8 +110,12 @@ class NominaCalculator:
         # 3. Calcular festivos (solo con contrato)
         if trabajador.tipo_contrato.nombre == 'CON_CONTRATO':
             base_deducible += self._calcular_festivos(nomina, registros)
-        
-        # 4. Auxilio de transporte
+
+        # 4. Ajuste Febrero (2 días básico extra en Q2 de febrero, solo con contrato)
+        if trabajador.tipo_contrato.nombre == 'CON_CONTRATO':
+            base_deducible += self._calcular_ajuste_febrero(nomina, trabajador)
+
+        # 5. Auxilio de transporte
         auxilio_transporte = Decimal('0.00')
         if self._trabajador_recibe_auxilio(trabajador):
             auxilio_transporte = self._calcular_auxilio_transporte(nomina)
@@ -543,7 +547,42 @@ class NominaCalculator:
                 )
         
         return total
-    
+
+    def _calcular_ajuste_febrero(self, nomina, trabajador):
+        """
+        Pagar 2 días básico extra en la segunda quincena de febrero.
+        Solo aplica a trabajadores CON_CONTRATO no administrativos.
+        """
+        # Solo en Q2 de febrero
+        if not (self.quincena.mes == 2 and self.quincena.numero == 2):
+            return Decimal('0.00')
+
+        # No aplica a administrativos con salario fijo
+        if trabajador.es_administrativo:
+            return Decimal('0.00')
+
+        labor_dia_basico = self._get_labor_dia_basico()
+        if not labor_dia_basico:
+            return Decimal('0.00')
+
+        precio_dia_basico = self._get_precio_vigente(labor_dia_basico)
+        if not precio_dia_basico:
+            return Decimal('0.00')
+
+        valor_total = precio_dia_basico * 2
+
+        DetalleNomina.objects.create(
+            nomina=nomina,
+            tipo='DEVENGO',
+            concepto='DEVENGO_ADICIONAL',
+            descripcion='Ajuste Febrero',
+            cantidad=2,
+            valor_unitario=precio_dia_basico,
+            valor_total=valor_total
+        )
+
+        return valor_total
+
     def _calcular_auxilio_transporte(self, nomina):
         """
         Calcular auxilio de transporte QUINCENAL proporcional a días LABORABLES trabajados.

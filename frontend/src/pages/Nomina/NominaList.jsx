@@ -686,7 +686,12 @@ export default function NominaList() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <div className="flex gap-2">
                           <button
-                            onClick={() => navigate(`/nomina/${nomina.id}`)}
+                            onClick={() => navigate(`/nomina/${nomina.id}`, {
+                              state: {
+                                nominaIds: nominasFiltradas.map(n => n.id),
+                                currentIndex: nominasFiltradas.findIndex(n => n.id === nomina.id)
+                              }
+                            })}
                             className="text-blue-600 hover:text-blue-900"
                             title="Ver detalle"
                           >
