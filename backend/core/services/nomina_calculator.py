@@ -49,10 +49,20 @@ class NominaCalculator:
             return contrato_activo.recibe_auxilio_transporte
         return True
 
+    def _debe_calcular_nomina(self, trabajador):
+        """Solo calcular nomina para trabajadores con contrato y estado contratado."""
+        return (
+            trabajador.tipo_contrato.nombre == 'CON_CONTRATO'
+            and trabajador.estado == Trabajador.CONTRATADO
+        )
+
     def calcular_quincena_completa(self, usuario):
         """Calcular nómina para todos los trabajadores que pueden trabajar (no retirados)"""
         # Excluir trabajadores retirados - tanto CONTRATADO como SIN_CONTRATO pueden trabajar
-        trabajadores = Trabajador.objects.exclude(estado=Trabajador.RETIRADO)
+        trabajadores = Trabajador.objects.filter(
+            tipo_contrato__nombre='CON_CONTRATO',
+            estado=Trabajador.CONTRATADO
+        )
         nominas_creadas = []
 
         for trabajador in trabajadores:
@@ -67,6 +77,9 @@ class NominaCalculator:
         """Calcular nómina para un trabajador específico"""
 
         # Verificar si ya existe nómina
+        if not self._debe_calcular_nomina(trabajador):
+            return None
+
         nomina, created = Nomina.objects.get_or_create(
             trabajador=trabajador,
             quincena=self.quincena,

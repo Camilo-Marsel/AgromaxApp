@@ -8,6 +8,7 @@ from core.models import (
     Finca,
     Labor,
     ListaPrecios,
+    Nomina,
     Quincena,
     RegistroLabor,
     TipoContrato,
@@ -23,6 +24,12 @@ class ColombianHolidaysTestCase(TestCase):
         self.finca = Finca.objects.create(nombre='Finca Prueba')
         self.tipo_contrato = TipoContrato.objects.create(
             nombre='CON_CONTRATO',
+            aplica_deducciones=False,
+            aplica_dominicales=False,
+            aplica_auxilio_transporte=False,
+        )
+        self.tipo_sin_contrato = TipoContrato.objects.create(
+            nombre='SIN_CONTRATO',
             aplica_deducciones=False,
             aplica_dominicales=False,
             aplica_auxilio_transporte=False,
@@ -69,6 +76,28 @@ class ColombianHolidaysTestCase(TestCase):
             fecha_ingreso=date(2026, 1, 1),
             estado=Trabajador.CONTRATADO,
         )
+        self.trabajador_sin_contrato = Trabajador.objects.create(
+            nombres='Luis',
+            apellidos='Sin Contrato',
+            tipo_documento='CC',
+            numero_documento='987654321',
+            fecha_nacimiento=date(1991, 1, 1),
+            tipo_contrato=self.tipo_sin_contrato,
+            finca=self.finca,
+            fecha_ingreso=date(2026, 1, 1),
+            estado=Trabajador.CONTRATADO,
+        )
+        self.trabajador_estado_inactivo = Trabajador.objects.create(
+            nombres='Marta',
+            apellidos='Inactiva',
+            tipo_documento='CC',
+            numero_documento='111222333',
+            fecha_nacimiento=date(1992, 1, 1),
+            tipo_contrato=self.tipo_contrato,
+            finca=self.finca,
+            fecha_ingreso=date(2026, 1, 1),
+            estado=Trabajador.SIN_CONTRATO,
+        )
 
     def test_monday_march_23_2026_is_detected_as_holiday(self):
         self.assertTrue(is_colombian_holiday(date(2026, 3, 23)))
@@ -94,3 +123,10 @@ class ColombianHolidaysTestCase(TestCase):
 
         with self.assertRaises(ValidationError):
             registro.full_clean()
+
+    def test_bulk_payroll_only_includes_contratado_with_con_contrato(self):
+        nominas = NominaCalculator(self.quincena).calcular_quincena_completa(None)
+
+        self.assertEqual(len(nominas), 1)
+        self.assertEqual(nominas[0].trabajador_id, self.trabajador.id)
+        self.assertEqual(Nomina.objects.count(), 1)
