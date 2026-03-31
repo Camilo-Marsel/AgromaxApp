@@ -25,7 +25,7 @@ class ColombianHolidaysTestCase(TestCase):
         self.tipo_contrato = TipoContrato.objects.create(
             nombre='CON_CONTRATO',
             aplica_deducciones=False,
-            aplica_dominicales=False,
+            aplica_dominicales=True,
             aplica_auxilio_transporte=False,
         )
         self.tipo_sin_contrato = TipoContrato.objects.create(
@@ -124,9 +124,46 @@ class ColombianHolidaysTestCase(TestCase):
         with self.assertRaises(ValidationError):
             registro.full_clean()
 
-    def test_bulk_payroll_only_includes_contratado_with_con_contrato(self):
+    def test_bulk_payroll_includes_non_retired_workers(self):
         nominas = NominaCalculator(self.quincena).calcular_quincena_completa(None)
 
-        self.assertEqual(len(nominas), 1)
-        self.assertEqual(nominas[0].trabajador_id, self.trabajador.id)
-        self.assertEqual(Nomina.objects.count(), 1)
+        trabajadores_ids = {nomina.trabajador_id for nomina in nominas}
+
+        self.assertEqual(len(nominas), 3)
+        self.assertEqual(
+            trabajadores_ids,
+            {
+                self.trabajador.id,
+                self.trabajador_sin_contrato.id,
+                self.trabajador_estado_inactivo.id,
+            }
+        )
+        self.assertEqual(Nomina.objects.count(), 3)
+
+    def test_non_contract_worker_does_not_receive_holiday_payment(self):
+        nomina = NominaCalculator(self.quincena).calcular_trabajador(self.trabajador_sin_contrato, None)
+
+        self.assertFalse(nomina.detalles.filter(concepto='FESTIVO').exists())
+
+    def test_holiday_does_not_cause_loss_of_weekly_dominical(self):
+        for work_day in [
+            date(2026, 3, 24),
+            date(2026, 3, 25),
+            date(2026, 3, 26),
+            date(2026, 3, 27),
+            date(2026, 3, 28),
+        ]:
+            RegistroLabor.objects.create(
+                trabajador=self.trabajador,
+                labor=self.labor_basica,
+                quincena=self.quincena,
+                fecha=work_day,
+                cantidad=Decimal('1.0000'),
+            )
+
+        nomina = NominaCalculator(self.quincena).calcular_trabajador(self.trabajador, None)
+        detalle_dominical = nomina.detalles.get(concepto='DOMINICAL')
+
+        self.assertEqual(detalle_dominical.cantidad, Decimal('1'))
+        self.assertEqual(detalle_dominical.valor_unitario, Decimal('40000.00'))
+        self.assertEqual(detalle_dominical.valor_total, Decimal('40000.00'))
