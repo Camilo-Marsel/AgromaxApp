@@ -1,6 +1,7 @@
 # backend/core/serializers.py
 
 from rest_framework import serializers
+from core.utils import is_colombian_holiday
 from django.contrib.auth import authenticate
 from django.core.exceptions import ValidationError
 from .models import (
@@ -555,6 +556,10 @@ class RegistroLaborCreateUpdateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "La labor 'Domingo extra' solo puede registrarse en días domingo."
                 )
+        elif fecha and is_colombian_holiday(fecha):
+            raise serializers.ValidationError(
+                "No se pueden registrar labores en festivos de Colombia."
+            )
 
         # Validar que la quincena permita registro
         if not quincena.puede_registrar:

@@ -3,6 +3,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator
 from decimal import Decimal
+from core.utils import is_colombian_holiday
 
 # ============================================================================
 # CATÁLOGOS DE LABORES
@@ -219,6 +220,9 @@ class RegistroLabor(models.Model):
         # Validar que no sea domingo
         if self.fecha.weekday() == 6:  # 6 = domingo
             raise ValidationError('No se pueden registrar labores en domingo')
+
+        if is_colombian_holiday(self.fecha):
+            raise ValidationError('No se pueden registrar labores en festivos de Colombia')
 
         # Validar que la fecha esté dentro de la quincena
         if not (self.quincena.fecha_inicio <= self.fecha <= self.quincena.fecha_fin):

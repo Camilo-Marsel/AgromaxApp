@@ -4,6 +4,7 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
+from core.utils import is_colombian_holiday
 from rest_framework.filters import SearchFilter, OrderingFilter
 from .services.nomina_calculator import NominaCalculator
 from django.http import FileResponse, HttpResponse
@@ -551,6 +552,10 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
 
             if fecha.weekday() == 6:
                 errores.append(f"{fecha_str}: No se puede registrar en domingo")
+                continue
+
+            if is_colombian_holiday(fecha):
+                errores.append(f"{fecha_str}: No se puede registrar en festivo")
                 continue
 
             if RegistroLabor.objects.filter(

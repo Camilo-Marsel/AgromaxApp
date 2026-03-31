@@ -9,6 +9,7 @@ from core.models import (
     Contrato
 )
 from datetime import timedelta
+from core.utils import get_colombian_holidays
 
 class NominaCalculator:
     """Servicio para calcular nóminas con todas las reglas de negocio"""
@@ -521,31 +522,50 @@ class NominaCalculator:
         return semanas
     
     def _calcular_festivos(self, nomina, registros):
-        """Calcular festivos registrados"""
+        """Calcular festivos de Colombia dentro de la quincena."""
         total = Decimal('0.00')
-        
-        # Buscar registros de festivos
-        festivos = registros.filter(labor__nombre='Festivo')
-        
-        if festivos.exists():
-            labor_festivo = festivos.first().labor
-            precio = self._get_precio_vigente(labor_festivo)
-            
-            if precio:
-                cantidad = sum([f.cantidad for f in festivos])
-                valor_total = cantidad * precio
-                total += valor_total
-                
-                DetalleNomina.objects.create(
-                    nomina=nomina,
-                    tipo='DEVENGO',
-                    concepto='FESTIVO',
-                    descripcion=f"Festivos: {cantidad}",
-                    cantidad=cantidad,
-                    valor_unitario=precio,
-                    valor_total=valor_total
-                )
-        
+
+        labor_festivo = Labor.objects.filter(nombre='Festivo').first()
+        if not labor_festivo:
+            return total
+
+        precio = self._get_precio_vigente(labor_festivo)
+        if not precio:
+            return total
+
+        festivos_quincena = sorted(
+            holiday_date
+            for holiday_date in get_colombian_holidays(self.quincena.fecha_inicio.year)
+            if self.quincena.fecha_inicio <= holiday_date <= self.quincena.fecha_fin
+        )
+
+        if not festivos_quincena and self.quincena.fecha_inicio.year != self.quincena.fecha_fin.year:
+            festivos_quincena = sorted(
+                holiday_date
+                for year in {self.quincena.fecha_inicio.year, self.quincena.fecha_fin.year}
+                for holiday_date in get_colombian_holidays(year)
+                if self.quincena.fecha_inicio <= holiday_date <= self.quincena.fecha_fin
+            )
+
+        cantidad = Decimal(str(len(festivos_quincena)))
+        if cantidad == 0:
+            return total
+
+        valor_total = cantidad * precio
+        total += valor_total
+
+        fechas_texto = ', '.join(fecha.strftime('%d/%m/%Y') for fecha in festivos_quincena)
+        DetalleNomina.objects.create(
+            nomina=nomina,
+            tipo='DEVENGO',
+            concepto='FESTIVO',
+            descripcion=f"Festivos: {fechas_texto}",
+            labor=labor_festivo,
+            cantidad=cantidad,
+            valor_unitario=precio,
+            valor_total=valor_total
+        )
+
         return total
 
     def _calcular_ajuste_febrero(self, nomina, trabajador):

@@ -4,6 +4,7 @@
 // ============================================
 
 import { useState, useEffect } from 'react';
+import { isColombianHoliday } from '../../utils/holidays';
 
 export default function MultipleDatePicker({ 
   quincena, 
@@ -38,6 +39,7 @@ export default function MultipleDatePicker({
       const dateStr = `${year}-${month}-${day}`;
       
       const isDomingo = current.getDay() === 0;
+      const isFestivo = isColombianHoliday(dateStr);
       
       // Obtener labores de esta fecha
       const laboresEnFecha = registrosDetallados
@@ -81,6 +83,9 @@ export default function MultipleDatePicker({
         // Labor normal en domingo → deshabilitar
         disabled = true;
         mensajeTooltip = 'Domingo - No disponible para esta labor';
+      } else if (isFestivo) {
+        disabled = true;
+        mensajeTooltip = 'Festivo en Colombia - No se registran labores';
       } else if (!isDomingo && tieneRegistro) {
         // Clasificar labores existentes
         const laboresNormalesExistentes = laboresEnFecha.filter(l => !LABORES_ADICIONALES.includes(l));
@@ -121,6 +126,7 @@ export default function MultipleDatePicker({
         dia: current.getDate(),
         diaSemana: current.toLocaleDateString('es-ES', { weekday: 'short' }),
         isDomingo,
+        isFestivo,
         tieneRegistro,
         laboresEnFecha,
         disabled,
