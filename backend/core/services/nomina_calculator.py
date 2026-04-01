@@ -630,7 +630,14 @@ class NominaCalculator:
         domingos_en_quincena = self._contar_domingos_en_quincena()
 
         # Calcular días LABORABLES (sin domingos) - BASE para el auxilio
-        dias_laborables = dias_totales_quincena - domingos_en_quincena
+        dias_festivos = 0
+        current = self.quincena.fecha_inicio
+        while current <= self.quincena.fecha_fin:
+            if current.weekday() < 6 and is_colombian_holiday(current):
+                dias_festivos += 1
+            current += timedelta(days=1)
+
+        dias_laborables = dias_totales_quincena - domingos_en_quincena - dias_festivos
 
         # Obtener TODOS los registros del trabajador en esta quincena
         registros = RegistroLabor.objects.filter(

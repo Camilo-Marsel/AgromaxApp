@@ -14,6 +14,7 @@ from core.models import (
     TipoContrato,
     Trabajador,
     UnidadMedida,
+    VariablesNomina,
 )
 from core.services.nomina_calculator import NominaCalculator
 from core.utils import is_colombian_holiday
@@ -26,7 +27,7 @@ class ColombianHolidaysTestCase(TestCase):
             nombre='CON_CONTRATO',
             aplica_deducciones=False,
             aplica_dominicales=True,
-            aplica_auxilio_transporte=False,
+            aplica_auxilio_transporte=True,
         )
         self.tipo_sin_contrato = TipoContrato.objects.create(
             nombre='SIN_CONTRATO',
@@ -55,6 +56,11 @@ class ColombianHolidaysTestCase(TestCase):
         ListaPrecios.objects.create(
             labor=self.labor_basica,
             precio=Decimal('40000.00'),
+            fecha_inicio_vigencia=date(2026, 1, 1),
+        )
+        VariablesNomina.objects.create(
+            nombre=VariablesNomina.AUXILIO_TRANSPORTE,
+            valor=Decimal('200000.00'),
             fecha_inicio_vigencia=date(2026, 1, 1),
         )
         self.quincena = Quincena.objects.create(
@@ -167,3 +173,32 @@ class ColombianHolidaysTestCase(TestCase):
         self.assertEqual(detalle_dominical.cantidad, Decimal('1'))
         self.assertEqual(detalle_dominical.valor_unitario, Decimal('40000.00'))
         self.assertEqual(detalle_dominical.valor_total, Decimal('40000.00'))
+
+    def test_holiday_does_not_discount_transport_allowance(self):
+        for work_day in [
+            date(2026, 3, 16),
+            date(2026, 3, 17),
+            date(2026, 3, 18),
+            date(2026, 3, 19),
+            date(2026, 3, 20),
+            date(2026, 3, 21),
+            date(2026, 3, 24),
+            date(2026, 3, 25),
+            date(2026, 3, 26),
+            date(2026, 3, 27),
+            date(2026, 3, 28),
+            date(2026, 3, 30),
+            date(2026, 3, 31),
+        ]:
+            RegistroLabor.objects.create(
+                trabajador=self.trabajador,
+                labor=self.labor_basica,
+                quincena=self.quincena,
+                fecha=work_day,
+                cantidad=Decimal('1.0000'),
+            )
+
+        nomina = NominaCalculator(self.quincena).calcular_trabajador(self.trabajador, None)
+        detalle_auxilio = nomina.detalles.get(concepto='AUXILIO_TRANSPORTE')
+
+        self.assertEqual(detalle_auxilio.valor_total, Decimal('200000.00'))
