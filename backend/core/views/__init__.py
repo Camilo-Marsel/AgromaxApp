@@ -11,6 +11,7 @@ from .prestamos import PrestamoViewSet
 from .contratos import ContratoViewSet, DocumentoContratoViewSet
 from .configuracion import ConfiguracionEmpresaViewSet
 from .obligaciones import PILAViewSet, PrestacionesViewSet
+from .inventario import ProductoViewSet, MovimientoInventarioViewSet
 
 __all__ = [
     'RolViewSet', 'UsuarioViewSet',
@@ -22,4 +23,5 @@ __all__ = [
     'ContratoViewSet', 'DocumentoContratoViewSet',
     'ConfiguracionEmpresaViewSet',
     'PILAViewSet', 'PrestacionesViewSet',
+    'ProductoViewSet', 'MovimientoInventarioViewSet',
 ]

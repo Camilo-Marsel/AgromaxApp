@@ -33,6 +33,10 @@ router.register(r'configuracion-empresa', ConfiguracionEmpresaViewSet, basename=
 router.register(r'pila', PILAViewSet, basename='pila')
 router.register(r'prestaciones', PrestacionesViewSet, basename='prestaciones')
 
+# Inventario
+router.register(r'inventario/productos', ProductoViewSet, basename='producto')
+router.register(r'inventario/movimientos', MovimientoInventarioViewSet, basename='movimiento-inventario')
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def health_check(request):

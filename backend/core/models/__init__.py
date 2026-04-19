@@ -10,6 +10,7 @@ from .payroll import VariablesNomina, Nomina, DetalleNomina
 from .loans import Prestamo, CuotaPrestamo
 from .audit import AuditoriaLog
 from .config import ConfiguracionEmpresa
+from .inventario import Producto, MovimientoInventario
 from .obligations import (
     PILA, DetallePILA, ProvisionPrestaciones, ResumenPrestaciones,
     PORCENTAJE_SALUD_EMPLEADOR, PORCENTAJE_PENSION_EMPLEADOR,
@@ -53,6 +54,10 @@ __all__ = [
 
     # Config models
     'ConfiguracionEmpresa',
+
+    # Inventory models
+    'Producto',
+    'MovimientoInventario',
 
     # Obligations models (PILA and Prestaciones)
     'PILA',

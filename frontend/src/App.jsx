@@ -34,6 +34,9 @@ import ReportesNomina from './pages/Reportes/ReportesNomina';
 import UsuariosList from './pages/Usuarios/UsuariosList';
 import UsuarioForm from './pages/Usuarios/UsuarioForm';
 import HistorialRegistros from './pages/Registros/HistorialRegistros';
+import ProductosList from './pages/Inventario/ProductosList';
+import ProductoDetail from './pages/Inventario/ProductoDetail';
+import ProductoForm from './pages/Inventario/ProductoForm';
 
 // Obligaciones Laborales
 import PILAList from './pages/ObligacionesLaborales/PILA/PILAList';
@@ -329,6 +332,24 @@ function App() {
                 </MainLayout>
               </ProtectedRoute>
             }
+          />
+
+          {/* Inventario */}
+          <Route
+            path="/inventario"
+            element={<ProtectedRoute><MainLayout><ProductosList /></MainLayout></ProtectedRoute>}
+          />
+          <Route
+            path="/inventario/productos/nuevo"
+            element={<ProtectedRoute modifyOnly><MainLayout><ProductoForm /></MainLayout></ProtectedRoute>}
+          />
+          <Route
+            path="/inventario/productos/:id"
+            element={<ProtectedRoute><MainLayout><ProductoDetail /></MainLayout></ProtectedRoute>}
+          />
+          <Route
+            path="/inventario/productos/:id/editar"
+            element={<ProtectedRoute modifyOnly><MainLayout><ProductoForm /></MainLayout></ProtectedRoute>}
           />
 
           {/* Nómina */}

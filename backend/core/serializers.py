@@ -15,6 +15,7 @@ from .models import (
     PORCENTAJE_ARL, PORCENTAJE_CAJA_COMPENSACION,
     PORCENTAJE_CESANTIAS, PORCENTAJE_INTERESES_CESANTIAS,
     PORCENTAJE_PRIMA, PORCENTAJE_VACACIONES,
+    Producto, MovimientoInventario,
 )
 from decimal import Decimal
 from datetime import date
@@ -1197,3 +1198,80 @@ class PorcentajesObligacionesSerializer(serializers.Serializer):
     prima = serializers.DecimalField(max_digits=5, decimal_places=4)
     vacaciones = serializers.DecimalField(max_digits=5, decimal_places=4)
     total_prestaciones = serializers.DecimalField(max_digits=5, decimal_places=4)
+
+
+# ============================================================================
+# INVENTARIO
+# ============================================================================
+
+class ProductoListSerializer(serializers.ModelSerializer):
+    categoria_display = serializers.CharField(source='get_categoria_display', read_only=True)
+    unidad_display    = serializers.CharField(source='get_unidad_display', read_only=True)
+    finca_nombre      = serializers.CharField(source='finca.nombre', read_only=True, default=None)
+    stock_bajo        = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model  = Producto
+        fields = [
+            'id', 'nombre', 'descripcion', 'categoria', 'categoria_display',
+            'unidad', 'unidad_display', 'stock_actual', 'stock_minimo',
+            'stock_bajo', 'finca', 'finca_nombre', 'activo', 'created_at',
+        ]
+
+
+class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Producto
+        fields = [
+            'id', 'nombre', 'descripcion', 'categoria', 'unidad',
+            'stock_minimo', 'finca', 'activo',
+        ]
+
+    def validate_stock_minimo(self, value):
+        if value < 0:
+            raise serializers.ValidationError('El stock mínimo no puede ser negativo.')
+        return value
+
+
+class MovimientoInventarioSerializer(serializers.ModelSerializer):
+    tipo_display        = serializers.CharField(source='get_tipo_display', read_only=True)
+    producto_nombre     = serializers.CharField(source='producto.nombre', read_only=True)
+    producto_unidad     = serializers.CharField(source='producto.unidad', read_only=True)
+    creado_por          = serializers.CharField(
+        source='created_by.get_full_name', read_only=True, default=None,
+    )
+
+    class Meta:
+        model  = MovimientoInventario
+        fields = [
+            'id', 'producto', 'producto_nombre', 'producto_unidad',
+            'tipo', 'tipo_display', 'cantidad',
+            'stock_antes', 'stock_despues',
+            'fecha', 'observaciones',
+            'referencia_tipo', 'referencia_id',
+            'creado_por', 'created_at',
+        ]
+        read_only_fields = ['stock_antes', 'stock_despues', 'created_at']
+
+
+class MovimientoInventarioCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = MovimientoInventario
+        fields = ['producto', 'tipo', 'cantidad', 'fecha', 'observaciones']
+
+    def validate_cantidad(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('La cantidad debe ser mayor que cero.')
+        return value
+
+    def validate(self, data):
+        if data.get('tipo') == 'SALIDA':
+            producto = data.get('producto')
+            if producto and data['cantidad'] > producto.stock_actual:
+                raise serializers.ValidationError({
+                    'cantidad': (
+                        f'Stock insuficiente. Disponible: {producto.stock_actual} '
+                        f'{producto.get_unidad_display()}.'
+                    )
+                })
+        return data
