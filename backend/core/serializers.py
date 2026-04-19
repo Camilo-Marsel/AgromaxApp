@@ -922,9 +922,15 @@ class ContratoCreateUpdateSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
     def validate(self, data):
-        """Validaciones adicionales"""
-        # Las validaciones del modelo se ejecutarán automáticamente en save()
-        # Aquí solo agregamos validaciones adicionales si necesario
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        # Construir instancia temporal para correr clean() del modelo
+        instance = self.instance or Contrato()
+        for attr, value in data.items():
+            setattr(instance, attr, value)
+        try:
+            instance.clean()
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.message_dict if hasattr(e, 'message_dict') else e.messages)
         return data
 
     def create(self, validated_data):

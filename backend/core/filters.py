@@ -34,13 +34,14 @@ class LaborFilter(filters.FilterSet):
 class RegistroLaborFilter(filters.FilterSet):
     trabajador = filters.NumberFilter(field_name='trabajador__id')
     quincena = filters.NumberFilter(field_name='quincena__id')
+    finca = filters.NumberFilter(field_name='trabajador__finca__id')
     fecha_desde = filters.DateFilter(field_name='fecha', lookup_expr='gte')
     fecha_hasta = filters.DateFilter(field_name='fecha', lookup_expr='lte')
     labor = filters.NumberFilter(field_name='labor__id')
-    
+
     class Meta:
         model = RegistroLabor
-        fields = ['trabajador', 'quincena', 'fecha_desde', 'fecha_hasta', 'labor']
+        fields = ['trabajador', 'quincena', 'finca', 'fecha_desde', 'fecha_hasta', 'labor']
 
 
 class NominaFilter(filters.FilterSet):

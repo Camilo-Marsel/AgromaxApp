@@ -31,3 +31,6 @@ Thumbs.db
 
 # Evitar subir el volcado de datos de producción
 backend/datos_produccion.json
+
+# Script de seed local — solo para desarrollo
+backend/seed_local.py

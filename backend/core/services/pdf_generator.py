@@ -277,30 +277,22 @@ def generar_colillas_consolidadas(nominas):
     Returns:
         BytesIO buffer con el PDF consolidado
     """
-    from PyPDF2 import PdfMerger
+    from pypdf import PdfWriter, PdfReader
 
     if not nominas:
-        # Si no hay nóminas, retornar PDF vacío con mensaje
         return _generar_pdf_vacio()
 
-    # Crear merger de PDFs
-    merger = PdfMerger()
+    writer = PdfWriter()
 
-    # Generar PDF individual para cada nómina y agregarla al merger
     for nomina in nominas:
-        # Generar PDF individual
         pdf_buffer = generar_comprobante_pdf(nomina)
         pdf_buffer.seek(0)
+        reader = PdfReader(pdf_buffer)
+        for page in reader.pages:
+            writer.add_page(page)
 
-        # Agregar al documento consolidado
-        merger.append(pdf_buffer)
-
-    # Escribir el PDF consolidado a un buffer
     output_buffer = BytesIO()
-    merger.write(output_buffer)
-    merger.close()
-
-    # Posicionar al inicio para lectura
+    writer.write(output_buffer)
     output_buffer.seek(0)
 
     return output_buffer

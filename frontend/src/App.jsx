@@ -2,6 +2,7 @@
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useContext } from 'react';
+import PropTypes from 'prop-types';
 import { Toaster } from 'react-hot-toast';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
 import Landing from './pages/Landing';
@@ -32,6 +33,7 @@ import ReportesList from './pages/Reportes/ReportesList';
 import ReportesNomina from './pages/Reportes/ReportesNomina';
 import UsuariosList from './pages/Usuarios/UsuariosList';
 import UsuarioForm from './pages/Usuarios/UsuarioForm';
+import HistorialRegistros from './pages/Registros/HistorialRegistros';
 
 // Obligaciones Laborales
 import PILAList from './pages/ObligacionesLaborales/PILA/PILAList';
@@ -40,8 +42,10 @@ import PrestacionesList from './pages/ObligacionesLaborales/Prestaciones/Prestac
 import PrestacionesDetail from './pages/ObligacionesLaborales/Prestaciones/PrestacionesDetail';
 
 // Componente para rutas protegidas
-function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useContext(AuthContext);
+// adminOnly  → solo ADMINISTRADOR
+// modifyOnly → ADMINISTRADOR o SUPERVISOR
+function ProtectedRoute({ children, adminOnly = false, modifyOnly = false }) {
+  const { isAuthenticated, loading, isAdmin, canModify } = useContext(AuthContext);
 
   if (loading) {
     return (
@@ -54,8 +58,18 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (adminOnly && !isAdmin()) return <Navigate to="/dashboard" replace />;
+  if (modifyOnly && !canModify()) return <Navigate to="/dashboard" replace />;
+
+  return children;
 }
+
+ProtectedRoute.propTypes = {
+  children: PropTypes.node.isRequired,
+  adminOnly: PropTypes.bool,
+  modifyOnly: PropTypes.bool,
+};
 
 // Layout para páginas internas
 function MainLayout({ children }) {
@@ -119,7 +133,7 @@ function App() {
           <Route
             path="/trabajadores/nuevo"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute modifyOnly>
                 <MainLayout>
                   <TrabajadorForm />
                 </MainLayout>
@@ -129,7 +143,7 @@ function App() {
           <Route
             path="/trabajadores/:id/editar"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute modifyOnly>
                 <MainLayout>
                   <TrabajadorForm />
                 </MainLayout>
@@ -151,7 +165,7 @@ function App() {
           <Route
             path="/contratos/nuevo"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute modifyOnly>
                 <MainLayout>
                   <ContratoForm />
                 </MainLayout>
@@ -171,7 +185,7 @@ function App() {
           <Route
             path="/contratos/:id/editar"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute modifyOnly>
                 <MainLayout>
                   <ContratoForm />
                 </MainLayout>
@@ -193,7 +207,7 @@ function App() {
           <Route
             path="/prestamos/nuevo"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute modifyOnly>
                 <MainLayout>
                   <PrestamoForm />
                 </MainLayout>
@@ -225,7 +239,7 @@ function App() {
           <Route
             path="/labores/nueva"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <MainLayout>
                   <LaborForm />
                 </MainLayout>
@@ -235,7 +249,7 @@ function App() {
           <Route
             path="/labores/:id/editar"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <MainLayout>
                   <LaborForm />
                 </MainLayout>
@@ -245,7 +259,7 @@ function App() {
           <Route
             path="/labores/:id/precios"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <MainLayout>
                   <LaborPrecios />
                 </MainLayout>
@@ -267,7 +281,7 @@ function App() {
           <Route
             path="/fincas/nueva"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <MainLayout>
                   <FincaForm />
                 </MainLayout>
@@ -277,7 +291,7 @@ function App() {
           <Route
             path="/fincas/:id/editar"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <MainLayout>
                   <FincaForm />
                 </MainLayout>
@@ -302,6 +316,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <RegistroLabores />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/registros/historial"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <HistorialRegistros />
                 </MainLayout>
               </ProtectedRoute>
             }
@@ -333,7 +357,7 @@ function App() {
           <Route
             path="/configuracion/variables"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <MainLayout>
                   <ConfiguracionVariables />
                 </MainLayout>
@@ -413,7 +437,7 @@ function App() {
           <Route
             path="/usuarios"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <MainLayout>
                   <UsuariosList />
                 </MainLayout>
@@ -423,7 +447,7 @@ function App() {
           <Route
             path="/usuarios/nuevo"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <MainLayout>
                   <UsuarioForm />
                 </MainLayout>
@@ -433,7 +457,7 @@ function App() {
           <Route
             path="/usuarios/:id/editar"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <MainLayout>
                   <UsuarioForm />
                 </MainLayout>

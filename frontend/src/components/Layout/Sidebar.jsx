@@ -1,7 +1,7 @@
 // frontend/src/components/Layout/Sidebar.jsx
 
 import { NavLink } from 'react-router-dom';
-import { Home, Users, Briefcase, DollarSign, FileText, Settings, MapPin, FileCheck, UserCog, Shield } from 'lucide-react';
+import { Home, Users, Briefcase, DollarSign, FileText, Settings, MapPin, FileCheck, UserCog, Shield, ClipboardList } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function Sidebar() {
@@ -14,6 +14,7 @@ export default function Sidebar() {
     { path: '/fincas', icon: MapPin, label: 'Fincas' },
     { path: '/labores', icon: Briefcase, label: 'Labores' },
     { path: '/registros', icon: Briefcase, label: 'Registro Labores' },
+    { path: '/registros/historial', icon: ClipboardList, label: 'Historial Registros' },
     { path: '/nomina', icon: DollarSign, label: 'Nómina' },
     { path: '/reportes', icon: FileText, label: 'Reportes' },
     { path: '/prestamos', icon: DollarSign, label: 'Adelantos' },

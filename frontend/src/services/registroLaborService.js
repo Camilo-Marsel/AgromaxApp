@@ -42,10 +42,15 @@ const registroLaborService = {
   // Obtener registros por trabajador y quincena
   getByTrabajadorQuincena: async (trabajadorId, quincenaId) => {
     const response = await api.get('/registros-labor/', {
-      params: {
-        trabajador: trabajadorId,
-        quincena: quincenaId,
-      },
+      params: { trabajador: trabajadorId, quincena: quincenaId },
+    });
+    return response.data;
+  },
+
+  // Resumen de registros (total días + totales por labor)
+  getResumen: async (trabajadorId, quincenaId) => {
+    const response = await api.get('/registros-labor/resumen/', {
+      params: { trabajador: trabajadorId, quincena: quincenaId },
     });
     return response.data;
   },

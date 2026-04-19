@@ -502,13 +502,8 @@ class Contrato(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
-        # Generar número de contrato si es nuevo
         if not self.numero_contrato:
             self.numero_contrato = self._generar_numero_contrato()
-
-        # Ejecutar validaciones
-        self.clean()
-
         super().save(*args, **kwargs)
 
     def _generar_numero_contrato(self):

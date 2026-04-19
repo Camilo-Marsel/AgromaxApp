@@ -178,6 +178,8 @@ class DetalleNomina(models.Model):
         ('PENSION', 'Pensión'),
         ('PRESTAMO', 'Préstamo'),
         ('AJUSTE_MANUAL', 'Ajuste Manual'),
+        ('DEVENGO_ADICIONAL', 'Devengo Adicional'),
+        ('DEDUCCION_ADICIONAL', 'Deducción Adicional'),
     ]
 
     nomina = models.ForeignKey(

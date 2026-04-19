@@ -6,6 +6,14 @@ import toast from 'react-hot-toast';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // ============================================================================
+// TOKEN EN MEMORIA (nunca en localStorage — no accesible desde JS externo)
+// ============================================================================
+let _accessToken = null;
+
+export const setAccessToken = (token) => { _accessToken = token; };
+export const clearAccessToken = () => { _accessToken = null; };
+
+// ============================================================================
 // COLD START DETECTION (Para Render Free Tier)
 // ============================================================================
 let isFirstRequest = true;
@@ -46,28 +54,21 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true,
-  timeout: 60000, // 60 segundos para cold start
+  withCredentials: true, // necesario para enviar la cookie de refresh
+  timeout: 60000,
 });
 
 // ============================================================================
-// INTERCEPTOR REQUEST - Detectar Cold Start
+// INTERCEPTOR REQUEST
 // ============================================================================
 api.interceptors.request.use(
   (config) => {
-    // Agregar token
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (_accessToken) {
+      config.headers.Authorization = `Bearer ${_accessToken}`;
     }
 
-    // Detectar posible cold start solo en la primera request
     if (isFirstRequest) {
-      // Mostrar mensaje después de 2 segundos si no hay respuesta
-      coldStartTimer = setTimeout(() => {
-        showColdStartMessage();
-      }, 2000);
-      
+      coldStartTimer = setTimeout(showColdStartMessage, 2000);
       isFirstRequest = false;
     }
 
@@ -80,51 +81,54 @@ api.interceptors.request.use(
 );
 
 // ============================================================================
-// INTERCEPTOR RESPONSE - Limpiar mensajes y manejar errores
+// INTERCEPTOR RESPONSE — refresh silencioso cuando expira el access token
 // ============================================================================
+let _refreshPromise = null;
+
 api.interceptors.response.use(
   (response) => {
-    // Ocultar mensaje de cold start cuando llegue la primera respuesta
     hideColdStartMessage();
-    
     return response;
   },
   async (error) => {
-    // Ocultar mensaje de cold start en caso de error
     hideColdStartMessage();
 
     const originalRequest = error.config;
 
-    // Manejar timeout específicamente
-    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
       toast.error('El servidor tardó demasiado en responder. Por favor intenta de nuevo.', {
         duration: 5000,
       });
       return Promise.reject(error);
     }
 
-    // Si el token expiró, intentar refrescarlo
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
+      // Si ya hay un refresh en curso, esperar el mismo en vez de lanzar otro
+      if (!_refreshPromise) {
+        _refreshPromise = axios
+          .post(`${API_URL}/auth/refresh/`, {}, { withCredentials: true })
+          .then((res) => {
+            setAccessToken(res.data.access);
+            return res.data.access;
+          })
+          .catch((err) => {
+            clearAccessToken();
+            globalThis.location.href = '/login';
+            throw err;
+          })
+          .finally(() => {
+            _refreshPromise = null;
+          });
+      }
+
       try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        const response = await axios.post(`${API_URL}/auth/refresh/`, {
-          refresh: refreshToken,
-        });
-
-        const { access } = response.data;
-        localStorage.setItem('access_token', access);
-
-        // Reintentar request original con nuevo token
-        originalRequest.headers.Authorization = `Bearer ${access}`;
+        const newToken = await _refreshPromise;
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
-      } catch (refreshError) {
-        // Si falla el refresh, logout
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
+      } catch {
+        return Promise.reject(error);
       }
     }
 
@@ -140,22 +144,38 @@ export default api;
 
 export const authService = {
   login: async (username, password) => {
-    const response = await axios.post(`${API_URL}/auth/login/`, {
-      username,
-      password,
-    });
-    return response.data;
+    // La cookie de refresh la setea el backend automáticamente
+    const response = await axios.post(
+      `${API_URL}/auth/login/`,
+      { username, password },
+      { withCredentials: true }
+    );
+    return response.data; // solo contiene { access }
   },
 
-  logout: () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+  refreshToken: async () => {
+    // La cookie se envía automáticamente gracias a withCredentials
+    const response = await axios.post(
+      `${API_URL}/auth/refresh/`,
+      {},
+      { withCredentials: true }
+    );
+    return response.data.access;
+  },
+
+  logout: async () => {
+    clearAccessToken();
+    try {
+      await axios.post(`${API_URL}/auth/logout/`, {}, { withCredentials: true });
+    } catch {
+      // Si falla el logout en el servidor igual limpiamos el estado local
+    }
   },
 
   getCurrentUser: async () => {
     const response = await api.get('/auth/me/');
     return response.data;
-  }
+  },
 };
 
 // ============================================================================

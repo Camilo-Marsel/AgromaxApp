@@ -2,6 +2,7 @@
 
 from decimal import Decimal
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 from core.models import (
     Trabajador, Quincena, RegistroLabor, Nomina, DetalleNomina,
@@ -51,10 +52,39 @@ class NominaCalculator:
 
     def calcular_quincena_completa(self, usuario):
         """Calcular nómina para todos los trabajadores que pueden trabajar (no retirados)"""
-        # Excluir trabajadores retirados - tanto CONTRATADO como SIN_CONTRATO pueden trabajar
-        trabajadores = Trabajador.objects.exclude(estado=Trabajador.RETIRADO)
-        nominas_creadas = []
+        from collections import defaultdict
+        from django.db.models import Prefetch
 
+        trabajadores = list(
+            Trabajador.objects.exclude(estado=Trabajador.RETIRADO)
+            .select_related('tipo_contrato', 'finca')
+        )
+
+        # 1 sola query para todos los registros de la quincena
+        todos_registros = list(
+            RegistroLabor.objects.filter(quincena=self.quincena)
+            .select_related('labor', 'labor__unidad_medida')
+        )
+        self._registros_cache = defaultdict(list)
+        for reg in todos_registros:
+            self._registros_cache[reg.trabajador_id].append(reg)
+
+        # 1 sola query para todos los préstamos activos con sus cuotas
+        todos_prestamos = list(
+            Prestamo.objects.filter(estado='ACTIVO')
+            .prefetch_related(
+                Prefetch(
+                    'cuotas',
+                    queryset=CuotaPrestamo.objects.filter(estado='PENDIENTE').order_by('numero_cuota'),
+                    to_attr='cuotas_pendientes'
+                )
+            )
+        )
+        self._prestamos_cache = defaultdict(list)
+        for prestamo in todos_prestamos:
+            self._prestamos_cache[prestamo.trabajador_id].append(prestamo)
+
+        nominas_creadas = []
         for trabajador in trabajadores:
             nomina = self.calcular_trabajador(trabajador, usuario)
             if nomina:
@@ -91,12 +121,15 @@ class NominaCalculator:
         if trabajador.es_administrativo:
             return self._calcular_administrativo(nomina, trabajador)
         
-        # Obtener registros de labor del trabajador en esta quincena
-        registros = RegistroLabor.objects.filter(
-            trabajador=trabajador,
-            quincena=self.quincena
-        ).select_related('labor', 'labor__unidad_medida')
-        
+        # Obtener registros (desde caché si estamos en cálculo masivo)
+        if hasattr(self, '_registros_cache'):
+            registros = self._registros_cache[trabajador.id]
+        else:
+            registros = list(
+                RegistroLabor.objects.filter(trabajador=trabajador, quincena=self.quincena)
+                .select_related('labor', 'labor__unidad_medida')
+            )
+
         # Calcular devengos BASE (sin auxilio de transporte)
         base_deducible = Decimal('0.00')
 
@@ -119,7 +152,7 @@ class NominaCalculator:
         # 5. Auxilio de transporte
         auxilio_transporte = Decimal('0.00')
         if self._trabajador_recibe_auxilio(trabajador):
-            auxilio_transporte = self._calcular_auxilio_transporte(nomina)
+            auxilio_transporte = self._calcular_auxilio_transporte(nomina, registros)
         
         # 5. AJUSTES MANUALES - DEVENGOS ADICIONALES
         devengos_adicionales = nomina.devengos_adicionales or Decimal('0.00')
@@ -211,7 +244,7 @@ class NominaCalculator:
         total_incapacidad = Decimal('0.00')
 
         # Filtrar festivos porque se calculan en _calcular_festivos()
-        registros_labores = registros.exclude(labor__nombre='Festivo')
+        registros_labores = [r for r in registros if r.labor.nombre != 'Festivo']
 
         # Agrupar registros por labor
         labores_dict = {}
@@ -300,12 +333,15 @@ class NominaCalculator:
         base_deducible = salario_quincenal
 
         # 1b. Labores adicionales (si el administrativo tiene registros de labor)
-        registros = RegistroLabor.objects.filter(
-            trabajador=trabajador,
-            quincena=self.quincena
-        ).select_related('labor', 'labor__unidad_medida')
+        if hasattr(self, '_registros_cache'):
+            registros = self._registros_cache[trabajador.id]
+        else:
+            registros = list(
+                RegistroLabor.objects.filter(trabajador=trabajador, quincena=self.quincena)
+                .select_related('labor', 'labor__unidad_medida')
+            )
 
-        if registros.exists():
+        if registros:
             labores_normal, labores_incapacidad = self._calcular_labores(nomina, registros)
             base_deducible += labores_normal + labores_incapacidad
 
@@ -603,7 +639,7 @@ class NominaCalculator:
 
         return valor_total
 
-    def _calcular_auxilio_transporte(self, nomina):
+    def _calcular_auxilio_transporte(self, nomina, registros):
         """
         Calcular auxilio de transporte QUINCENAL proporcional a días LABORABLES trabajados.
         Base: $100,000 quincenal completo.
@@ -618,6 +654,8 @@ class NominaCalculator:
         - Permiso No Remunerado: NO pierde el auxilio del domingo (justa causa, Art. 173 CST)
         - Días sin ningún registro: No se cuentan como trabajados
         """
+        from collections import defaultdict
+
         auxilio_quincenal = self.variables.get(VariablesNomina.AUXILIO_TRANSPORTE, Decimal('0.00'))
 
         if auxilio_quincenal <= 0:
@@ -639,48 +677,28 @@ class NominaCalculator:
 
         dias_laborables = dias_totales_quincena - domingos_en_quincena - dias_festivos
 
-        # Obtener TODOS los registros del trabajador en esta quincena
-        registros = RegistroLabor.objects.filter(
-            trabajador=nomina.trabajador,
-            quincena=self.quincena
-        ).select_related('labor')
+        # Agrupar registros por fecha en memoria (evita N+1 dentro del loop)
+        registros_por_fecha = defaultdict(list)
+        for reg in registros:
+            registros_por_fecha[reg.fecha].append(reg)
 
-        # Obtener días únicos donde tiene CUALQUIER registro
-        dias_con_registro = set(registros.values_list('fecha', flat=True).distinct())
-
-        # Obtener días con Incapacidad Médica
-        dias_incapacidad = set(registros.filter(
-            labor__nombre='Incapacidad Médica'
-        ).values_list('fecha', flat=True).distinct())
-
-        # Obtener días con Ausencia No Justificada (pierde auxilio y domingo)
-        dias_ausencia_permiso = set(registros.filter(
-            labor__nombre='Ausencia No Justificada'
-        ).values_list('fecha', flat=True).distinct())
+        dias_con_registro = set(registros_por_fecha.keys())
+        dias_incapacidad = {r.fecha for r in registros if r.labor.nombre == 'Incapacidad Médica'}
+        dias_ausencia_permiso = {r.fecha for r in registros if r.labor.nombre == 'Ausencia No Justificada'}
 
         # Calcular días trabajados efectivos (puede ser fraccionario)
-        # Si un día solo tiene "Horas Trabajadas", cuenta como fracción (horas/8)
-        # Si tiene otras labores, cuenta como 1 día completo
         dias_trabajados = Decimal('0.00')
 
         for fecha in dias_con_registro:
-            registros_dia = registros.filter(fecha=fecha)
+            registros_dia = registros_por_fecha[fecha]
+            nombres = {r.labor.nombre for r in registros_dia}
+            solo_horas = 'Horas Trabajadas' in nombres and len(nombres) == 1
 
-            # Verificar si SOLO tiene "Horas Trabajadas" ese día
-            solo_horas = registros_dia.filter(labor__nombre='Horas Trabajadas').exists()
-            tiene_otras = registros_dia.exclude(labor__nombre='Horas Trabajadas').exists()
-
-            if solo_horas and not tiene_otras:
-                # Sumar todas las horas trabajadas ese día y dividir entre 8
-                total_horas = registros_dia.filter(
-                    labor__nombre='Horas Trabajadas'
-                ).aggregate(total=Sum('cantidad'))['total'] or Decimal('0')
-
-                # Contar como fracción del día (máximo 1 día)
+            if solo_horas:
+                total_horas = sum(r.cantidad for r in registros_dia if r.labor.nombre == 'Horas Trabajadas')
                 fraccion_dia = min(total_horas / 8, Decimal('1'))
                 dias_trabajados += fraccion_dia
             else:
-                # Día completo (tiene otras labores o no tiene horas trabajadas)
                 dias_trabajados += Decimal('1')
 
         # Redondear a 2 decimales para evitar problemas de precisión
@@ -797,17 +815,27 @@ class NominaCalculator:
         """
         total = Decimal('0.00')
         
-        # Obtener préstamos activos
-        prestamos = Prestamo.objects.filter(
-            trabajador=trabajador,
-            estado='ACTIVO'
-        )
-        
+        # Obtener préstamos activos (desde caché si estamos en cálculo masivo)
+        if hasattr(self, '_prestamos_cache'):
+            prestamos = self._prestamos_cache.get(trabajador.id, [])
+        else:
+            from django.db.models import Prefetch
+            prestamos = list(
+                Prestamo.objects.filter(trabajador=trabajador, estado='ACTIVO')
+                .prefetch_related(
+                    Prefetch(
+                        'cuotas',
+                        queryset=CuotaPrestamo.objects.filter(estado='PENDIENTE').order_by('numero_cuota'),
+                        to_attr='cuotas_pendientes'
+                    )
+                )
+            )
+
         for prestamo in prestamos:
             if prestamo.tipo_pago == 'UNICO':
                 # Descontar el total del préstamo (sin exceder devengado)
                 valor_descuento = min(prestamo.saldo_pendiente, total_devengado_actual - total)
-                
+
                 if valor_descuento > 0:
                     DetalleNomina.objects.create(
                         nomina=nomina,
@@ -816,21 +844,25 @@ class NominaCalculator:
                         descripcion=f'Adelanto #{prestamo.id} (Pago Único)',
                         valor_total=valor_descuento
                     )
-                    
+
                     # Actualizar préstamo
                     prestamo.saldo_pendiente -= valor_descuento
                     if prestamo.saldo_pendiente <= 0:
                         prestamo.estado = 'PAGADO'
                     prestamo.save()
-                    
+
                     total += valor_descuento
-                    
+
             else:  # CUOTAS
-                # Buscar siguiente cuota pendiente
-                cuota = CuotaPrestamo.objects.filter(
-                    prestamo=prestamo,
-                    estado='PENDIENTE'
-                ).order_by('numero_cuota').first()
+                # Buscar siguiente cuota pendiente (desde cuotas_pendientes pre-cargadas)
+                cuotas = getattr(prestamo, 'cuotas_pendientes', None)
+                if cuotas is not None:
+                    cuota = cuotas[0] if cuotas else None
+                else:
+                    cuota = CuotaPrestamo.objects.filter(
+                        prestamo=prestamo,
+                        estado='PENDIENTE'
+                    ).order_by('numero_cuota').first()
                 
                 if cuota:
                     # Validar que no exceda el devengado disponible
