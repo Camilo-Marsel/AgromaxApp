@@ -1,11 +1,10 @@
-// frontend/src/pages/Inventario/ProductoForm.jsx
+﻿// frontend/src/pages/Inventario/ProductoForm.jsx
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Package, Save } from 'lucide-react';
 import inventarioService from '../../services/inventarioService';
-import fincaService from '../../services/fincaService';
-import LoadingSpinner from '../../components/UI/LoadingSpinner';
+import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
 
 const CATEGORIAS = [
@@ -31,36 +30,27 @@ export default function ProductoForm() {
   const navigate = useNavigate();
   const esEdicion = Boolean(id);
 
-  const [fincas, setFincas]     = useState([]);
-  const [loading, setLoading]   = useState(esEdicion);
-  const [saving, setSaving]     = useState(false);
-  const [errors, setErrors]     = useState({});
+  const [loading, setLoading] = useState(esEdicion);
+  const [saving, setSaving]   = useState(false);
+  const [errors, setErrors]   = useState({});
 
   const [form, setForm] = useState({
-    nombre:        '',
-    descripcion:   '',
-    categoria:     'MATERIALES',
-    unidad:        'UNIDADES',
-    stock_minimo:  '0',
-    stock_inicial: '0',
-    finca:         '',
-    activo:        true,
+    nombre:      '',
+    descripcion: '',
+    categoria:   'MATERIALES',
+    unidad:      'UNIDADES',
+    activo:      true,
   });
 
   useEffect(() => {
-    fincaService.getAll().then(d => setFincas(d.results ?? d)).catch(() => {});
-
     if (esEdicion) {
       inventarioService.getProducto(id)
         .then(p => setForm({
-          nombre:       p.nombre,
-          descripcion:  p.descripcion ?? '',
-          categoria:    p.categoria,
-          unidad:       p.unidad,
-          stock_minimo: p.stock_minimo,
-          stock_inicial: p.stock_actual,
-          finca:        p.finca ?? '',
-          activo:       p.activo,
+          nombre:      p.nombre,
+          descripcion: p.descripcion ?? '',
+          categoria:   p.categoria,
+          unidad:      p.unidad,
+          activo:      p.activo,
         }))
         .catch(() => { toast.error('Error cargando producto'); navigate('/inventario'); })
         .finally(() => setLoading(false));
@@ -70,14 +60,12 @@ export default function ProductoForm() {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm(f => ({ ...f, [name]: type === 'checkbox' ? checked : value }));
-    if (errors[name]) setErrors(e => ({ ...e, [name]: null }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: null }));
   };
 
   const validate = () => {
     const err = {};
-    if (!form.nombre.trim())            err.nombre = 'El nombre es requerido.';
-    if (Number(form.stock_minimo) < 0)  err.stock_minimo = 'No puede ser negativo.';
-    if (!esEdicion && Number(form.stock_inicial) < 0) err.stock_inicial = 'No puede ser negativo.';
+    if (!form.nombre.trim()) err.nombre = 'El nombre es requerido.';
     setErrors(err);
     return Object.keys(err).length === 0;
   };
@@ -88,26 +76,22 @@ export default function ProductoForm() {
     setSaving(true);
     try {
       const payload = {
-        nombre:       form.nombre.trim(),
-        descripcion:  form.descripcion.trim(),
-        categoria:    form.categoria,
-        unidad:       form.unidad,
-        stock_minimo: form.stock_minimo,
-        finca:        form.finca || null,
-        activo:       form.activo,
+        nombre:      form.nombre.trim(),
+        descripcion: form.descripcion.trim(),
+        categoria:   form.categoria,
+        unidad:      form.unidad,
+        activo:      form.activo,
       };
-      if (!esEdicion) payload.stock_inicial = form.stock_inicial;
 
       if (esEdicion) {
         await inventarioService.updateProducto(id, payload);
         toast.success('Producto actualizado');
+        navigate(`/inventario/productos/${id}`);
       } else {
         const nuevo = await inventarioService.createProducto(payload);
-        toast.success('Producto creado');
+        toast.success('Producto creado. Ahora puedes agregar stock por finca.');
         navigate(`/inventario/productos/${nuevo.id}`);
-        return;
       }
-      navigate(`/inventario/productos/${id}`);
     } catch (err) {
       const data = err.response?.data;
       if (data && typeof data === 'object') {
@@ -125,7 +109,6 @@ export default function ProductoForm() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-700">
           <ArrowLeft className="w-5 h-5" />
@@ -138,9 +121,14 @@ export default function ProductoForm() {
         </div>
       </div>
 
+      {!esEdicion && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700">
+          Crea el producto en el catálogo primero. Luego podrás asignarle stock por finca desde el detalle.
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
 
-        {/* Nombre */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Nombre <span className="text-red-500">*</span>
@@ -155,7 +143,6 @@ export default function ProductoForm() {
           {errors.nombre && <p className="text-xs text-red-500 mt-1">{errors.nombre}</p>}
         </div>
 
-        {/* Descripción */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
           <textarea
@@ -168,7 +155,6 @@ export default function ProductoForm() {
           />
         </div>
 
-        {/* Categoría + Unidad */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
@@ -194,55 +180,6 @@ export default function ProductoForm() {
           </div>
         </div>
 
-        {/* Stock mínimo + Stock inicial */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Stock mínimo</label>
-            <input
-              type="number"
-              name="stock_minimo"
-              min="0"
-              step="0.01"
-              value={form.stock_minimo}
-              onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${errors.stock_minimo ? 'border-red-400' : 'border-gray-300'}`}
-            />
-            <p className="text-xs text-gray-400 mt-1">Alerta cuando el stock baje de este valor.</p>
-            {errors.stock_minimo && <p className="text-xs text-red-500">{errors.stock_minimo}</p>}
-          </div>
-          {!esEdicion && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Stock inicial</label>
-              <input
-                type="number"
-                name="stock_inicial"
-                min="0"
-                step="0.01"
-                value={form.stock_inicial}
-                onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${errors.stock_inicial ? 'border-red-400' : 'border-gray-300'}`}
-              />
-              <p className="text-xs text-gray-400 mt-1">Cantidad disponible al crear el producto.</p>
-              {errors.stock_inicial && <p className="text-xs text-red-500">{errors.stock_inicial}</p>}
-            </div>
-          )}
-        </div>
-
-        {/* Finca */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Finca</label>
-          <select
-            name="finca"
-            value={form.finca}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <option value="">Sin finca específica (global)</option>
-            {fincas.map(f => <option key={f.id} value={f.id}>{f.nombre}</option>)}
-          </select>
-        </div>
-
-        {/* Activo */}
         {esEdicion && (
           <label className="flex items-center gap-3 cursor-pointer">
             <input
@@ -256,7 +193,6 @@ export default function ProductoForm() {
           </label>
         )}
 
-        {/* Botones */}
         <div className="flex gap-3 pt-2">
           <button
             type="submit"
