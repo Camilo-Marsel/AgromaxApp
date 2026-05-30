@@ -1,22 +1,17 @@
-#!/usr/bin/env bash
-# backend/build.sh
+#!/bin/bash
+set -e
 
-set -o errexit
+echo "=== Limpiando bytecode cacheado ==="
+find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+find . -name "*.pyc" -delete 2>/dev/null || true
 
+echo "=== Instalando dependencias ==="
 pip install -r requirements.txt
 
+echo "=== Colectando archivos estaticos ==="
 python manage.py collectstatic --no-input
 
-echo "================================================"
-echo "Running migrations..."
-echo "================================================"
-
+echo "=== Ejecutando migraciones ==="
 python manage.py migrate
 
-echo "================================================"
-echo "Final migration status:"
-echo "================================================"
-python manage.py showmigrations core
-
-# Crear superusuario automáticamente
-python create_superuser.py
+echo "=== Build completo ==="
