@@ -83,42 +83,33 @@ export default function MultipleDatePicker({
         // Labor normal en domingo → deshabilitar
         disabled = true;
         mensajeTooltip = 'Domingo - No disponible para esta labor';
-      } else if (isFestivo) {
-        disabled = true;
-        mensajeTooltip = 'Festivo en Colombia - No se registran labores';
-      } else if (!isDomingo && tieneRegistro) {
+      } else if (tieneRegistro) {
         // Clasificar labores existentes
         const laboresNormalesExistentes = laboresEnFecha.filter(l => !LABORES_ADICIONALES.includes(l));
         const laboresAdicionalesExistentes = laboresEnFecha.filter(l => LABORES_ADICIONALES.includes(l));
 
         // Si la labor actual es adicional
         if (LABORES_ADICIONALES.includes(laborActualNombre)) {
-          // Verificar que no esté duplicada
           if (laboresEnFecha.includes(laborActualNombre)) {
             disabled = true;
             mensajeTooltip = `Ya tiene ${laborActualNombre} registrado.`;
           } else {
-            // Puede agregarse
             disabled = false;
-            mensajeTooltip = laboresEnFecha.length > 0
-              ? `Tiene: ${laboresEnFecha.join(', ')}. Puede agregar ${laborActualNombre}.`
-              : dateStr;
+            mensajeTooltip = `${isFestivo ? 'Festivo. ' : ''}Tiene: ${laboresEnFecha.join(', ')}. Puede agregar ${laborActualNombre}.`;
           }
         } else {
-          // Es una labor normal, verificar que no haya otra labor normal
           if (laboresNormalesExistentes.length > 0) {
             disabled = true;
-            mensajeTooltip = `Ya tiene: ${laboresNormalesExistentes[0]}. Solo puede agregar labores adicionales (Control, Resiembra, Siembra Nueva, Amarre, Amarre 3 pitas).`;
+            mensajeTooltip = `Ya tiene: ${laboresNormalesExistentes[0]}. Solo puede agregar labores adicionales.`;
           } else {
-            // No hay labores normales, puede agregarse
             disabled = false;
             mensajeTooltip = laboresAdicionalesExistentes.length > 0
-              ? `Tiene: ${laboresAdicionalesExistentes.join(', ')}. Puede agregar esta labor.`
-              : dateStr;
+              ? `${isFestivo ? 'Festivo. ' : ''}Tiene: ${laboresAdicionalesExistentes.join(', ')}. Puede agregar esta labor.`
+              : (isFestivo ? 'Festivo - puede registrar labor' : dateStr);
           }
         }
       } else {
-        mensajeTooltip = dateStr;
+        mensajeTooltip = isFestivo ? 'Festivo - puede registrar labor' : dateStr;
       }
 
       dias.push({
@@ -208,18 +199,25 @@ export default function MultipleDatePicker({
               p-2 rounded-md text-xs font-medium border transition-colors
               ${dia.isDomingo && dia.disabled ? 'bg-red-50 text-red-400 cursor-not-allowed border-red-200' : ''}
               ${dia.isDomingo && !dia.disabled ? 'bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100' : ''}
-              ${dia.tieneRegistro && dia.disabled ? 'bg-orange-50 text-orange-400 cursor-not-allowed border-orange-200' : ''}
-              ${dia.tieneRegistro && !dia.disabled ? 'bg-yellow-50 text-yellow-700 border-yellow-300' : ''}
+              ${dia.tieneRegistro && dia.disabled && !dia.isDomingo ? 'bg-orange-50 text-orange-400 cursor-not-allowed border-orange-200' : ''}
+              ${dia.tieneRegistro && !dia.disabled && !dia.isFestivo && !dia.isDomingo ? 'bg-yellow-50 text-yellow-700 border-yellow-300' : ''}
+              ${dia.isFestivo && !dia.disabled && !selectedDates.includes(dia.fecha) ? 'bg-violet-100 text-violet-700 border-violet-300 hover:bg-violet-200' : ''}
               ${selectedDates.includes(dia.fecha) ? 'bg-blue-600 text-white border-blue-600' : ''}
-              ${!dia.disabled && !dia.tieneRegistro && !selectedDates.includes(dia.fecha) ? 'bg-white hover:bg-blue-50 border-gray-300' : ''}
+              ${!dia.disabled && !dia.tieneRegistro && !dia.isFestivo && !dia.isDomingo && !selectedDates.includes(dia.fecha) ? 'bg-white hover:bg-blue-50 border-gray-300' : ''}
             `}
             title={dia.tooltip}
           >
             <div className="text-center">
               <div className="text-[10px] uppercase">{dia.diaSemana}</div>
               <div className="font-bold">{dia.dia}</div>
-              {dia.tieneRegistro && !dia.disabled && (
+              {dia.isFestivo && !dia.isDomingo && (
+                <div className="text-[8px]">★</div>
+              )}
+              {dia.tieneRegistro && !dia.disabled && !dia.isFestivo && (
                 <div className="text-[8px]">✓</div>
+              )}
+              {dia.tieneRegistro && !dia.disabled && dia.isFestivo && (
+                <div className="text-[8px]">★✓</div>
               )}
             </div>
           </button>
