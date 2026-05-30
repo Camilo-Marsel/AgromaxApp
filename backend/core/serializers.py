@@ -1,7 +1,6 @@
 # backend/core/serializers.py
 
 from rest_framework import serializers
-from core.utils import is_colombian_holiday
 from django.contrib.auth import authenticate
 from django.core.exceptions import ValidationError
 from .models import (
@@ -15,7 +14,7 @@ from .models import (
     PORCENTAJE_ARL, PORCENTAJE_CAJA_COMPENSACION,
     PORCENTAJE_CESANTIAS, PORCENTAJE_INTERESES_CESANTIAS,
     PORCENTAJE_PRIMA, PORCENTAJE_VACACIONES,
-    Producto, MovimientoInventario,
+    Producto, StockFinca, MovimientoInventario,
 )
 from decimal import Decimal
 from datetime import date
@@ -557,11 +556,6 @@ class RegistroLaborCreateUpdateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "La labor 'Domingo extra' solo puede registrarse en días domingo."
                 )
-        elif fecha and is_colombian_holiday(fecha):
-            raise serializers.ValidationError(
-                "No se pueden registrar labores en festivos de Colombia."
-            )
-
         # Validar que la quincena permita registro
         if not quincena.puede_registrar:
             raise serializers.ValidationError(
@@ -1200,51 +1194,100 @@ class PorcentajesObligacionesSerializer(serializers.Serializer):
     total_prestaciones = serializers.DecimalField(max_digits=5, decimal_places=4)
 
 
+
 # ============================================================================
 # INVENTARIO
 # ============================================================================
 
-class ProductoListSerializer(serializers.ModelSerializer):
+class ProductoSerializer(serializers.ModelSerializer):
     categoria_display = serializers.CharField(source='get_categoria_display', read_only=True)
     unidad_display    = serializers.CharField(source='get_unidad_display', read_only=True)
-    finca_nombre      = serializers.CharField(source='finca.nombre', read_only=True, default=None)
-    stock_bajo        = serializers.BooleanField(read_only=True)
+    total_fincas      = serializers.SerializerMethodField()
 
     class Meta:
         model  = Producto
         fields = [
             'id', 'nombre', 'descripcion', 'categoria', 'categoria_display',
-            'unidad', 'unidad_display', 'stock_actual', 'stock_minimo',
-            'stock_bajo', 'finca', 'finca_nombre', 'activo', 'created_at',
+            'unidad', 'unidad_display', 'activo', 'total_fincas', 'created_at',
         ]
+
+    def get_total_fincas(self, obj):
+        return obj.stocks.filter(activo=True).count()
 
 
 class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Producto
+        fields = ['id', 'nombre', 'descripcion', 'categoria', 'unidad', 'activo']
+
+
+class StockFincaSerializer(serializers.ModelSerializer):
+    producto_nombre   = serializers.CharField(source='producto.nombre', read_only=True)
+    producto_unidad   = serializers.CharField(source='producto.unidad', read_only=True)
+    unidad_display    = serializers.CharField(source='producto.get_unidad_display', read_only=True)
+    categoria         = serializers.CharField(source='producto.categoria', read_only=True)
+    categoria_display = serializers.CharField(source='producto.get_categoria_display', read_only=True)
+    finca_nombre      = serializers.SerializerMethodField()
+    stock_bajo        = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model  = StockFinca
         fields = [
-            'id', 'nombre', 'descripcion', 'categoria', 'unidad',
-            'stock_minimo', 'finca', 'activo',
+            'id', 'producto', 'producto_nombre', 'producto_unidad', 'unidad_display',
+            'categoria', 'categoria_display',
+            'finca', 'finca_nombre',
+            'stock_actual', 'stock_minimo', 'stock_bajo',
+            'activo', 'created_at', 'updated_at',
         ]
 
-    def validate_stock_minimo(self, value):
-        if value < 0:
-            raise serializers.ValidationError('El stock mínimo no puede ser negativo.')
-        return value
+    def get_finca_nombre(self, obj):
+        return obj.finca.nombre if obj.finca else 'Bodega Central'
+
+
+class StockFincaCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = StockFinca
+        fields = ['producto', 'finca', 'stock_minimo', 'stock_inicial']
+
+    stock_inicial = serializers.DecimalField(
+        max_digits=12, decimal_places=2, required=False, default=0,
+        min_value=0, write_only=True,
+    )
+
+    def validate(self, data):
+        producto = data.get('producto')
+        finca    = data.get('finca')
+        qs = StockFinca.objects.filter(producto=producto, finca=finca)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            ubicacion = finca.nombre if finca else 'Bodega Central'
+            raise serializers.ValidationError(
+                f'Ya existe un stock de "{producto.nombre}" en {ubicacion}.'
+            )
+        return data
+
+    def create(self, validated_data):
+        stock_inicial = validated_data.pop('stock_inicial', 0)
+        instance = super().create(validated_data)
+        instance.stock_actual = stock_inicial
+        instance.save(update_fields=['stock_actual'])
+        return instance
 
 
 class MovimientoInventarioSerializer(serializers.ModelSerializer):
-    tipo_display        = serializers.CharField(source='get_tipo_display', read_only=True)
-    producto_nombre     = serializers.CharField(source='producto.nombre', read_only=True)
-    producto_unidad     = serializers.CharField(source='producto.unidad', read_only=True)
-    creado_por          = serializers.CharField(
+    tipo_display      = serializers.CharField(source='get_tipo_display', read_only=True)
+    producto_nombre   = serializers.CharField(source='stock_finca.producto.nombre', read_only=True)
+    producto_unidad   = serializers.CharField(source='stock_finca.producto.unidad', read_only=True)
+    finca_nombre      = serializers.SerializerMethodField()
+    creado_por        = serializers.CharField(
         source='created_by.get_full_name', read_only=True, default=None,
     )
 
     class Meta:
         model  = MovimientoInventario
         fields = [
-            'id', 'producto', 'producto_nombre', 'producto_unidad',
+            'id', 'stock_finca', 'producto_nombre', 'producto_unidad', 'finca_nombre',
             'tipo', 'tipo_display', 'cantidad',
             'stock_antes', 'stock_despues',
             'fecha', 'observaciones',
@@ -1253,25 +1296,23 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['stock_antes', 'stock_despues', 'created_at']
 
+    def get_finca_nombre(self, obj):
+        return obj.stock_finca.finca.nombre if obj.stock_finca.finca else 'Bodega Central'
 
-class MovimientoInventarioCreateSerializer(serializers.ModelSerializer):
+
+class MovimientoCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = MovimientoInventario
-        fields = ['producto', 'tipo', 'cantidad', 'fecha', 'observaciones']
-
-    def validate_cantidad(self, value):
-        if value <= 0:
-            raise serializers.ValidationError('La cantidad debe ser mayor que cero.')
-        return value
+        fields = ['stock_finca', 'tipo', 'cantidad', 'fecha', 'observaciones']
 
     def validate(self, data):
         if data.get('tipo') == 'SALIDA':
-            producto = data.get('producto')
-            if producto and data['cantidad'] > producto.stock_actual:
+            sf = data.get('stock_finca')
+            if sf and data['cantidad'] > sf.stock_actual:
                 raise serializers.ValidationError({
                     'cantidad': (
-                        f'Stock insuficiente. Disponible: {producto.stock_actual} '
-                        f'{producto.get_unidad_display()}.'
+                        f'Stock insuficiente. Disponible: {sf.stock_actual} '
+                        f'{sf.producto.get_unidad_display()}.'
                     )
                 })
         return data

@@ -21,8 +21,6 @@ from ..filters import NominaFilter, RegistroLaborFilter
 from ..services.nomina_calculator import NominaCalculator
 from ..services.pdf_generator import generar_comprobante_pdf
 from ..services.excel_generator import ExcelGenerator
-from core.utils import is_colombian_holiday
-
 IsSuperAdmin = IsAdministrador
 
 
@@ -334,10 +332,6 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
 
             if fecha.weekday() == 6:
                 errores.append(f"{fecha_str}: No se puede registrar en domingo")
-                continue
-
-            if is_colombian_holiday(fecha):
-                errores.append(f"{fecha_str}: No se puede registrar en festivo")
                 continue
 
             if RegistroLabor.objects.filter(
