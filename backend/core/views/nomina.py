@@ -1,4 +1,4 @@
-# backend/core/views/nomina.py
+# backend/core/views/nomina.py - redeploy 2026-05-30
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
