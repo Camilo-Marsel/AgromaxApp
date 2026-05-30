@@ -35,6 +35,7 @@ router.register(r'prestaciones', PrestacionesViewSet, basename='prestaciones')
 
 # Inventario
 router.register(r'inventario/productos', ProductoViewSet, basename='producto')
+router.register(r'inventario/stocks', StockFincaViewSet, basename='stock-finca')
 router.register(r'inventario/movimientos', MovimientoInventarioViewSet, basename='movimiento-inventario')
 
 @api_view(['GET'])
