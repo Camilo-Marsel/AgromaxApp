@@ -11,6 +11,7 @@ from .loans import Prestamo, CuotaPrestamo
 from .audit import AuditoriaLog
 from .config import ConfiguracionEmpresa
 from .inventario import Producto, StockFinca, MovimientoInventario
+from .produccion import MataCaida, Embarque
 from .obligations import (
     PILA, DetallePILA, ProvisionPrestaciones, ResumenPrestaciones,
     PORCENTAJE_SALUD_EMPLEADOR, PORCENTAJE_PENSION_EMPLEADOR,
@@ -61,6 +62,10 @@ __all__ = [
     'Producto',
     'StockFinca',
     'MovimientoInventario',
+
+    # Produccion models
+    'MataCaida',
+    'Embarque',
 
     # Obligations models (PILA and Prestaciones)
     'PILA',

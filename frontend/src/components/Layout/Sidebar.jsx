@@ -1,7 +1,7 @@
 // frontend/src/components/Layout/Sidebar.jsx
 
 import { NavLink } from 'react-router-dom';
-import { Home, Users, Briefcase, DollarSign, FileText, Settings, MapPin, FileCheck, UserCog, Shield, ClipboardList, Package, Warehouse, Layers } from 'lucide-react';
+import { Home, Users, Briefcase, DollarSign, FileText, Settings, MapPin, FileCheck, UserCog, Shield, ClipboardList, Package, Warehouse, Layers, Leaf, Ship } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function Sidebar() {
@@ -18,6 +18,8 @@ export default function Sidebar() {
     { path: '/inventario', icon: Package, label: 'Inventario' },
     { path: '/inventario/bodegas', icon: Warehouse, label: 'Bodegas' },
     { path: '/labores/insumos', icon: Layers, label: 'Labor → Insumo', adminOnly: true },
+    { path: '/produccion/matas-caidas', icon: Leaf, label: 'Matas Caídas' },
+    { path: '/produccion/embarques', icon: Ship, label: 'Embarques' },
     { path: '/nomina', icon: DollarSign, label: 'Nómina' },
     { path: '/reportes', icon: FileText, label: 'Reportes' },
     { path: '/prestamos', icon: DollarSign, label: 'Adelantos' },

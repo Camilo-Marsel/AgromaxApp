@@ -39,6 +39,8 @@ import ProductoDetail from './pages/Inventario/ProductoDetail';
 import ProductoForm from './pages/Inventario/ProductoForm';
 import BodegasList from './pages/Inventario/BodegasList';
 import LaborInsumos from './pages/Labores/LaborInsumos';
+import MatasCaidasList from './pages/Produccion/MatasCaidasList';
+import EmbarquesList from './pages/Produccion/EmbarquesList';
 
 // Obligaciones Laborales
 import PILAList from './pages/ObligacionesLaborales/PILA/PILAList';
@@ -354,6 +356,16 @@ function App() {
           <Route
             path="/inventario/bodegas"
             element={<ProtectedRoute><MainLayout><BodegasList /></MainLayout></ProtectedRoute>}
+          />
+
+          {/* Producción */}
+          <Route
+            path="/produccion/matas-caidas"
+            element={<ProtectedRoute modifyOnly><MainLayout><MatasCaidasList /></MainLayout></ProtectedRoute>}
+          />
+          <Route
+            path="/produccion/embarques"
+            element={<ProtectedRoute modifyOnly><MainLayout><EmbarquesList /></MainLayout></ProtectedRoute>}
           />
           <Route
             path="/inventario/productos/nuevo"

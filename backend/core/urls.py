@@ -36,6 +36,9 @@ router.register(r'prestaciones', PrestacionesViewSet, basename='prestaciones')
 
 # Inventario
 router.register(r'inventario/bodegas', BodegaViewSet, basename='bodega')
+# Producción
+router.register(r'produccion/matas-caidas', MataCaidaViewSet, basename='mata-caida')
+router.register(r'produccion/embarques', EmbarqueViewSet, basename='embarque')
 router.register(r'inventario/productos', ProductoViewSet, basename='producto')
 router.register(r'inventario/stocks', StockFincaViewSet, basename='stock-finca')
 router.register(r'inventario/movimientos', MovimientoInventarioViewSet, basename='movimiento-inventario')

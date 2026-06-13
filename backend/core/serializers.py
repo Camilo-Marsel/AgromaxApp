@@ -16,6 +16,7 @@ from .models import (
     PORCENTAJE_PRIMA, PORCENTAJE_VACACIONES,
     Producto, StockFinca, MovimientoInventario,
     Bodega, LaborInsumo,
+    MataCaida, Embarque,
 )
 from decimal import Decimal
 from datetime import date
@@ -1373,3 +1374,78 @@ class MovimientoCreateSerializer(serializers.ModelSerializer):
                     )
                 })
         return data
+
+
+# ============================================================================
+# PRODUCCIÓN — MataCaida y Embarque
+# ============================================================================
+
+class MataCaidaSerializer(serializers.ModelSerializer):
+    lote_nombre = serializers.CharField(source='lote.nombre', read_only=True)
+    color_cinta_display = serializers.CharField(source='get_color_cinta_display', read_only=True)
+    created_by_nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MataCaida
+        fields = [
+            'id', 'lote', 'lote_nombre', 'color_cinta', 'color_cinta_display',
+            'semana_año', 'cantidad_caidas', 'fecha_reporte', 'observaciones',
+            'created_at', 'created_by', 'created_by_nombre',
+        ]
+        read_only_fields = ['created_at', 'created_by']
+
+    def get_created_by_nombre(self, obj):
+        return obj.created_by.get_full_name() if obj.created_by else None
+
+
+class MataCaidaCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MataCaida
+        fields = ['lote', 'color_cinta', 'semana_año', 'cantidad_caidas', 'fecha_reporte', 'observaciones']
+
+    def validate_semana_año(self, value):
+        import re
+        if not re.match(r'^\d{4}-\d{2}$', value):
+            raise serializers.ValidationError('Formato requerido: YYYY-WW (ej: 2026-23)')
+        return value
+
+
+class EmbarqueSerializer(serializers.ModelSerializer):
+    lote_nombre = serializers.CharField(source='lote.nombre', read_only=True)
+    color_cinta_display = serializers.CharField(source='get_color_cinta_display', read_only=True)
+    total_cintas = serializers.ReadOnlyField()
+    cajas_netas = serializers.ReadOnlyField()
+    ratio = serializers.ReadOnlyField()
+    created_by_nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Embarque
+        fields = [
+            'id', 'lote', 'lote_nombre', 'fecha_embarque', 'semana_año',
+            'color_cinta', 'color_cinta_display',
+            'cintas_semana_actual', 'cintas_semana_anterior', 'cintas_semana_siguiente',
+            'total_cintas',
+            'cajas_empacadas', 'cajas_rechazadas', 'cajas_netas',
+            'ratio', 'observaciones',
+            'created_at', 'created_by', 'created_by_nombre',
+        ]
+        read_only_fields = ['created_at', 'created_by']
+
+    def get_created_by_nombre(self, obj):
+        return obj.created_by.get_full_name() if obj.created_by else None
+
+
+class EmbarqueCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Embarque
+        fields = [
+            'lote', 'fecha_embarque', 'semana_año', 'color_cinta',
+            'cintas_semana_actual', 'cintas_semana_anterior', 'cintas_semana_siguiente',
+            'cajas_empacadas', 'cajas_rechazadas', 'observaciones',
+        ]
+
+    def validate_semana_año(self, value):
+        import re
+        if not re.match(r'^\d{4}-\d{2}$', value):
+            raise serializers.ValidationError('Formato requerido: YYYY-WW (ej: 2026-23)')
+        return value
