@@ -8,20 +8,36 @@ from rest_framework.response import Response
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 
-from ..models import Producto, StockFinca, MovimientoInventario
+from ..models import Bodega, Producto, StockFinca, MovimientoInventario
 from ..serializers import (
+    BodegaSerializer, BodegaCreateUpdateSerializer,
     ProductoSerializer, ProductoCreateUpdateSerializer,
     StockFincaSerializer, StockFincaCreateSerializer,
     MovimientoInventarioSerializer, MovimientoCreateSerializer,
 )
-from ..permissions import CanModifyData, FincaFilterMixin
+from ..permissions import CanModifyData
 
 logger = logging.getLogger(__name__)
 
 
+class BodegaViewSet(viewsets.ModelViewSet):
+    """CRUD de bodegas. Una bodega puede estar asociada a una o más fincas."""
+    queryset = Bodega.objects.prefetch_related('fincas').all()
+    permission_classes = [CanModifyData]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['nombre']
+    filterset_fields = ['activa']
+    ordering = ['nombre']
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return BodegaCreateUpdateSerializer
+        return BodegaSerializer
+
+
 class ProductoViewSet(viewsets.ModelViewSet):
     """Catálogo global de productos. Sin lógica de stock."""
-    queryset = Producto.objects.prefetch_related('stocks__finca').all()
+    queryset = Producto.objects.prefetch_related('stocks__bodega').all()
     permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['nombre', 'descripcion']
@@ -38,28 +54,24 @@ class ProductoViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def stocks(self, request, pk=None):
-        """Todos los stocks de este producto (una entrada por finca)."""
+        """Todos los stocks de este producto (una entrada por bodega)."""
         producto = self.get_object()
         qs = StockFinca.objects.filter(
             producto=producto, activo=True,
-        ).select_related('finca')
+        ).select_related('bodega')
         serializer = StockFincaSerializer(qs, many=True)
         return Response(serializer.data)
 
 
-class StockFincaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
-    """
-    Stock de un producto en una finca específica (o bodega central).
-    Cada (producto, finca) es único.
-    """
+class StockFincaViewSet(viewsets.ModelViewSet):
+    """Stock de un producto en una bodega. Cada (producto, bodega) es único."""
     queryset = StockFinca.objects.select_related(
-        'producto', 'finca', 'created_by',
+        'producto', 'bodega', 'created_by',
     ).all()
     permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['producto', 'finca', 'activo']
+    filterset_fields = ['producto', 'bodega', 'activo']
     ordering = ['producto__categoria', 'producto__nombre']
-    finca_field = 'finca'
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -72,11 +84,10 @@ class StockFincaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def stock_bajo(self, request):
         """Entradas con stock_actual <= stock_minimo."""
-        finca_id = request.query_params.get('finca')
+        bodega_id = request.query_params.get('bodega')
         qs = self.get_queryset().filter(activo=True, stock_minimo__gt=0)
-        if finca_id:
-            qs = qs.filter(finca_id=finca_id)
-        # Filtramos en Python para no depender de expresiones F() con decimals
+        if bodega_id:
+            qs = qs.filter(bodega_id=bodega_id)
         bajos = [s for s in qs if s.stock_bajo]
         serializer = StockFincaSerializer(bajos, many=True)
         return Response({'count': len(bajos), 'results': serializer.data})
@@ -84,10 +95,10 @@ class StockFincaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def resumen(self, request):
         """Totales para el dashboard."""
-        finca_id = request.query_params.get('finca')
+        bodega_id = request.query_params.get('bodega')
         qs = self.get_queryset().filter(activo=True)
-        if finca_id:
-            qs = qs.filter(finca_id=finca_id)
+        if bodega_id:
+            qs = qs.filter(bodega_id=bodega_id)
 
         stocks = list(qs)
         bajo_stock = sum(1 for s in stocks if s.stock_bajo)
@@ -107,11 +118,12 @@ class StockFincaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
 class MovimientoInventarioViewSet(viewsets.ModelViewSet):
     """Entradas, salidas y ajustes de inventario por stock_finca."""
     queryset = MovimientoInventario.objects.select_related(
-        'stock_finca__producto', 'stock_finca__finca', 'created_by',
+        'stock_finca__producto', 'stock_finca__bodega',
+        'lote', 'trabajador', 'created_by',
     ).all()
     permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['stock_finca', 'tipo']
+    filterset_fields = ['stock_finca', 'tipo', 'lote', 'trabajador']
     ordering = ['-fecha', '-created_at']
     http_method_names = ['get', 'post', 'head', 'options']
 

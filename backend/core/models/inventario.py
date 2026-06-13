@@ -47,17 +47,13 @@ class Producto(models.Model):
 
 
 class StockFinca(models.Model):
-    """
-    Stock de un producto en una finca (o en bodega central si finca=None).
-    Unique: (producto, finca) — aplicado a nivel de código para manejar el null.
-    """
+    """Stock de un producto en una bodega. Unique: (producto, bodega)."""
     producto     = models.ForeignKey(
         Producto, on_delete=models.PROTECT, related_name='stocks',
     )
-    # finca=None → bodega central compartida por todas las fincas
-    finca        = models.ForeignKey(
-        'Finca', on_delete=models.PROTECT,
-        related_name='stocks_inventario', null=True, blank=True,
+    bodega       = models.ForeignKey(
+        'Bodega', on_delete=models.PROTECT,
+        related_name='stocks', null=True, blank=True,
     )
     stock_actual = models.DecimalField(
         max_digits=12, decimal_places=2, default=Decimal('0.00'),
@@ -76,12 +72,12 @@ class StockFinca(models.Model):
     updated_at   = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['producto__categoria', 'producto__nombre', 'finca__nombre']
-        verbose_name = 'Stock por Finca'
-        verbose_name_plural = 'Stocks por Finca'
+        ordering = ['producto__categoria', 'producto__nombre', 'bodega__nombre']
+        verbose_name = 'Stock por Bodega'
+        verbose_name_plural = 'Stocks por Bodega'
 
     def __str__(self):
-        ubicacion = self.finca.nombre if self.finca else 'Bodega Central'
+        ubicacion = self.bodega.nombre if self.bodega else '—'
         return f'{self.producto.nombre} — {ubicacion}'
 
     @property
@@ -89,8 +85,8 @@ class StockFinca(models.Model):
         return self.stock_minimo > 0 and self.stock_actual <= self.stock_minimo
 
     @property
-    def finca_nombre(self):
-        return self.finca.nombre if self.finca else 'Bodega Central'
+    def bodega_nombre(self):
+        return self.bodega.nombre if self.bodega else '—'
 
 
 class MovimientoInventario(models.Model):
@@ -111,6 +107,15 @@ class MovimientoInventario(models.Model):
     stock_antes    = models.DecimalField(max_digits=12, decimal_places=2)
     stock_despues  = models.DecimalField(max_digits=12, decimal_places=2)
     fecha          = models.DateField()
+    fecha_consumo  = models.DateField(null=True, blank=True)
+    lote           = models.ForeignKey(
+        'Lote', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='movimientos_inventario',
+    )
+    trabajador     = models.ForeignKey(
+        'Trabajador', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='movimientos_inventario',
+    )
     observaciones  = models.TextField(blank=True)
     # Reservado para Fase 2: vincular con quincena al calcular consumo
     referencia_tipo = models.CharField(max_length=30, blank=True)

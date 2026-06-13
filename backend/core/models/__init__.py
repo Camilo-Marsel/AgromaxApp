@@ -4,7 +4,7 @@
 # This ensures zero breaking changes - all existing code will continue to work
 
 from .hr import Rol, Usuario, TipoContrato, Trabajador, Contrato, DocumentoContrato
-from .farm import Finca, Lote
+from .farm import Bodega, Finca, Lote
 from .labor import UnidadMedida, Labor, ListaPrecios, Quincena, RegistroLabor
 from .payroll import VariablesNomina, Nomina, DetalleNomina
 from .loans import Prestamo, CuotaPrestamo
@@ -30,6 +30,7 @@ __all__ = [
     'DocumentoContrato',
 
     # Farm models
+    'Bodega',
     'Finca',
     'Lote',
 

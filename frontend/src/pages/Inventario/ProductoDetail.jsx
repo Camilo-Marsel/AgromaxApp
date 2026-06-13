@@ -125,14 +125,14 @@ export default function ProductoDetail() {
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-gray-800 flex items-center gap-2">
             <Warehouse className="w-4 h-4 text-gray-500" />
-            Stock por finca
+            Stock por bodega
           </h2>
           {canModify() && (
             <button
               onClick={() => setShowStockForm(true)}
               className="flex items-center gap-1.5 text-sm text-green-700 border border-green-300 px-3 py-1.5 rounded-lg hover:bg-green-50"
             >
-              <Plus className="w-3.5 h-3.5" /> Agregar finca
+              <Plus className="w-3.5 h-3.5" /> Agregar bodega
             </button>
           )}
         </div>
@@ -166,7 +166,7 @@ export default function ProductoDetail() {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-semibold text-gray-700">
-                      {s.finca_nombre ?? <span className="italic text-gray-400">Bodega Central</span>}
+                      {s.bodega_nombre ?? <span className="italic text-gray-400">Bodega Central</span>}
                     </span>
                     {bajo && <AlertTriangle className="w-4 h-4 text-red-500" />}
                   </div>
@@ -227,7 +227,7 @@ export default function ProductoDetail() {
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-gray-400" />
               <h2 className="font-semibold text-gray-800">
-                Historial — {stockSeleccionado.finca_nombre ?? 'Bodega Central'}
+                Historial — {stockSeleccionado.bodega_nombre ?? 'Bodega Central'}
               </h2>
             </div>
             <span className="text-xs text-gray-400">{totalMovs} en total · últimos 30</span>
@@ -238,7 +238,7 @@ export default function ProductoDetail() {
           ) : movimientos.length === 0 ? (
             <div className="flex flex-col items-center py-12 text-gray-400 gap-2">
               <Clock className="w-8 h-8" />
-              <p className="text-sm">Sin movimientos en esta finca aún.</p>
+              <p className="text-sm">Sin movimientos en esta bodega aún.</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
@@ -308,7 +308,7 @@ export default function ProductoDetail() {
       {showStockForm && (
         <StockFincaForm
           producto={producto}
-          fincasExistentes={stocks}
+          stocksExistentes={stocks}
           onClose={() => setShowStockForm(false)}
           onSuccess={() => {
             setShowStockForm(false);

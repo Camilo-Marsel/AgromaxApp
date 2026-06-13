@@ -3,7 +3,29 @@
 import api from './api';
 
 const inventarioService = {
-  // ── Productos ────────────────────────────────────────────────────────────
+  // ── Bodegas ──────────────────────────────────────────────────────────────
+
+  getBodegas: async (params = {}) => {
+    const res = await api.get('/inventario/bodegas/', { params });
+    return res.data;
+  },
+
+  getBodega: async (id) => {
+    const res = await api.get(`/inventario/bodegas/${id}/`);
+    return res.data;
+  },
+
+  createBodega: async (data) => {
+    const res = await api.post('/inventario/bodegas/', data);
+    return res.data;
+  },
+
+  updateBodega: async (id, data) => {
+    const res = await api.patch(`/inventario/bodegas/${id}/`, data);
+    return res.data;
+  },
+
+  // ── Productos (catálogo) ─────────────────────────────────────────────────
 
   getProductos: async (params = {}) => {
     const res = await api.get('/inventario/productos/', { params });
@@ -12,6 +34,11 @@ const inventarioService = {
 
   getProducto: async (id) => {
     const res = await api.get(`/inventario/productos/${id}/`);
+    return res.data;
+  },
+
+  getProductoStocks: async (id) => {
+    const res = await api.get(`/inventario/productos/${id}/stocks/`);
     return res.data;
   },
 
@@ -30,13 +57,35 @@ const inventarioService = {
     return res.data;
   },
 
+  // ── Stocks por finca ─────────────────────────────────────────────────────
+
+  getStocks: async (params = {}) => {
+    const res = await api.get('/inventario/stocks/', { params });
+    return res.data;
+  },
+
+  getStock: async (id) => {
+    const res = await api.get(`/inventario/stocks/${id}/`);
+    return res.data;
+  },
+
+  createStock: async (data) => {
+    const res = await api.post('/inventario/stocks/', data);
+    return res.data;
+  },
+
+  updateStock: async (id, data) => {
+    const res = await api.patch(`/inventario/stocks/${id}/`, data);
+    return res.data;
+  },
+
   getStockBajo: async (params = {}) => {
-    const res = await api.get('/inventario/productos/stock_bajo/', { params });
+    const res = await api.get('/inventario/stocks/stock_bajo/', { params });
     return res.data;
   },
 
   getResumen: async (params = {}) => {
-    const res = await api.get('/inventario/productos/resumen/', { params });
+    const res = await api.get('/inventario/stocks/resumen/', { params });
     return res.data;
   },
 
@@ -47,9 +96,9 @@ const inventarioService = {
     return res.data;
   },
 
-  getMovimientosPorProducto: async (productoId, params = {}) => {
-    const res = await api.get('/inventario/movimientos/por_producto/', {
-      params: { producto: productoId, ...params },
+  getMovimientosPorStock: async (stockId, params = {}) => {
+    const res = await api.get('/inventario/movimientos/por_stock/', {
+      params: { stock_finca: stockId, ...params },
     });
     return res.data;
   },

@@ -56,7 +56,7 @@ export default function MovimientoForm({ stockFinca, tipoInicial = 'ENTRADA', on
     }
   };
 
-  const fincaNombre  = stockFinca.finca_nombre ?? 'Bodega Central';
+  const fincaNombre  = stockFinca.bodega_nombre ?? '—';
   const unidadLabel  = stockFinca.unidad_display ?? '';
 
   return (

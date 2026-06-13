@@ -15,6 +15,7 @@ from .models import (
     PORCENTAJE_CESANTIAS, PORCENTAJE_INTERESES_CESANTIAS,
     PORCENTAJE_PRIMA, PORCENTAJE_VACACIONES,
     Producto, StockFinca, MovimientoInventario,
+    Bodega,
 )
 from decimal import Decimal
 from datetime import date
@@ -1199,19 +1200,36 @@ class PorcentajesObligacionesSerializer(serializers.Serializer):
 # INVENTARIO
 # ============================================================================
 
+class BodegaSerializer(serializers.ModelSerializer):
+    num_fincas = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Bodega
+        fields = ['id', 'nombre', 'descripcion', 'activa', 'num_fincas', 'created_at', 'updated_at']
+
+    def get_num_fincas(self, obj):
+        return obj.fincas.count()
+
+
+class BodegaCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Bodega
+        fields = ['nombre', 'descripcion', 'activa']
+
+
 class ProductoSerializer(serializers.ModelSerializer):
     categoria_display = serializers.CharField(source='get_categoria_display', read_only=True)
     unidad_display    = serializers.CharField(source='get_unidad_display', read_only=True)
-    total_fincas      = serializers.SerializerMethodField()
+    total_bodegas     = serializers.SerializerMethodField()
 
     class Meta:
         model  = Producto
         fields = [
             'id', 'nombre', 'descripcion', 'categoria', 'categoria_display',
-            'unidad', 'unidad_display', 'activo', 'total_fincas', 'created_at',
+            'unidad', 'unidad_display', 'activo', 'total_bodegas', 'created_at',
         ]
 
-    def get_total_fincas(self, obj):
+    def get_total_bodegas(self, obj):
         return obj.stocks.filter(activo=True).count()
 
 
@@ -1227,7 +1245,7 @@ class StockFincaSerializer(serializers.ModelSerializer):
     unidad_display    = serializers.CharField(source='producto.get_unidad_display', read_only=True)
     categoria         = serializers.CharField(source='producto.categoria', read_only=True)
     categoria_display = serializers.CharField(source='producto.get_categoria_display', read_only=True)
-    finca_nombre      = serializers.SerializerMethodField()
+    bodega_nombre     = serializers.CharField(source='bodega.nombre', read_only=True, default=None)
     stock_bajo        = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -1235,35 +1253,32 @@ class StockFincaSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'producto', 'producto_nombre', 'producto_unidad', 'unidad_display',
             'categoria', 'categoria_display',
-            'finca', 'finca_nombre',
+            'bodega', 'bodega_nombre',
             'stock_actual', 'stock_minimo', 'stock_bajo',
             'activo', 'created_at', 'updated_at',
         ]
 
-    def get_finca_nombre(self, obj):
-        return obj.finca.nombre if obj.finca else 'Bodega Central'
-
 
 class StockFincaCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model  = StockFinca
-        fields = ['producto', 'finca', 'stock_minimo', 'stock_inicial']
-
     stock_inicial = serializers.DecimalField(
         max_digits=12, decimal_places=2, required=False, default=0,
         min_value=0, write_only=True,
     )
 
+    class Meta:
+        model  = StockFinca
+        fields = ['producto', 'bodega', 'stock_minimo', 'stock_inicial']
+
     def validate(self, data):
         producto = data.get('producto')
-        finca    = data.get('finca')
-        qs = StockFinca.objects.filter(producto=producto, finca=finca)
+        bodega   = data.get('bodega')
+        qs = StockFinca.objects.filter(producto=producto, bodega=bodega)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
-            ubicacion = finca.nombre if finca else 'Bodega Central'
+            nombre = bodega.nombre if bodega else '—'
             raise serializers.ValidationError(
-                f'Ya existe un stock de "{producto.nombre}" en {ubicacion}.'
+                f'Ya existe un stock de "{producto.nombre}" en {nombre}.'
             )
         return data
 
@@ -1279,7 +1294,9 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
     tipo_display      = serializers.CharField(source='get_tipo_display', read_only=True)
     producto_nombre   = serializers.CharField(source='stock_finca.producto.nombre', read_only=True)
     producto_unidad   = serializers.CharField(source='stock_finca.producto.unidad', read_only=True)
-    finca_nombre      = serializers.SerializerMethodField()
+    bodega_nombre     = serializers.SerializerMethodField()
+    lote_nombre       = serializers.SerializerMethodField()
+    trabajador_nombre = serializers.SerializerMethodField()
     creado_por        = serializers.CharField(
         source='created_by.get_full_name', read_only=True, default=None,
     )
@@ -1287,23 +1304,32 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
     class Meta:
         model  = MovimientoInventario
         fields = [
-            'id', 'stock_finca', 'producto_nombre', 'producto_unidad', 'finca_nombre',
+            'id', 'stock_finca', 'producto_nombre', 'producto_unidad', 'bodega_nombre',
             'tipo', 'tipo_display', 'cantidad',
             'stock_antes', 'stock_despues',
-            'fecha', 'observaciones',
+            'fecha', 'fecha_consumo',
+            'lote', 'lote_nombre',
+            'trabajador', 'trabajador_nombre',
+            'observaciones',
             'referencia_tipo', 'referencia_id',
             'creado_por', 'created_at',
         ]
         read_only_fields = ['stock_antes', 'stock_despues', 'created_at']
 
-    def get_finca_nombre(self, obj):
-        return obj.stock_finca.finca.nombre if obj.stock_finca.finca else 'Bodega Central'
+    def get_bodega_nombre(self, obj):
+        return obj.stock_finca.bodega.nombre if obj.stock_finca.bodega else '—'
+
+    def get_lote_nombre(self, obj):
+        return obj.lote.nombre if obj.lote else None
+
+    def get_trabajador_nombre(self, obj):
+        return obj.trabajador.nombre_completo if obj.trabajador else None
 
 
 class MovimientoCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = MovimientoInventario
-        fields = ['stock_finca', 'tipo', 'cantidad', 'fecha', 'observaciones']
+        fields = ['stock_finca', 'tipo', 'cantidad', 'fecha', 'fecha_consumo', 'lote', 'trabajador', 'observaciones']
 
     def validate(self, data):
         if data.get('tipo') == 'SALIDA':

@@ -3,13 +3,39 @@
 from django.db import models
 
 # ============================================================================
+# BODEGA
+# ============================================================================
+
+class Bodega(models.Model):
+    """Bodega física compartida entre una o varias fincas."""
+    nombre      = models.CharField(max_length=100, unique=True)
+    descripcion = models.TextField(blank=True)
+    activa      = models.BooleanField(default=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'bodegas'
+        verbose_name = 'Bodega'
+        verbose_name_plural = 'Bodegas'
+        ordering = ['nombre']
+
+    def __str__(self):
+        return self.nombre
+
+
+# ============================================================================
 # FINCAS Y LOTES
 # ============================================================================
 
 class Finca(models.Model):
     """Fincas donde trabajan los empleados"""
-    nombre = models.CharField(max_length=100, unique=True)
+    nombre    = models.CharField(max_length=100, unique=True)
     ubicacion = models.CharField(max_length=200, blank=True, null=True)
+    bodega    = models.ForeignKey(
+        Bodega, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='fincas',
+    )
     activa = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

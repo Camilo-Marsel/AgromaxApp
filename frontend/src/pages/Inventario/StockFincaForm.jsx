@@ -1,40 +1,41 @@
-﻿// frontend/src/pages/Inventario/StockFincaForm.jsx
-// Modal para agregar un nuevo registro de stock (producto + finca)
+// frontend/src/pages/Inventario/StockFincaForm.jsx
+// Modal para agregar un nuevo registro de stock (producto + bodega)
 
 import { useState, useEffect } from 'react';
 import { X, Save, Warehouse } from 'lucide-react';
 import inventarioService from '../../services/inventarioService';
-import fincaService from '../../services/fincaService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
 
-export default function StockFincaForm({ producto, fincasExistentes = [], onClose, onSuccess }) {
-  const [fincas, setFincas]         = useState([]);
-  const [finca, setFinca]           = useState('');
-  const [stockMinimo, setStockMin]  = useState('0');
-  const [stockInicial, setStockIni] = useState('0');
-  const [saving, setSaving]         = useState(false);
-  const [error, setError]           = useState(null);
+export default function StockFincaForm({ producto, stocksExistentes = [], onClose, onSuccess }) {
+  const [bodegas, setBodegas]        = useState([]);
+  const [bodega, setBodega]          = useState('');
+  const [stockMinimo, setStockMin]   = useState('0');
+  const [stockInicial, setStockIni]  = useState('0');
+  const [saving, setSaving]          = useState(false);
+  const [error, setError]            = useState(null);
 
   useEffect(() => {
-    fincaService.getAll()
-      .then(d => setFincas(d.results ?? d))
+    inventarioService.getBodegas({ activa: true })
+      .then(d => setBodegas(d.results ?? d))
       .catch(() => {});
   }, []);
 
-  // IDs de fincas que ya tienen stock para este producto
-  const fincasOcupadas = new Set(
-    fincasExistentes.map(s => s.finca ?? 'bodega'),
-  );
+  // IDs de bodegas que ya tienen stock para este producto
+  const bodegasOcupadas = new Set(stocksExistentes.map(s => s.bodega));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!bodega) {
+      setError('Selecciona una bodega.');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
       await inventarioService.createStock({
         producto:      producto.id,
-        finca:         finca === '' ? null : Number(finca),
+        bodega:        Number(bodega),
         stock_minimo:  Number(stockMinimo),
         stock_inicial: Number(stockInicial),
       });
@@ -54,9 +55,7 @@ export default function StockFincaForm({ producto, fincasExistentes = [], onClos
     }
   };
 
-  const fincaOcupada = finca === ''
-    ? fincasOcupadas.has('bodega')
-    : fincasOcupadas.has(Number(finca));
+  const bodegaOcupada = bodega !== '' && bodegasOcupadas.has(Number(bodega));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
@@ -76,21 +75,21 @@ export default function StockFincaForm({ producto, fincasExistentes = [], onClos
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Finca / Bodega
+              Bodega
             </label>
             <select
-              value={finca}
-              onChange={e => { setFinca(e.target.value); setError(null); }}
+              value={bodega}
+              onChange={e => { setBodega(e.target.value); setError(null); }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <option value="">Bodega Central (compartida)</option>
-              {fincas.map(f => (
-                <option key={f.id} value={f.id}>{f.nombre}</option>
+              <option value="">Selecciona una bodega…</option>
+              {bodegas.map(b => (
+                <option key={b.id} value={b.id}>{b.nombre}</option>
               ))}
             </select>
-            {fincaOcupada && (
+            {bodegaOcupada && (
               <p className="text-xs text-amber-600 mt-1">
-                Esta finca ya tiene stock para este producto. Usa un movimiento de ajuste para modificarlo.
+                Esta bodega ya tiene stock para este producto. Usa un movimiento de ajuste para modificarlo.
               </p>
             )}
           </div>
@@ -135,7 +134,7 @@ export default function StockFincaForm({ producto, fincasExistentes = [], onClos
           <div className="flex gap-3 pt-1">
             <button
               type="submit"
-              disabled={saving || fincaOcupada}
+              disabled={saving || bodegaOcupada || !bodega}
               className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white py-2.5 rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium text-sm"
             >
               {saving ? <LoadingSpinner size="sm" /> : <Save className="w-4 h-4" />}
