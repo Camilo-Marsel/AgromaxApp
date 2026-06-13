@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import inventarioService from '../../services/inventarioService';
-import fincaService from '../../services/fincaService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -39,22 +38,22 @@ export default function ProductosList() {
   const [productos, setProductos] = useState([]);
   const [stocks, setStocks]       = useState([]);
   const [resumen, setResumen]     = useState(null);
-  const [fincas, setFincas]       = useState([]);
+  const [bodegas, setBodegas]     = useState([]);
   const [loading, setLoading]     = useState(true);
 
   const [search, setSearch]               = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
-  const [filtroFinca, setFiltroFinca]         = useState('');
+  const [filtroBodega, setFiltroBodega]       = useState('');
   const [soloStockBajo, setSoloStockBajo]     = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const fincasData = await fincaService.getAll();
-      setFincas(fincasData.results ?? fincasData);
+      const bodegasData = await inventarioService.getBodegas();
+      setBodegas(bodegasData.results ?? bodegasData);
 
       const resumenData = await inventarioService.getResumen(
-        filtroFinca ? { finca: filtroFinca } : {},
+        filtroBodega ? { bodega: filtroBodega } : {},
       );
       setResumen(resumenData);
 
@@ -67,12 +66,12 @@ export default function ProductosList() {
       } else {
         if (soloStockBajo) {
           const data = await inventarioService.getStockBajo(
-            filtroFinca ? { finca: filtroFinca } : {},
+            filtroBodega ? { bodega: filtroBodega } : {},
           );
           setStocks(data.results ?? data);
         } else {
           const params = { activo: true };
-          if (filtroFinca)     params.finca    = filtroFinca;
+          if (filtroBodega)    params.bodega              = filtroBodega;
           if (filtroCategoria) params.producto__categoria = filtroCategoria;
           const data = await inventarioService.getStocks(params);
           setStocks(data.results ?? data);
@@ -83,7 +82,7 @@ export default function ProductosList() {
     } finally {
       setLoading(false);
     }
-  }, [vista, filtroCategoria, filtroFinca, search, soloStockBajo]);
+  }, [vista, filtroCategoria, filtroBodega, search, soloStockBajo]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -120,7 +119,7 @@ export default function ProductosList() {
             </div>
             <p className="text-3xl font-bold text-gray-900 mt-1">{resumen.total_productos}</p>
             <p className="text-xs text-gray-400 mt-1">
-              {filtroFinca ? 'en esta finca' : 'en todas las fincas'}
+              {filtroBodega ? 'en esta bodega' : 'en todas las bodegas'}
             </p>
           </div>
 
@@ -172,7 +171,7 @@ export default function ProductosList() {
           className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${vista === 'stocks' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
         >
           <Warehouse className="w-3.5 h-3.5" />
-          Stock por finca
+          Stock por bodega
         </button>
       </div>
 
@@ -204,13 +203,12 @@ export default function ProductosList() {
 
           {vista === 'stocks' && (
             <select
-              value={filtroFinca}
-              onChange={e => setFiltroFinca(e.target.value)}
+              value={filtroBodega}
+              onChange={e => setFiltroBodega(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <option value="">Todas las fincas</option>
-              <option value="null">Bodega Central</option>
-              {fincas.map(f => <option key={f.id} value={f.id}>{f.nombre}</option>)}
+              <option value="">Todas las bodegas</option>
+              {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
             </select>
           )}
 
@@ -268,7 +266,7 @@ function CatalogoTable({ productos, navigate }) {
           <th className="text-left px-4 py-3 font-medium text-gray-600">Producto</th>
           <th className="text-left px-4 py-3 font-medium text-gray-600">Categoría</th>
           <th className="text-left px-4 py-3 font-medium text-gray-600">Unidad</th>
-          <th className="text-center px-4 py-3 font-medium text-gray-600">Fincas con stock</th>
+          <th className="text-center px-4 py-3 font-medium text-gray-600">Bodegas con stock</th>
           <th className="px-4 py-3"></th>
         </tr>
       </thead>
@@ -292,9 +290,9 @@ function CatalogoTable({ productos, navigate }) {
             </td>
             <td className="px-4 py-3 text-gray-500">{p.unidad_display}</td>
             <td className="px-4 py-3 text-center">
-              {p.total_fincas > 0 ? (
+              {p.total_bodegas > 0 ? (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                  <Warehouse className="w-3 h-3" /> {p.total_fincas}
+                  <Warehouse className="w-3 h-3" /> {p.total_bodegas}
                 </span>
               ) : (
                 <span className="text-xs text-gray-400">Sin stock</span>
@@ -325,7 +323,7 @@ function StocksTable({ stocks, navigate }) {
       <thead className="bg-gray-50 border-b border-gray-200">
         <tr>
           <th className="text-left px-4 py-3 font-medium text-gray-600">Producto</th>
-          <th className="text-left px-4 py-3 font-medium text-gray-600">Finca</th>
+          <th className="text-left px-4 py-3 font-medium text-gray-600">Bodega</th>
           <th className="text-right px-4 py-3 font-medium text-gray-600">Stock actual</th>
           <th className="text-right px-4 py-3 font-medium text-gray-600">Mínimo</th>
           <th className="text-center px-4 py-3 font-medium text-gray-600">Estado</th>
@@ -344,7 +342,7 @@ function StocksTable({ stocks, navigate }) {
               <div className="text-xs text-gray-400">{s.producto_categoria_display ?? s.categoria_display}</div>
             </td>
             <td className="px-4 py-3 text-gray-600">
-              {s.finca_nombre ?? <span className="text-gray-400 italic">Bodega Central</span>}
+              {s.bodega_nombre ?? <span className="text-gray-400 italic">—</span>}
             </td>
             <td className={`px-4 py-3 text-right font-semibold ${s.stock_bajo ? 'text-red-600' : 'text-green-700'}`}>
               {parseFloat(s.stock_actual).toLocaleString('es-CO', { maximumFractionDigits: 2 })}

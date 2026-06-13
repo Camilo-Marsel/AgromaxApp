@@ -70,7 +70,7 @@ class StockFincaViewSet(viewsets.ModelViewSet):
     ).all()
     permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['producto', 'bodega', 'activo']
+    filterset_fields = ['producto', 'bodega', 'activo', 'producto__categoria']
     ordering = ['producto__categoria', 'producto__nombre']
 
     def get_serializer_class(self):
