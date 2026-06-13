@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import fincaService from '../../services/fincaService';
+import inventarioService from '../../services/inventarioService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Save } from 'lucide-react';
@@ -13,7 +14,8 @@ export default function FincaForm() {
   const { id } = useParams();
   const isEditing = Boolean(id);
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [bodegas, setBodegas]   = useState([]);
 
   const {
     register,
@@ -23,9 +25,10 @@ export default function FincaForm() {
   } = useForm();
 
   useEffect(() => {
-    if (isEditing) {
-      loadFinca();
-    }
+    inventarioService.getBodegas({ activa: true })
+      .then(d => setBodegas(d.results ?? d))
+      .catch(() => {});
+    if (isEditing) loadFinca();
   }, [id]);
 
   const loadFinca = async () => {
@@ -123,6 +126,27 @@ export default function FincaForm() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Ej: Vereda La Esperanza, Turbo"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bodega asignada
+              </label>
+              <select
+                {...register('bodega')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="">Sin bodega asignada</option>
+                {bodegas.map(b => (
+                  <option key={b.id} value={b.id}>{b.nombre}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">
+                ¿No hay bodegas?{' '}
+                <a href="/inventario/bodegas" className="text-blue-600 hover:underline">
+                  Créalas aquí
+                </a>
+              </p>
             </div>
 
             <div>

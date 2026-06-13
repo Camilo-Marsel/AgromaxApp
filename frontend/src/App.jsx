@@ -37,6 +37,7 @@ import HistorialRegistros from './pages/Registros/HistorialRegistros';
 import ProductosList from './pages/Inventario/ProductosList';
 import ProductoDetail from './pages/Inventario/ProductoDetail';
 import ProductoForm from './pages/Inventario/ProductoForm';
+import BodegasList from './pages/Inventario/BodegasList';
 
 // Obligaciones Laborales
 import PILAList from './pages/ObligacionesLaborales/PILA/PILAList';
@@ -338,6 +339,10 @@ function App() {
           <Route
             path="/inventario"
             element={<ProtectedRoute><MainLayout><ProductosList /></MainLayout></ProtectedRoute>}
+          />
+          <Route
+            path="/inventario/bodegas"
+            element={<ProtectedRoute><MainLayout><BodegasList /></MainLayout></ProtectedRoute>}
           />
           <Route
             path="/inventario/productos/nuevo"

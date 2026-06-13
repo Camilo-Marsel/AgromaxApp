@@ -132,7 +132,7 @@ export default function ProductoDetail() {
               onClick={() => setShowStockForm(true)}
               className="flex items-center gap-1.5 text-sm text-green-700 border border-green-300 px-3 py-1.5 rounded-lg hover:bg-green-50"
             >
-              <Plus className="w-3.5 h-3.5" /> Agregar bodega
+              <Plus className="w-3.5 h-3.5" /> Agregar stock
             </button>
           )}
         </div>
@@ -140,7 +140,7 @@ export default function ProductoDetail() {
         {!hayStocks ? (
           <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl flex flex-col items-center py-10 gap-3 text-gray-400">
             <Warehouse className="w-10 h-10" />
-            <p className="text-sm">Este producto aún no tiene stock en ninguna finca.</p>
+            <p className="text-sm">Este producto aún no tiene stock en ninguna bodega.</p>
             {canModify() && (
               <button
                 onClick={() => setShowStockForm(true)}
