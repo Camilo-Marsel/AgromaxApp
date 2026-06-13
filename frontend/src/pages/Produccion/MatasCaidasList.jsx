@@ -30,9 +30,10 @@ function semanaActual() {
   return `${now.getFullYear()}-${String(week).padStart(2, '0')}`;
 }
 
-function MataCaidaModal({ item, lotes, onClose, onSuccess }) {
+function MataCaidaModal({ item, fincas, onClose, onSuccess }) {
   const isEditing = Boolean(item);
   const [form, setForm] = useState({
+    finca: item?.finca ?? '',
     lote: item?.lote ?? '',
     color_cinta: item?.color_cinta ?? '',
     semana_año: item?.semana_año ?? semanaActual(),
@@ -40,21 +41,40 @@ function MataCaidaModal({ item, lotes, onClose, onSuccess }) {
     fecha_reporte: item?.fecha_reporte ?? new Date().toISOString().slice(0, 10),
     observaciones: item?.observaciones ?? '',
   });
+  const [lotes, setLotes] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  useEffect(() => {
+    if (form.finca) {
+      loteService.getByFinca(form.finca)
+        .then((d) => setLotes(d.results || d))
+        .catch(() => setLotes([]));
+    } else {
+      setLotes([]);
+    }
+  }, [form.finca]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.lote || !form.color_cinta || !form.semana_año || !form.cantidad_caidas || !form.fecha_reporte) {
-      setError('Todos los campos obligatorios deben completarse.');
+    if (!form.finca || !form.color_cinta || !form.semana_año || !form.cantidad_caidas || !form.fecha_reporte) {
+      setError('Finca, color, semana, cantidad y fecha son obligatorios.');
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      const payload = { ...form, lote: Number(form.lote), cantidad_caidas: Number(form.cantidad_caidas) };
+      const payload = {
+        finca: Number(form.finca),
+        lote: form.lote ? Number(form.lote) : null,
+        color_cinta: form.color_cinta,
+        semana_año: form.semana_año,
+        cantidad_caidas: Number(form.cantidad_caidas),
+        fecha_reporte: form.fecha_reporte,
+        observaciones: form.observaciones,
+      };
       if (isEditing) {
         await produccionService.updateMataCaida(item.id, payload);
         toast.success('Registro actualizado');
@@ -81,11 +101,25 @@ function MataCaidaModal({ item, lotes, onClose, onSuccess }) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Finca */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Lote *</label>
-            <select value={form.lote} onChange={(e) => set('lote', e.target.value)} required
+            <label className="block text-sm font-medium text-gray-700 mb-1">Finca *</label>
+            <select value={form.finca} onChange={(e) => { set('finca', e.target.value); set('lote', ''); }} required
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">Seleccione...</option>
+              <option value="">Seleccione una finca...</option>
+              {fincas.map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
+            </select>
+          </div>
+
+          {/* Lote (opcional) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Lote <span className="text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <select value={form.lote} onChange={(e) => set('lote', e.target.value)}
+              disabled={!form.finca}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
+              <option value="">Sin lote específico</option>
               {lotes.map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}
             </select>
           </div>
@@ -166,18 +200,18 @@ export default function MatasCaidasList() {
     if (filtroFinca) {
       loteService.getByFinca(filtroFinca).then((d) => setLotes(d.results || d)).catch(() => setLotes([]));
     } else {
-      loteService.getAll().then((d) => setLotes(d.results || d)).catch(() => {});
+      setLotes([]);
+      setFiltroLote('');
     }
   }, [filtroFinca]);
 
-  useEffect(() => {
-    loadItems();
-  }, [filtroLote, filtroColor]);
+  useEffect(() => { loadItems(); }, [filtroFinca, filtroLote, filtroColor]);
 
   const loadItems = async () => {
     setLoading(true);
     try {
       const params = {};
+      if (filtroFinca) params.finca = filtroFinca;
       if (filtroLote) params.lote = filtroLote;
       if (filtroColor) params.color_cinta = filtroColor;
       const data = await produccionService.getMatasCaidas(params);
@@ -208,9 +242,7 @@ export default function MatasCaidasList() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Matas Caídas</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Registro de matas caídas por lote y color de cinta durante el ciclo.
-          </p>
+          <p className="text-gray-500 text-sm mt-1">Registro de matas caídas por finca, color de cinta y semana de encintado.</p>
         </div>
         {canModify() && (
           <button onClick={() => setModal('new')}
@@ -233,7 +265,8 @@ export default function MatasCaidasList() {
         <div className="flex-1 min-w-[160px]">
           <label className="block text-xs text-gray-500 mb-1">Lote</label>
           <select value={filtroLote} onChange={(e) => setFiltroLote(e.target.value)}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm">
+            disabled={!filtroFinca}
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm disabled:bg-gray-100">
             <option value="">Todos</option>
             {lotes.map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}
           </select>
@@ -260,7 +293,7 @@ export default function MatasCaidasList() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {['Lote', 'Color', 'Semana encintado', 'Caídas', 'Fecha reporte', canModify() ? 'Acciones' : ''].map((h) => (
+                {['Finca', 'Lote', 'Color', 'Semana', 'Caídas', 'Fecha reporte', canModify() ? 'Acciones' : ''].filter(Boolean).map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
                 ))}
               </tr>
@@ -268,7 +301,8 @@ export default function MatasCaidasList() {
             <tbody className="divide-y divide-gray-200">
               {items.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.lote_nombre}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.finca_nombre}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{item.lote_nombre ?? <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3">
                     <span className="inline-flex px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
                       {colorLabel(item.color_cinta)}
@@ -282,13 +316,8 @@ export default function MatasCaidasList() {
                   {canModify() && (
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
-                        <button onClick={() => setModal(item)} className="text-blue-600 hover:text-blue-800" title="Editar">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setConfirmDelete({ isOpen: true, id: item.id })}
-                          className="text-red-600 hover:text-red-800" title="Eliminar">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <button onClick={() => setModal(item)} className="text-blue-600 hover:text-blue-800"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => setConfirmDelete({ isOpen: true, id: item.id })} className="text-red-600 hover:text-red-800"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </td>
                   )}
@@ -302,7 +331,7 @@ export default function MatasCaidasList() {
       {modal && (
         <MataCaidaModal
           item={modal === 'new' ? null : modal}
-          lotes={lotes.length > 0 ? lotes : []}
+          fincas={fincas}
           onClose={() => setModal(null)}
           onSuccess={loadItems}
         />

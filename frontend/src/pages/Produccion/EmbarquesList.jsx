@@ -30,7 +30,6 @@ function semanaActual() {
   return `${now.getFullYear()}-${String(week).padStart(2, '0')}`;
 }
 
-// Panel de validación cruzada que se carga al ver un embarque
 function ValidacionPanel({ embarqueId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -48,32 +47,28 @@ function ValidacionPanel({ embarqueId }) {
   if (!data) return null;
 
   const hayAlerta = data.alerta_desviacion || data.alerta_matas_sin_reportar;
+  const scopeLabel = data.scope === 'lote' ? 'lote' : 'finca';
 
   return (
     <div className={`mt-3 rounded-md border p-3 text-xs ${hayAlerta ? 'border-amber-300 bg-amber-50' : 'border-green-300 bg-green-50'}`}>
       <div className="flex items-center gap-1.5 font-semibold mb-2">
         {hayAlerta
-          ? <><AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> <span className="text-amber-700">Alertas de discrepancia</span></>
-          : <><CheckCircle className="w-3.5 h-3.5 text-green-600" /> <span className="text-green-700">Validación correcta</span></>
+          ? <><AlertTriangle className="w-3.5 h-3.5 text-amber-600" /><span className="text-amber-700">Alertas de discrepancia</span></>
+          : <><CheckCircle className="w-3.5 h-3.5 text-green-600" /><span className="text-green-700">Validación correcta</span></>
         }
+        <span className="ml-auto text-gray-400 font-normal">Scope: {scopeLabel}</span>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-700">
         <span>Encintadas (Control):</span><span className="font-medium">{data.encintadas}</span>
         <span>Caídas reportadas:</span><span className="font-medium">{data.caidas_reportadas}</span>
         <span>Esperadas en corte:</span><span className="font-medium">{data.esperadas}</span>
         <span>Matas cortadas:</span><span className="font-medium">{data.matas_corte}</span>
-        <span className={data.alerta_matas_sin_reportar ? 'text-amber-700 font-semibold' : ''}>
-          Sin reportar:
-        </span>
-        <span className={`font-medium ${data.alerta_matas_sin_reportar ? 'text-amber-700' : ''}`}>
-          {data.matas_sin_reportar}
-        </span>
+        <span className={data.alerta_matas_sin_reportar ? 'text-amber-700 font-semibold' : ''}>Sin reportar:</span>
+        <span className={`font-medium ${data.alerta_matas_sin_reportar ? 'text-amber-700' : ''}`}>{data.matas_sin_reportar}</span>
         <span>Ratio actual:</span><span className="font-medium">{data.ratio_actual ?? '—'}</span>
         <span>Cajas esperadas:</span><span className="font-medium">{data.cajas_esperadas ?? '—'}</span>
         <span>Cajas netas:</span><span className="font-medium">{data.cajas_netas}</span>
-        <span className={data.alerta_desviacion ? 'text-amber-700 font-semibold' : ''}>
-          Desviación:
-        </span>
+        <span className={data.alerta_desviacion ? 'text-amber-700 font-semibold' : ''}>Desviación:</span>
         <span className={`font-medium ${data.alerta_desviacion ? 'text-amber-700' : ''}`}>
           {data.desviacion_pct != null ? `${data.desviacion_pct}%` : '—'}
           {data.alerta_desviacion && ` ⚠️ (umbral: ${data.umbral_desviacion_pct}%)`}
@@ -83,9 +78,10 @@ function ValidacionPanel({ embarqueId }) {
   );
 }
 
-function EmbarqueModal({ item, lotes, onClose, onSuccess }) {
+function EmbarqueModal({ item, fincas, onClose, onSuccess }) {
   const isEditing = Boolean(item);
   const [form, setForm] = useState({
+    finca: item?.finca ?? '',
     lote: item?.lote ?? '',
     fecha_embarque: item?.fecha_embarque ?? new Date().toISOString().slice(0, 10),
     semana_año: item?.semana_año ?? semanaActual(),
@@ -97,6 +93,7 @@ function EmbarqueModal({ item, lotes, onClose, onSuccess }) {
     cajas_rechazadas: item?.cajas_rechazadas ?? 0,
     observaciones: item?.observaciones ?? '',
   });
+  const [lotes, setLotes] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [ratioInfo, setRatioInfo] = useState(null);
@@ -104,38 +101,47 @@ function EmbarqueModal({ item, lotes, onClose, onSuccess }) {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
-    if (form.lote) {
-      produccionService.getRatioLote(form.lote)
+    if (form.finca) {
+      loteService.getByFinca(form.finca)
+        .then((d) => setLotes(d.results || d))
+        .catch(() => setLotes([]));
+      produccionService.getRatioFinca(form.finca, form.lote || null)
         .then(setRatioInfo)
         .catch(() => setRatioInfo(null));
+    } else {
+      setLotes([]);
+      setRatioInfo(null);
     }
-  }, [form.lote]);
+  }, [form.finca, form.lote]);
 
   const totalCintas =
     Number(form.cintas_semana_actual) +
     Number(form.cintas_semana_anterior) +
     Number(form.cintas_semana_siguiente);
-
   const cajasNetas = Math.max(0, Number(form.cajas_empacadas) - Number(form.cajas_rechazadas));
   const ratioEstimado = cajasNetas > 0 ? (totalCintas / cajasNetas).toFixed(4) : null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.lote || !form.color_cinta || !form.cajas_empacadas) {
-      setError('Lote, color de cinta y cajas empacadas son obligatorios.');
+    if (!form.finca || !form.color_cinta || !form.cajas_empacadas) {
+      setError('Finca, color de cinta y cajas empacadas son obligatorios.');
       return;
     }
     setSaving(true);
     setError(null);
     try {
       const payload = {
-        ...form,
-        lote: Number(form.lote),
+        finca: Number(form.finca),
+        lote: form.lote ? Number(form.lote) : null,
+        fecha_embarque: form.fecha_embarque,
+        semana_año: form.semana_año,
+        color_cinta: form.color_cinta,
         cintas_semana_actual: Number(form.cintas_semana_actual),
         cintas_semana_anterior: Number(form.cintas_semana_anterior),
         cintas_semana_siguiente: Number(form.cintas_semana_siguiente),
         cajas_empacadas: Number(form.cajas_empacadas),
         cajas_rechazadas: Number(form.cajas_rechazadas),
+        observaciones: form.observaciones,
       };
       if (isEditing) {
         await produccionService.updateEmbarque(item.id, payload);
@@ -163,44 +169,56 @@ function EmbarqueModal({ item, lotes, onClose, onSuccess }) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          {/* Lote + fecha */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Lote *</label>
-              <select value={form.lote} onChange={(e) => set('lote', e.target.value)} required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
-                <option value="">Seleccione...</option>
-                {lotes.map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha embarque *</label>
-              <input type="date" value={form.fecha_embarque} onChange={(e) => set('fecha_embarque', e.target.value)} required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
-            </div>
+          {/* Finca */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Finca *</label>
+            <select value={form.finca} onChange={(e) => { set('finca', e.target.value); set('lote', ''); }} required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+              <option value="">Seleccione una finca...</option>
+              {fincas.map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
+            </select>
+          </div>
+
+          {/* Lote (opcional) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Lote <span className="text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <select value={form.lote} onChange={(e) => set('lote', e.target.value)}
+              disabled={!form.finca}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm disabled:bg-gray-100">
+              <option value="">Sin lote específico</option>
+              {lotes.map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}
+            </select>
           </div>
 
           {/* Ratio info */}
           {ratioInfo?.ratio_actual && (
             <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 px-3 py-1.5 rounded">
-              <Info className="w-3.5 h-3.5" />
-              Ratio actual del lote (últ. {ratioInfo.embarques_usados} embarques): <strong className="ml-1">{ratioInfo.ratio_actual}</strong>
+              <Info className="w-3.5 h-3.5 flex-shrink-0" />
+              Ratio actual {form.lote ? 'del lote' : 'de la finca'} (últ. {ratioInfo.embarques_usados} embarques):
+              <strong className="ml-1">{ratioInfo.ratio_actual}</strong>
             </div>
           )}
 
-          {/* Semana + Color */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Fecha + Semana + Color */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha *</label>
+              <input type="date" value={form.fecha_embarque} onChange={(e) => set('fecha_embarque', e.target.value)} required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+            </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Semana cortada *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Semana *</label>
               <input type="text" value={form.semana_año} onChange={(e) => set('semana_año', e.target.value)}
                 placeholder="YYYY-WW" pattern="\d{4}-\d{2}" required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Color principal *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Color *</label>
               <select value={form.color_cinta} onChange={(e) => set('color_cinta', e.target.value)} required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
-                <option value="">Seleccione...</option>
+                <option value="">Color...</option>
                 {COLORES_CINTA.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
@@ -292,18 +310,18 @@ export default function EmbarquesList() {
     if (filtroFinca) {
       loteService.getByFinca(filtroFinca).then((d) => setLotes(d.results || d)).catch(() => setLotes([]));
     } else {
-      loteService.getAll().then((d) => setLotes(d.results || d)).catch(() => {});
+      setLotes([]);
+      setFiltroLote('');
     }
   }, [filtroFinca]);
 
-  useEffect(() => {
-    loadItems();
-  }, [filtroLote, filtroColor]);
+  useEffect(() => { loadItems(); }, [filtroFinca, filtroLote, filtroColor]);
 
   const loadItems = async () => {
     setLoading(true);
     try {
       const params = {};
+      if (filtroFinca) params.finca = filtroFinca;
       if (filtroLote) params.lote = filtroLote;
       if (filtroColor) params.color_cinta = filtroColor;
       const data = await produccionService.getEmbarques(params);
@@ -335,7 +353,7 @@ export default function EmbarquesList() {
         <div>
           <h1 className="text-2xl font-bold">Embarques</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Registro de corte y empaque. Haz clic en un embarque para ver la validación cruzada.
+            Registro de corte y empaque por finca. Expande un embarque para ver la validación cruzada.
           </p>
         </div>
         {canModify() && (
@@ -359,7 +377,8 @@ export default function EmbarquesList() {
         <div className="flex-1 min-w-[160px]">
           <label className="block text-xs text-gray-500 mb-1">Lote</label>
           <select value={filtroLote} onChange={(e) => setFiltroLote(e.target.value)}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm">
+            disabled={!filtroFinca}
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm disabled:bg-gray-100">
             <option value="">Todos</option>
             {lotes.map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}
           </select>
@@ -391,7 +410,10 @@ export default function EmbarquesList() {
               >
                 <div className="flex items-center gap-4">
                   <div>
-                    <p className="font-medium text-sm">{item.lote_nombre}</p>
+                    <p className="font-medium text-sm">
+                      {item.finca_nombre}
+                      {item.lote_nombre && <span className="text-gray-400 font-normal"> · {item.lote_nombre}</span>}
+                    </p>
                     <p className="text-xs text-gray-500">
                       {new Date(item.fecha_embarque + 'T00:00:00').toLocaleDateString('es-CO')} · Sem {item.semana_año}
                     </p>
@@ -427,7 +449,6 @@ export default function EmbarquesList() {
                 </div>
               </div>
 
-              {/* Panel de validación expandible */}
               {expandedId === item.id && (
                 <div className="border-t border-gray-100 px-4 pb-4">
                   <div className="grid grid-cols-3 gap-4 py-3 text-xs text-gray-600 border-b border-gray-100">
@@ -449,7 +470,7 @@ export default function EmbarquesList() {
       {modal && (
         <EmbarqueModal
           item={modal === 'new' ? null : modal}
-          lotes={lotes.length > 0 ? lotes : []}
+          fincas={fincas}
           onClose={() => setModal(null)}
           onSuccess={loadItems}
         />
@@ -460,7 +481,7 @@ export default function EmbarquesList() {
         onClose={() => setConfirmDelete({ isOpen: false, id: null })}
         onConfirm={() => handleDelete(confirmDelete.id)}
         title="Eliminar embarque"
-        message="¿Está seguro de eliminar este embarque? La validación cruzada ya no lo tendrá en cuenta."
+        message="¿Está seguro de eliminar este embarque?"
         type="danger"
       />
     </div>

@@ -28,7 +28,8 @@ class Migration(migrations.Migration):
                 ('observaciones', models.TextField(blank=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('created_by', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='embarques_creados', to=settings.AUTH_USER_MODEL)),
-                ('lote', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='embarques', to='core.lote')),
+                ('finca', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='embarques', to='core.finca')),
+                ('lote', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='embarques', to='core.lote')),
             ],
             options={
                 'verbose_name': 'Embarque',
@@ -48,7 +49,8 @@ class Migration(migrations.Migration):
                 ('observaciones', models.TextField(blank=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('created_by', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='matas_caidas_creadas', to=settings.AUTH_USER_MODEL)),
-                ('lote', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='matas_caidas', to='core.lote')),
+                ('finca', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='matas_caidas', to='core.finca')),
+                ('lote', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='matas_caidas', to='core.lote')),
             ],
             options={
                 'verbose_name': 'Mata Caída',

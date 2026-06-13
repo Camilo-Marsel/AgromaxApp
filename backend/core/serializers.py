@@ -1381,18 +1381,23 @@ class MovimientoCreateSerializer(serializers.ModelSerializer):
 # ============================================================================
 
 class MataCaidaSerializer(serializers.ModelSerializer):
-    lote_nombre = serializers.CharField(source='lote.nombre', read_only=True)
+    finca_nombre = serializers.CharField(source='finca.nombre', read_only=True)
+    lote_nombre = serializers.SerializerMethodField()
     color_cinta_display = serializers.CharField(source='get_color_cinta_display', read_only=True)
     created_by_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = MataCaida
         fields = [
-            'id', 'lote', 'lote_nombre', 'color_cinta', 'color_cinta_display',
+            'id', 'finca', 'finca_nombre', 'lote', 'lote_nombre',
+            'color_cinta', 'color_cinta_display',
             'semana_año', 'cantidad_caidas', 'fecha_reporte', 'observaciones',
             'created_at', 'created_by', 'created_by_nombre',
         ]
         read_only_fields = ['created_at', 'created_by']
+
+    def get_lote_nombre(self, obj):
+        return obj.lote.nombre if obj.lote else None
 
     def get_created_by_nombre(self, obj):
         return obj.created_by.get_full_name() if obj.created_by else None
@@ -1401,7 +1406,7 @@ class MataCaidaSerializer(serializers.ModelSerializer):
 class MataCaidaCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = MataCaida
-        fields = ['lote', 'color_cinta', 'semana_año', 'cantidad_caidas', 'fecha_reporte', 'observaciones']
+        fields = ['finca', 'lote', 'color_cinta', 'semana_año', 'cantidad_caidas', 'fecha_reporte', 'observaciones']
 
     def validate_semana_año(self, value):
         import re
@@ -1409,9 +1414,17 @@ class MataCaidaCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Formato requerido: YYYY-WW (ej: 2026-23)')
         return value
 
+    def validate(self, data):
+        lote = data.get('lote')
+        finca = data.get('finca')
+        if lote and lote.finca_id != finca.id:
+            raise serializers.ValidationError({'lote': 'El lote no pertenece a la finca seleccionada.'})
+        return data
+
 
 class EmbarqueSerializer(serializers.ModelSerializer):
-    lote_nombre = serializers.CharField(source='lote.nombre', read_only=True)
+    finca_nombre = serializers.CharField(source='finca.nombre', read_only=True)
+    lote_nombre = serializers.SerializerMethodField()
     color_cinta_display = serializers.CharField(source='get_color_cinta_display', read_only=True)
     total_cintas = serializers.ReadOnlyField()
     cajas_netas = serializers.ReadOnlyField()
@@ -1421,7 +1434,8 @@ class EmbarqueSerializer(serializers.ModelSerializer):
     class Meta:
         model = Embarque
         fields = [
-            'id', 'lote', 'lote_nombre', 'fecha_embarque', 'semana_año',
+            'id', 'finca', 'finca_nombre', 'lote', 'lote_nombre',
+            'fecha_embarque', 'semana_año',
             'color_cinta', 'color_cinta_display',
             'cintas_semana_actual', 'cintas_semana_anterior', 'cintas_semana_siguiente',
             'total_cintas',
@@ -1431,6 +1445,9 @@ class EmbarqueSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'created_by']
 
+    def get_lote_nombre(self, obj):
+        return obj.lote.nombre if obj.lote else None
+
     def get_created_by_nombre(self, obj):
         return obj.created_by.get_full_name() if obj.created_by else None
 
@@ -1439,7 +1456,7 @@ class EmbarqueCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Embarque
         fields = [
-            'lote', 'fecha_embarque', 'semana_año', 'color_cinta',
+            'finca', 'lote', 'fecha_embarque', 'semana_año', 'color_cinta',
             'cintas_semana_actual', 'cintas_semana_anterior', 'cintas_semana_siguiente',
             'cajas_empacadas', 'cajas_rechazadas', 'observaciones',
         ]
@@ -1449,3 +1466,10 @@ class EmbarqueCreateSerializer(serializers.ModelSerializer):
         if not re.match(r'^\d{4}-\d{2}$', value):
             raise serializers.ValidationError('Formato requerido: YYYY-WW (ej: 2026-23)')
         return value
+
+    def validate(self, data):
+        lote = data.get('lote')
+        finca = data.get('finca')
+        if lote and finca and lote.finca_id != finca.id:
+            raise serializers.ValidationError({'lote': 'El lote no pertenece a la finca seleccionada.'})
+        return data

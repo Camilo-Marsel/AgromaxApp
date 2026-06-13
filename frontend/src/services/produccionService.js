@@ -45,8 +45,10 @@ const produccionService = {
     await api.delete(`/produccion/embarques/${id}/`);
   },
 
-  getRatioLote: async (loteId) => {
-    const res = await api.get('/produccion/embarques/ratio-lote/', { params: { lote: loteId } });
+  getRatioFinca: async (fincaId, loteId = null) => {
+    const params = { finca: fincaId };
+    if (loteId) params.lote = loteId;
+    const res = await api.get('/produccion/embarques/ratio-finca/', { params });
     return res.data;
   },
 

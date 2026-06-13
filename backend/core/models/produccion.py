@@ -22,11 +22,14 @@ COLORES_CINTA = [
 class MataCaida(models.Model):
     """
     Registro de matas caídas durante el ciclo de 10 semanas.
-    Se vincula al lote y al color de la semana en que fueron encintadas
-    (no necesariamente la semana en que cayeron).
+    Finca obligatoria; lote opcional (si se conoce el lote específico).
     """
+    finca = models.ForeignKey(
+        'Finca', on_delete=models.CASCADE, related_name='matas_caidas',
+    )
     lote = models.ForeignKey(
-        'Lote', on_delete=models.CASCADE, related_name='matas_caidas',
+        'Lote', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='matas_caidas',
     )
     color_cinta = models.CharField(max_length=10, choices=COLORES_CINTA)
     # Semana ISO en formato "YYYY-WW" de cuando fueron encintadas
@@ -52,20 +55,23 @@ class MataCaida(models.Model):
         ordering = ['-fecha_reporte']
 
     def __str__(self):
-        return f'{self.lote} / {self.color_cinta} / sem {self.semana_año} — {self.cantidad_caidas}'
+        ubicacion = self.lote or self.finca
+        return f'{ubicacion} / {self.color_cinta} / sem {self.semana_año} — {self.cantidad_caidas}'
 
 
 class Embarque(models.Model):
     """
-    Registro del corte y empaque semanal.
-    Captura las cintas contadas en empacadora (pueden venir de 3 semanas)
-    y el resultado en cajas.
+    Registro del corte y empaque semanal a nivel de finca.
+    Lote opcional para mayor granularidad cuando se conoce.
     """
+    finca = models.ForeignKey(
+        'Finca', on_delete=models.CASCADE, related_name='embarques',
+    )
     lote = models.ForeignKey(
-        'Lote', on_delete=models.CASCADE, related_name='embarques',
+        'Lote', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='embarques',
     )
     fecha_embarque = models.DateField()
-    # Semana del color principal que se cortó
     semana_año = models.CharField(
         max_length=8,
         help_text='Semana ISO del color principal cortado, formato YYYY-WW',
@@ -75,9 +81,9 @@ class Embarque(models.Model):
         help_text='Color de la semana principal cortada',
     )
 
-    # Cintas contadas en empacadora (3 posibles semanas)
-    cintas_semana_actual   = models.PositiveIntegerField(default=0)
-    cintas_semana_anterior = models.PositiveIntegerField(default=0)
+    # Cintas contadas en empacadora (pueden venir de 3 semanas)
+    cintas_semana_actual    = models.PositiveIntegerField(default=0)
+    cintas_semana_anterior  = models.PositiveIntegerField(default=0)
     cintas_semana_siguiente = models.PositiveIntegerField(default=0)
 
     # Resultado
@@ -98,7 +104,8 @@ class Embarque(models.Model):
         ordering = ['-fecha_embarque']
 
     def __str__(self):
-        return f'{self.lote} — {self.fecha_embarque} ({self.color_cinta})'
+        ref = f'Lote {self.lote}' if self.lote else str(self.finca)
+        return f'{ref} — {self.fecha_embarque} ({self.color_cinta})'
 
     # ── Propiedades calculadas ────────────────────────────────────────────────
 
@@ -112,7 +119,7 @@ class Embarque(models.Model):
 
     @property
     def ratio(self):
-        """Cintas por caja neta. Retorna None si cajas_netas == 0."""
+        """Cintas por caja neta. None si cajas_netas == 0."""
         if not self.cajas_netas:
             return None
         try:
