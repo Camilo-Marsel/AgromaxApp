@@ -38,6 +38,7 @@ import ProductosList from './pages/Inventario/ProductosList';
 import ProductoDetail from './pages/Inventario/ProductoDetail';
 import ProductoForm from './pages/Inventario/ProductoForm';
 import BodegasList from './pages/Inventario/BodegasList';
+import LaborInsumos from './pages/Labores/LaborInsumos';
 
 // Obligaciones Laborales
 import PILAList from './pages/ObligacionesLaborales/PILA/PILAList';
@@ -266,6 +267,16 @@ function App() {
               <ProtectedRoute adminOnly>
                 <MainLayout>
                   <LaborPrecios />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/labores/insumos"
+            element={
+              <ProtectedRoute adminOnly>
+                <MainLayout>
+                  <LaborInsumos />
                 </MainLayout>
               </ProtectedRoute>
             }

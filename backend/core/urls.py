@@ -20,6 +20,7 @@ router.register(r'unidades-medida', UnidadMedidaViewSet, basename='unidad-medida
 router.register(r'tipos-contrato', TipoContratoViewSet, basename='tipo-contrato')
 router.register(r'labores', LaborViewSet, basename='labor')
 router.register(r'lista-precios', ListaPreciosViewSet, basename='lista-precios')
+router.register(r'labor-insumos', LaborInsumoViewSet, basename='labor-insumo')
 router.register(r'variables-nomina', VariablesNominaViewSet, basename='variables-nomina')
 router.register(r'quincenas', QuincenaViewSet, basename='quincena')
 router.register(r'registros-labor', RegistroLaborViewSet, basename='registro-labor')

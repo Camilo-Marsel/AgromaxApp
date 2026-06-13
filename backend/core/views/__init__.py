@@ -2,7 +2,7 @@
 
 from .usuarios import RolViewSet, UsuarioViewSet
 from .trabajadores import TipoContratoViewSet, TrabajadorViewSet, FincaViewSet, LoteViewSet
-from .catalogo import UnidadMedidaViewSet, LaborViewSet, ListaPreciosViewSet
+from .catalogo import UnidadMedidaViewSet, LaborViewSet, LaborInsumoViewSet, ListaPreciosViewSet
 from .nomina import (
     VariablesNominaViewSet, QuincenaViewSet, RegistroLaborViewSet,
     NominaViewSet, AuditoriaLogViewSet,
@@ -16,7 +16,7 @@ from .inventario import BodegaViewSet, ProductoViewSet, StockFincaViewSet, Movim
 __all__ = [
     'RolViewSet', 'UsuarioViewSet',
     'TipoContratoViewSet', 'TrabajadorViewSet', 'FincaViewSet', 'LoteViewSet',
-    'UnidadMedidaViewSet', 'LaborViewSet', 'ListaPreciosViewSet',
+    'UnidadMedidaViewSet', 'LaborViewSet', 'LaborInsumoViewSet', 'ListaPreciosViewSet',
     'VariablesNominaViewSet', 'QuincenaViewSet', 'RegistroLaborViewSet',
     'NominaViewSet', 'AuditoriaLogViewSet',
     'PrestamoViewSet',

@@ -8,9 +8,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.http import HttpResponse
 from django.utils import timezone
 
-from ..models import UnidadMedida, Labor, ListaPrecios
+from ..models import UnidadMedida, Labor, LaborInsumo, ListaPrecios
 from ..serializers import (
     UnidadMedidaSerializer, LaborListSerializer, LaborCreateUpdateSerializer,
+    LaborInsumoSerializer, LaborInsumoCreateUpdateSerializer,
     ListaPreciosSerializer, ListaPreciosCreateSerializer,
 )
 from ..permissions import CanModifyData
@@ -143,3 +144,17 @@ class ListaPreciosViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+
+class LaborInsumoViewSet(viewsets.ModelViewSet):
+    queryset = LaborInsumo.objects.select_related('labor', 'producto').all()
+    permission_classes = [CanModifyData]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['labor']
+    ordering_fields = ['labor__nombre', 'created_at']
+    ordering = ['labor__nombre']
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return LaborInsumoCreateUpdateSerializer
+        return LaborInsumoSerializer

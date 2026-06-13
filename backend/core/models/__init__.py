@@ -5,7 +5,7 @@
 
 from .hr import Rol, Usuario, TipoContrato, Trabajador, Contrato, DocumentoContrato
 from .farm import Bodega, Finca, Lote
-from .labor import UnidadMedida, Labor, ListaPrecios, Quincena, RegistroLabor
+from .labor import UnidadMedida, Labor, LaborInsumo, ListaPrecios, Quincena, RegistroLabor
 from .payroll import VariablesNomina, Nomina, DetalleNomina
 from .loans import Prestamo, CuotaPrestamo
 from .audit import AuditoriaLog
@@ -37,6 +37,7 @@ __all__ = [
     # Labor models
     'UnidadMedida',
     'Labor',
+    'LaborInsumo',
     'ListaPrecios',
     'Quincena',
     'RegistroLabor',

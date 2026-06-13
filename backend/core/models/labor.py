@@ -160,8 +160,70 @@ class Quincena(models.Model):
         return hoy <= self.fecha_cierre_registro
 
 
+class LaborInsumo(models.Model):
+    """
+    Conversión entre la unidad de pago de una labor y el producto de bodega
+    que consume. Editable por el administrador.
+    Ejemplo: Amarre → 1 ROLLO de Pita = 130 UNIDADES pagadas
+    """
+    UNIDAD_CHOICES = [
+        ('UNIDADES', 'Unidades'),
+        ('ROLLOS',   'Rollos'),
+        ('KG',       'Kilogramos'),
+        ('LITROS',   'Litros'),
+        ('SACOS',    'Sacos'),
+        ('METROS',   'Metros'),
+        ('CAJAS',    'Cajas'),
+    ]
+
+    labor          = models.OneToOneField(
+        Labor, on_delete=models.CASCADE, related_name='insumo',
+    )
+    producto       = models.ForeignKey(
+        'Producto', on_delete=models.PROTECT, related_name='labor_insumos',
+    )
+    # Cuántas unidades de la labor equivalen a 1 unidad del producto en bodega
+    # Ej: 130 unidades (matas amarradas) = 1 rollo de pita
+    # Ej: 1  unidad  (mata controlada)  = 1 cinta
+    factor         = models.DecimalField(
+        max_digits=10, decimal_places=4,
+        help_text='Unidades de labor por 1 unidad del producto de bodega',
+    )
+    es_aproximado  = models.BooleanField(
+        default=False,
+        help_text='True cuando la conversión es estimada (ej. abono)',
+    )
+    created_at     = models.DateTimeField(auto_now_add=True)
+    updated_at     = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Labor → Insumo'
+        verbose_name_plural = 'Labores → Insumos'
+
+    def __str__(self):
+        return f'{self.labor.nombre} → {self.producto.nombre} (÷{self.factor})'
+
+    def calcular_cantidad_producto(self, cantidad_labor):
+        """Unidades de producto a descontar dado cantidad de labor registrada."""
+        from decimal import Decimal
+        return (Decimal(str(cantidad_labor)) / self.factor).quantize(Decimal('0.01'))
+
+
 class RegistroLabor(models.Model):
     """Registro diario de labores realizadas por cada trabajador"""
+
+    COLORES_CINTA = [
+        ('ROJO',     'Rojo'),
+        ('VERDE',    'Verde'),
+        ('AZUL',     'Azul'),
+        ('AMARILLO', 'Amarillo'),
+        ('NEGRO',    'Negro'),
+        ('BLANCO',   'Blanco'),
+        ('NARANJA',  'Naranja'),
+        ('MORADO',   'Morado'),
+        ('ROSADO',   'Rosado'),
+        ('CAFE',     'Café'),
+    ]
 
     trabajador = models.ForeignKey(
         'Trabajador',
@@ -178,7 +240,15 @@ class RegistroLabor(models.Model):
         on_delete=models.CASCADE,
         related_name='registros'
     )
-    fecha = models.DateField()
+    fecha       = models.DateField()
+    lote        = models.ForeignKey(
+        'Lote', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='registros_labor',
+    )
+    color_cinta = models.CharField(
+        max_length=10, choices=COLORES_CINTA, blank=True,
+        help_text='Solo para labor Control',
+    )
     cantidad = models.DecimalField(
         max_digits=10,
         decimal_places=4,

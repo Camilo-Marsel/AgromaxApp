@@ -15,7 +15,7 @@ from .models import (
     PORCENTAJE_CESANTIAS, PORCENTAJE_INTERESES_CESANTIAS,
     PORCENTAJE_PRIMA, PORCENTAJE_VACACIONES,
     Producto, StockFinca, MovimientoInventario,
-    Bodega,
+    Bodega, LaborInsumo,
 )
 from decimal import Decimal
 from datetime import date
@@ -138,11 +138,13 @@ class LoteSerializer(serializers.ModelSerializer):
 class FincaSerializer(serializers.ModelSerializer):
     lotes = LoteSerializer(many=True, read_only=True)
     total_lotes = serializers.SerializerMethodField()
-    
+    bodega_nombre = serializers.CharField(source='bodega.nombre', read_only=True, default=None)
+
     class Meta:
         model = Finca
         fields = [
             'id', 'nombre', 'ubicacion', 'activa',
+            'bodega', 'bodega_nombre',
             'lotes', 'total_lotes',
             'created_at', 'updated_at'
         ]
@@ -459,6 +461,28 @@ class ListaPreciosCreateSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class LaborInsumoSerializer(serializers.ModelSerializer):
+    labor_nombre   = serializers.CharField(source='labor.nombre', read_only=True)
+    producto_nombre = serializers.CharField(source='producto.nombre', read_only=True)
+    producto_unidad = serializers.CharField(source='producto.unidad', read_only=True)
+    unidad_display  = serializers.CharField(source='producto.get_unidad_display', read_only=True)
+
+    class Meta:
+        model  = LaborInsumo
+        fields = [
+            'id', 'labor', 'labor_nombre',
+            'producto', 'producto_nombre', 'producto_unidad', 'unidad_display',
+            'factor', 'es_aproximado', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+
+class LaborInsumoCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = LaborInsumo
+        fields = ['labor', 'producto', 'factor', 'es_aproximado']
+
+
 class VariablesNominaSerializer(serializers.ModelSerializer):
     nombre_display = serializers.CharField(source='get_nombre_display', read_only=True)
     created_by_info = UsuarioSerializer(source='created_by', read_only=True)
@@ -500,11 +524,13 @@ class QuincenaSerializer(serializers.ModelSerializer):
 
 class RegistroLaborSerializer(serializers.ModelSerializer):
     trabajador_info = TrabajadorListSerializer(source='trabajador', read_only=True)
-    labor_info = LaborListSerializer(source='labor', read_only=True)
-    quincena_info = QuincenaSerializer(source='quincena', read_only=True)
+    labor_info      = LaborListSerializer(source='labor', read_only=True)
+    quincena_info   = QuincenaSerializer(source='quincena', read_only=True)
     created_by_info = UsuarioSerializer(source='created_by', read_only=True)
     updated_by_info = UsuarioSerializer(source='updated_by', read_only=True)
-    
+    lote_nombre     = serializers.SerializerMethodField()
+    color_cinta_display = serializers.CharField(source='get_color_cinta_display', read_only=True)
+
     class Meta:
         model = RegistroLabor
         fields = [
@@ -512,10 +538,15 @@ class RegistroLaborSerializer(serializers.ModelSerializer):
             'labor', 'labor_info',
             'quincena', 'quincena_info',
             'fecha', 'cantidad', 'observaciones',
+            'lote', 'lote_nombre',
+            'color_cinta', 'color_cinta_display',
             'created_at', 'created_by', 'created_by_info',
             'updated_at', 'updated_by', 'updated_by_info'
         ]
         read_only_fields = ['created_at', 'created_by', 'updated_at', 'updated_by']
+
+    def get_lote_nombre(self, obj):
+        return obj.lote.nombre if obj.lote else None
     
     def validate(self, attrs):
         """Validación adicional en el serializer"""
@@ -535,7 +566,7 @@ class RegistroLaborSerializer(serializers.ModelSerializer):
 class RegistroLaborCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = RegistroLabor
-        fields = ['trabajador', 'labor', 'quincena', 'fecha', 'cantidad', 'observaciones']
+        fields = ['trabajador', 'labor', 'quincena', 'fecha', 'cantidad', 'observaciones', 'lote', 'color_cinta']
     
     def validate(self, data):
         """Validaciones de negocio"""
