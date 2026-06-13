@@ -1,10 +1,10 @@
-﻿// frontend/src/pages/Inventario/ProductoDetail.jsx
+// frontend/src/pages/Inventario/ProductoDetail.jsx
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Package, ArrowLeft, Edit2, TrendingUp, TrendingDown,
-  Sliders, AlertTriangle, Clock, Plus, Warehouse,
+  Sliders, AlertTriangle, Clock, Plus, Warehouse, X, Save,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import inventarioService from '../../services/inventarioService';
@@ -27,6 +27,69 @@ const CATEGORIA_COLORS = {
   OTROS:         'bg-gray-100 text-gray-700',
 };
 
+// ── Modal editar stock mínimo ─────────────────────────────────────────────────
+function EditarMinimoModal({ stock, unidad, onClose, onSuccess }) {
+  const [valor, setValor]   = useState(String(stock.stock_minimo));
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await inventarioService.updateStock(stock.id, { stock_minimo: Number(valor) });
+      toast.success('Stock mínimo actualizado');
+      onSuccess();
+    } catch {
+      toast.error('Error actualizando el mínimo');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="font-semibold text-gray-900 text-sm">Editar stock mínimo</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Stock mínimo ({unidad}) — alerta cuando el stock baje de este valor
+            </label>
+            <input
+              autoFocus
+              type="number"
+              min="0"
+              step="0.01"
+              value={valor}
+              onChange={e => setValor(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+            >
+              {saving ? <LoadingSpinner size="sm" /> : <Save className="w-3.5 h-3.5" />}
+              Guardar
+            </button>
+            <button type="button" onClick={onClose} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Página principal ──────────────────────────────────────────────────────────
 export default function ProductoDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -40,9 +103,10 @@ export default function ProductoDetail() {
   const [loadingMovs, setLoadingMovs]     = useState(false);
   const [loading, setLoading]             = useState(true);
 
-  const [showMovForm, setShowMovForm]     = useState(false);
-  const [tipoMovForm, setTipoMovForm]     = useState('ENTRADA');
-  const [showStockForm, setShowStockForm] = useState(false);
+  const [showMovForm, setShowMovForm]       = useState(false);
+  const [tipoMovForm, setTipoMovForm]       = useState('ENTRADA');
+  const [showStockForm, setShowStockForm]   = useState(false);
+  const [editandoMinimo, setEditandoMinimo] = useState(null); // stock obj | null
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -54,7 +118,6 @@ export default function ProductoDetail() {
       setProducto(prod);
       const lista = stocksData.results ?? stocksData;
       setStocks(lista);
-      // Seleccionar el primer stock por defecto
       if (lista.length > 0) setStockSel(prev => prev ?? lista[0]);
     } catch {
       toast.error('Error cargando el producto');
@@ -66,7 +129,6 @@ export default function ProductoDetail() {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  // Cargar movimientos cuando cambia el stock seleccionado
   useEffect(() => {
     if (!stockSeleccionado) return;
     setLoadingMovs(true);
@@ -79,9 +141,13 @@ export default function ProductoDetail() {
       .finally(() => setLoadingMovs(false));
   }, [stockSeleccionado]);
 
-  const abrirMovimiento = (tipo) => {
-    setTipoMovForm(tipo);
-    setShowMovForm(true);
+  const abrirMovimiento = (tipo) => { setTipoMovForm(tipo); setShowMovForm(true); };
+
+  const refrescarStock = (stockId) => {
+    inventarioService.getStock(stockId).then(updated => {
+      setStockSel(updated);
+      setStocks(prev => prev.map(s => s.id === updated.id ? updated : s));
+    }).catch(() => {});
   };
 
   if (loading) return <div className="flex justify-center py-20"><LoadingSpinner /></div>;
@@ -120,7 +186,7 @@ export default function ProductoDetail() {
         )}
       </div>
 
-      {/* Stocks por finca */}
+      {/* Stocks por bodega */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-gray-800 flex items-center gap-2">
@@ -166,7 +232,7 @@ export default function ProductoDetail() {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-semibold text-gray-700">
-                      {s.bodega_nombre ?? <span className="italic text-gray-400">Bodega Central</span>}
+                      {s.bodega_nombre ?? <span className="italic text-gray-400">—</span>}
                     </span>
                     {bajo && <AlertTriangle className="w-4 h-4 text-red-500" />}
                   </div>
@@ -174,17 +240,29 @@ export default function ProductoDetail() {
                     {Number.parseFloat(s.stock_actual).toLocaleString('es-CO', { maximumFractionDigits: 2 })}
                     <span className="text-sm font-normal text-gray-400 ml-1">{producto.unidad_display}</span>
                   </p>
+                  {/* Stock mínimo con botón editar */}
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-xs text-gray-400">
+                      Mínimo: {Number.parseFloat(s.stock_minimo).toLocaleString('es-CO', { maximumFractionDigits: 2 })} {producto.unidad_display}
+                    </p>
+                    {activo && canModify() && (
+                      <button
+                        onClick={e => { e.stopPropagation(); setEditandoMinimo(s); }}
+                        className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-0.5 ml-2"
+                        title="Editar mínimo"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                   {pct !== null && (
-                    <div className="mt-2">
+                    <div className="mt-1.5">
                       <div className="h-1.5 rounded-full bg-gray-200">
                         <div
                           className={`h-1.5 rounded-full ${pct <= 100 ? 'bg-red-400' : 'bg-green-400'}`}
                           style={{ width: `${Math.min(pct, 100)}%` }}
                         />
                       </div>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        Mínimo: {Number.parseFloat(s.stock_minimo).toLocaleString('es-CO', { maximumFractionDigits: 2 })} {producto.unidad_display}
-                      </p>
                     </div>
                   )}
                   {/* Botones de acción rápida en el card seleccionado */}
@@ -192,21 +270,18 @@ export default function ProductoDetail() {
                     <div className="flex gap-1.5 mt-3 pt-3 border-t border-gray-100">
                       <button
                         onClick={e => { e.stopPropagation(); abrirMovimiento('ENTRADA'); }}
-                        title="Registrar entrada"
                         className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
                       >
                         <TrendingUp className="w-3.5 h-3.5" /> Entrada
                       </button>
                       <button
                         onClick={e => { e.stopPropagation(); abrirMovimiento('SALIDA'); }}
-                        title="Registrar salida"
                         className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
                       >
                         <TrendingDown className="w-3.5 h-3.5" /> Salida
                       </button>
                       <button
                         onClick={e => { e.stopPropagation(); abrirMovimiento('AJUSTE'); }}
-                        title="Ajuste de inventario"
                         className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
                       >
                         <Sliders className="w-3.5 h-3.5" /> Ajuste
@@ -227,7 +302,7 @@ export default function ProductoDetail() {
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-gray-400" />
               <h2 className="font-semibold text-gray-800">
-                Historial — {stockSeleccionado.bodega_nombre ?? 'Bodega Central'}
+                Historial — {stockSeleccionado.bodega_nombre ?? '—'}
               </h2>
             </div>
             <span className="text-xs text-gray-400">{totalMovs} en total · últimos 30</span>
@@ -285,14 +360,7 @@ export default function ProductoDetail() {
           onClose={() => setShowMovForm(false)}
           onSuccess={() => {
             setShowMovForm(false);
-            // Refrescar el stock seleccionado y volver a cargar movimientos
-            inventarioService.getStock(stockSeleccionado.id)
-              .then(updated => {
-                setStockSel(updated);
-                setStocks(prev => prev.map(s => s.id === updated.id ? updated : s));
-              })
-              .catch(() => {});
-            // Recargar movimientos
+            refrescarStock(stockSeleccionado.id);
             setLoadingMovs(true);
             inventarioService.getMovimientosPorStock(stockSeleccionado.id, { limit: 30 })
               .then(data => {
@@ -304,15 +372,25 @@ export default function ProductoDetail() {
         />
       )}
 
-      {/* Modal: agregar stock en nueva finca */}
+      {/* Modal: agregar stock en nueva bodega */}
       {showStockForm && (
         <StockFincaForm
           producto={producto}
           stocksExistentes={stocks}
           onClose={() => setShowStockForm(false)}
+          onSuccess={() => { setShowStockForm(false); cargar(); }}
+        />
+      )}
+
+      {/* Modal: editar stock mínimo */}
+      {editandoMinimo && (
+        <EditarMinimoModal
+          stock={editandoMinimo}
+          unidad={producto.unidad_display}
+          onClose={() => setEditandoMinimo(null)}
           onSuccess={() => {
-            setShowStockForm(false);
-            cargar();
+            setEditandoMinimo(null);
+            refrescarStock(editandoMinimo.id);
           }}
         />
       )}
