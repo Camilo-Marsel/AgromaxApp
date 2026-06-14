@@ -199,7 +199,7 @@ export default function Dashboard() {
                   onClick={() => navigate('/inventario')}
                 >
                   <p className="font-medium text-gray-800 truncate">{s.producto}</p>
-                  <p className="text-xs text-gray-400">{s.finca} · {s.stock_actual} / mín {s.stock_minimo} {s.unidad}</p>
+                  <p className="text-xs text-gray-400">{s.bodega} · {s.stock_actual} / mín {s.stock_minimo} {s.unidad}</p>
                 </li>
               ))}
             </ul>
