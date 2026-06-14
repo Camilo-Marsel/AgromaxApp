@@ -25,6 +25,7 @@ export default function Sidebar() {
     { path: '/prestamos', icon: DollarSign, label: 'Adelantos' },
     { path: '/obligaciones', icon: Shield, label: 'Obligaciones' },
     { path: '/configuracion/variables', icon: Settings, label: 'Configuración' },
+    { path: '/configuracion/empresa', icon: Settings, label: 'Config. Empresa', adminOnly: true },
     // Solo visible para ADMINISTRADOR
     { path: '/usuarios', icon: UserCog, label: 'Usuarios', adminOnly: true },
   ];

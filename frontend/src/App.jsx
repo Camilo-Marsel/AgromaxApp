@@ -29,6 +29,7 @@ import ContratosList from './pages/Contratos/ContratosList';
 import ContratoDetail from './pages/Contratos/ContratoDetail';
 import ContratoForm from './pages/Contratos/ContratoForm';
 import ConfiguracionVariables from './pages/Configuracion/ConfiguracionVariables';
+import ConfiguracionEmpresa from './pages/Configuracion/ConfiguracionEmpresa';
 import ReportesList from './pages/Reportes/ReportesList';
 import ReportesNomina from './pages/Reportes/ReportesNomina';
 import UsuariosList from './pages/Usuarios/UsuariosList';
@@ -41,6 +42,7 @@ import BodegasList from './pages/Inventario/BodegasList';
 import LaborInsumos from './pages/Labores/LaborInsumos';
 import MatasCaidasList from './pages/Produccion/MatasCaidasList';
 import EmbarquesList from './pages/Produccion/EmbarquesList';
+import ReportesProduccion from './pages/Reportes/ReportesProduccion';
 
 // Obligaciones Laborales
 import PILAList from './pages/ObligacionesLaborales/PILA/PILAList';
@@ -409,6 +411,7 @@ function App() {
               <ProtectedRoute adminOnly>
                 <MainLayout>
                   <ConfiguracionVariables />
+            <Route path="/configuracion/empresa" element={<ConfiguracionEmpresa />} />
                 </MainLayout>
               </ProtectedRoute>
             }
@@ -431,6 +434,7 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <ReportesNomina />
+            <Route path="/reportes/produccion" element={<ReportesProduccion />} />
                 </MainLayout>
               </ProtectedRoute>
             }

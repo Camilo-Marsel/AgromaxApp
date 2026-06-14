@@ -52,6 +52,13 @@ const produccionService = {
     return res.data;
   },
 
+  getTendencia: async (fincaId, loteId = null, n = 12) => {
+    const params = { finca: fincaId, n };
+    if (loteId) params.lote = loteId;
+    const res = await api.get('/produccion/embarques/tendencia/', { params });
+    return res.data;
+  },
+
   getValidacionEmbarque: async (embarqueId, params = {}) => {
     const res = await api.get(`/produccion/embarques/${embarqueId}/validacion/`, { params });
     return res.data;

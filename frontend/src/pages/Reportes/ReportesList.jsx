@@ -1,7 +1,7 @@
 // frontend/src/pages/Reportes/ReportesList.jsx
 
 import { useNavigate } from 'react-router-dom';
-import { FileText, DollarSign, Users, TrendingUp, ArrowRight } from 'lucide-react';
+import { FileText, DollarSign, Users, TrendingUp, ArrowRight, Leaf } from 'lucide-react';
 
 export default function ReportesList() {
   const navigate = useNavigate();
@@ -14,6 +14,15 @@ export default function ReportesList() {
       icono: DollarSign,
       color: 'blue',
       ruta: '/reportes/nomina',
+      disponible: true,
+    },
+    {
+      id: 'produccion',
+      titulo: 'Produccion',
+      descripcion: 'Tendencias de ratio, cajas por semana y analisis por color de cinta',
+      icono: Leaf,
+      color: 'green',
+      ruta: '/reportes/produccion',
       disponible: true,
     },
     {

@@ -1,34 +1,15 @@
 // frontend/src/pages/Produccion/MatasCaidasList.jsx
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, X, Save } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Save, Info } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import produccionService from '../../services/produccionService';
 import fincaService from '../../services/fincaService';
 import loteService from '../../services/loteService';
+import { COLORES_CINTA, getSemanasOpciones, getSemanaActual, getColorParaSemana } from '../../utils/produccionUtils';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import toast from 'react-hot-toast';
-
-const COLORES_CINTA = [
-  { value: 'ROJO', label: 'Rojo' },
-  { value: 'VERDE', label: 'Verde' },
-  { value: 'AZUL', label: 'Azul' },
-  { value: 'AMARILLO', label: 'Amarillo' },
-  { value: 'NEGRO', label: 'Negro' },
-  { value: 'BLANCO', label: 'Blanco' },
-  { value: 'NARANJA', label: 'Naranja' },
-  { value: 'MORADO', label: 'Morado' },
-  { value: 'ROSADO', label: 'Rosado' },
-  { value: 'CAFE', label: 'Café' },
-];
-
-function semanaActual() {
-  const now = new Date();
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const week = Math.ceil(((now - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
-  return `${now.getFullYear()}-${String(week).padStart(2, '0')}`;
-}
 
 function MataCaidaModal({ item, fincas, onClose, onSuccess }) {
   const isEditing = Boolean(item);
@@ -36,7 +17,7 @@ function MataCaidaModal({ item, fincas, onClose, onSuccess }) {
     finca: item?.finca ?? '',
     lote: item?.lote ?? '',
     color_cinta: item?.color_cinta ?? '',
-    semana_año: item?.semana_año ?? semanaActual(),
+    semana_año: item?.semana_año ?? getSemanaActual(),
     cantidad_caidas: item?.cantidad_caidas ?? '',
     fecha_reporte: item?.fecha_reporte ?? new Date().toISOString().slice(0, 10),
     observaciones: item?.observaciones ?? '',
@@ -124,22 +105,43 @@ function MataCaidaModal({ item, fincas, onClose, onSuccess }) {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Color de cinta *</label>
-              <select value={form.color_cinta} onChange={(e) => set('color_cinta', e.target.value)} required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">Seleccione...</option>
-                {COLORES_CINTA.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Semana encintado *</label>
-              <input type="text" value={form.semana_año} onChange={(e) => set('semana_año', e.target.value)}
-                placeholder="YYYY-WW" pattern="\d{4}-\d{2}" required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-          </div>
+          {/* Semana + color */}
+          {(() => {
+            const semanas = getSemanasOpciones();
+            const semSel = semanas.find((s) => s.value === form.semana_año);
+            const colorEsperado = semSel ? semSel.colorEsperado : null;
+            const colorMismatch = colorEsperado && form.color_cinta && form.color_cinta !== colorEsperado;
+            return (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Semana encintado *</label>
+                  <select value={form.semana_año} onChange={(e) => {
+                    const opt = semanas.find((s) => s.value === e.target.value);
+                    set('semana_año', e.target.value);
+                    if (opt && !form.color_cinta) set('color_cinta', opt.colorEsperado);
+                  }} required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    {semanas.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label} — {COLORES_CINTA.find((c)=>c.value===s.colorEsperado)?.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Color de cinta *</label>
+                  <select value={form.color_cinta} onChange={(e) => set('color_cinta', e.target.value)} required
+                    className={'w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ' + (colorMismatch ? 'border-amber-400 bg-amber-50' : 'border-gray-300')}>
+                    <option value="">Seleccione...</option>
+                    {COLORES_CINTA.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                  {colorMismatch && (
+                    <p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1">
+                      <Info className="w-3 h-3" /> Esperado para esa semana: {COLORES_CINTA.find((c)=>c.value===colorEsperado)?.label}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

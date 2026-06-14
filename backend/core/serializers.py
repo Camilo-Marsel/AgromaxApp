@@ -1014,6 +1014,7 @@ class ConfiguracionEmpresaSerializer(serializers.ModelSerializer):
             'correo', 'telefono', 'direccion',
             'ciudad', 'departamento', 'logo_path',
             'periodo_pago', 'periodo_pago_display',
+            'umbral_desviacion_produccion', 'umbral_matas_sin_reportar',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
