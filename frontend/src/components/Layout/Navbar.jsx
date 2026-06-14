@@ -30,7 +30,7 @@ export default function Navbar({ onMenuClick }) {
         <div className="flex items-center gap-3 ml-auto">
           <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600">
             <User className="w-4 h-4" />
-            <span>{user?.username || 'Usuario'}</span>
+            <span>{user?.nombre_completo || user?.username || 'Usuario'}</span>
           </div>
           <button
             onClick={handleLogout}
