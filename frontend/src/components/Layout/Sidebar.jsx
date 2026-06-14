@@ -6,16 +6,14 @@ import {
   Home, Users, Briefcase, DollarSign, FileText, Settings,
   MapPin, FileCheck, UserCog, Shield, ClipboardList, Package,
   Warehouse, Layers, Leaf, Ship, ChevronDown, ChevronRight,
-  BarChart2,
+  BarChart2, X,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 const GROUPS = [
   {
-    label: null, // sin encabezado — solo Dashboard
-    items: [
-      { path: '/dashboard', icon: Home, label: 'Dashboard' },
-    ],
+    label: null,
+    items: [{ path: '/dashboard', icon: Home, label: 'Dashboard' }],
   },
   {
     label: 'Personal',
@@ -58,9 +56,7 @@ const GROUPS = [
   },
   {
     label: 'Reportes',
-    items: [
-      { path: '/reportes', icon: BarChart2, label: 'Reportes' },
-    ],
+    items: [{ path: '/reportes', icon: BarChart2, label: 'Reportes' }],
   },
   {
     label: 'Sistema',
@@ -72,46 +68,45 @@ const GROUPS = [
   },
 ];
 
-export default function Sidebar() {
+function SidebarContent({ onClose }) {
   const { canManageUsers } = useAuth();
   const location = useLocation();
   const isAdmin = canManageUsers();
 
-  // Determine which group is active based on current path
   const activeGroupLabel = GROUPS.find((g) =>
     g.items.some((item) => location.pathname.startsWith(item.path) && item.path !== '/dashboard')
   )?.label ?? null;
 
   const [open, setOpen] = useState(() => {
     const initial = {};
-    GROUPS.forEach((g) => {
-      if (g.label) initial[g.label] = g.label === activeGroupLabel;
-    });
+    GROUPS.forEach((g) => { if (g.label) initial[g.label] = g.label === activeGroupLabel; });
     return initial;
   });
 
   const toggle = (label) => setOpen((prev) => ({ ...prev, [label]: !prev[label] }));
 
   return (
-    <div className="w-56 bg-gray-900 flex flex-col h-screen overflow-y-auto flex-shrink-0">
-      {/* Logo */}
-      <div className="px-4 py-4 border-b border-gray-700">
-        <span className="text-white font-bold text-lg tracking-wide">AgroMax</span>
+    <div className="w-56 bg-gray-900 flex flex-col h-full">
+      <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+        <span className="text-white font-bold text-lg">AgroMax</span>
+        {onClose && (
+          <button onClick={onClose} className="lg:hidden text-gray-400 hover:text-white p-1">
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
-
-      <nav className="flex-1 px-2 py-3 space-y-0.5">
+      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
         {GROUPS.map((group) => {
           if (group.adminOnly && !isAdmin) return null;
-
           const visibleItems = group.items.filter((i) => !i.adminOnly || isAdmin);
           if (visibleItems.length === 0) return null;
 
           if (!group.label) {
-            // Dashboard — always visible, no header
             return visibleItems.map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}
+                onClick={onClose}
                 className={({ isActive }) =>
                   'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ' +
                   (isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white')
@@ -136,12 +131,8 @@ export default function Sidebar() {
                 }
               >
                 <span>{group.label}</span>
-                {isGroupOpen
-                  ? <ChevronDown className="w-3 h-3" />
-                  : <ChevronRight className="w-3 h-3" />
-                }
+                {isGroupOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
               </button>
-
               {isGroupOpen && (
                 <div className="mt-0.5 space-y-0.5">
                   {visibleItems.map((item) => (
@@ -149,6 +140,7 @@ export default function Sidebar() {
                       key={item.path}
                       to={item.path}
                       end={item.path === '/registros'}
+                      onClick={onClose}
                       className={({ isActive }) =>
                         'flex items-center gap-2.5 pl-5 pr-3 py-2 rounded-md text-sm transition-colors ' +
                         (isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white')
@@ -165,5 +157,31 @@ export default function Sidebar() {
         })}
       </nav>
     </div>
+  );
+}
+
+export default function Sidebar({ isOpen, onClose }) {
+  return (
+    <>
+      {/* Desktop: always visible */}
+      <div className="hidden lg:flex flex-shrink-0 h-screen">
+        <SidebarContent />
+      </div>
+
+      {/* Mobile: overlay drawer */}
+      {isOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50"
+            onClick={onClose}
+          />
+          {/* Drawer */}
+          <div className="relative flex flex-col h-full shadow-xl">
+            <SidebarContent onClose={onClose} />
+          </div>
+        </div>
+      )}
+    </>
   );
 }

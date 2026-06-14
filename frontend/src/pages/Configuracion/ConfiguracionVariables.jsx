@@ -21,7 +21,7 @@ export default function ConfiguracionVariables() {
 
   useEffect(() => {
     loadVariables();
-    api.get('/configuracion-empresa/1/').then((r) => { setEmpresa(r.data); setEmpresaForm({ umbral_desviacion_produccion: r.data.umbral_desviacion_produccion, umbral_matas_sin_reportar: r.data.umbral_matas_sin_reportar }); }).catch(() => {});
+    api.get('/configuracion-empresa/').then((r) => { setEmpresa(r.data); setEmpresaForm({ umbral_desviacion_produccion: r.data.umbral_desviacion_produccion, umbral_matas_sin_reportar: r.data.umbral_matas_sin_reportar }); }).catch(() => {});
   }, []);
 
   const loadVariables = async () => {

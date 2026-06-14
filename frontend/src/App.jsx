@@ -1,7 +1,7 @@
 ﻿// frontend/src/App.jsx
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useContext } from 'react';
+import { useContext, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Toaster } from 'react-hot-toast';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
@@ -72,12 +72,13 @@ ProtectedRoute.propTypes = {
 };
 
 function MainLayout({ children }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   return (
     <div className="flex h-screen bg-gray-100">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Navbar />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-6">
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <Navbar onMenuClick={() => setSidebarOpen(true)} />
+        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-6">
           {children}
         </main>
       </div>

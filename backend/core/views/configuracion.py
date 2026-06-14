@@ -29,6 +29,21 @@ class ConfiguracionEmpresaViewSet(viewsets.ModelViewSet):
         serializer.save()
         return Response(serializer.data)
 
+    def retrieve(self, request, *args, **kwargs):
+        config = ConfiguracionEmpresa.get_config()
+        serializer = self.get_serializer(config)
+        return Response(serializer.data)
+
+    def update(self, request, *args, **kwargs):
+        config = ConfiguracionEmpresa.get_config()
+        serializer = self.get_serializer(config, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def partial_update(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
+
     @action(detail=False, methods=['get'])
     def actual(self, request):
         """Obtener la configuración actual de empresa"""
