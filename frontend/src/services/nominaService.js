@@ -203,10 +203,10 @@ const nominaService = {
   },
 
   // Enviar recibos masivos por correo electrónico
-  enviarRecibosMasivo: async (quincenaId, fincaId = null, estados = ['APROBADA']) => {
+  enviarRecibosMasivo: async (quincenaId, fincaIds = null, estados = ['APROBADA']) => {
     const response = await api.post('/nominas/enviar_recibos_masivo/', {
       quincena_id: quincenaId,
-      finca_id: fincaId,
+      finca_ids: fincaIds && fincaIds.length > 0 ? fincaIds : null,
       estados,
     });
     return response.data;

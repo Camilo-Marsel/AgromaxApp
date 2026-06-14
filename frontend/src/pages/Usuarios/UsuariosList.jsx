@@ -122,6 +122,7 @@ export default function UsuariosList() {
 
       {/* Tabla */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -217,6 +218,7 @@ export default function UsuariosList() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Leyenda de roles */}

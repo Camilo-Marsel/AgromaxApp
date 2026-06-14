@@ -829,7 +829,7 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         - estados (optional, default: ['APROBADA'])
         """
         quincena_id = request.data.get('quincena_id')
-        finca_id = request.data.get('finca_id')
+        finca_ids = request.data.get('finca_ids')
         estados = request.data.get('estados', ['APROBADA'])
 
         if not quincena_id:
@@ -844,14 +844,19 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
             trabajador__correo__isnull=False
         ).exclude(trabajador__correo='').select_related('trabajador', 'quincena')
 
-        if finca_id:
-            nominas = nominas.filter(trabajador__finca_id=finca_id)
+        if finca_ids:
+            if isinstance(finca_ids, list):
+                nominas = nominas.filter(trabajador__finca_id__in=finca_ids)
+            else:
+                nominas = nominas.filter(trabajador__finca_id=finca_ids)
 
         if not nominas.exists():
-            return Response(
-                {'error': 'No hay nóminas con correo registrado para enviar'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'message': 'No hay nóminas con correo registrado para enviar',
+                'exitosos': 0,
+                'fallidos': 0,
+                'detalles': [],
+            })
 
         try:
             from ..services.email_service import enviar_recibos_masivo

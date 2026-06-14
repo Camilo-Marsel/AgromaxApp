@@ -212,7 +212,7 @@ export default function NominaList() {
       setEnviandoCorreos(true);
       const result = await nominaService.enviarRecibosMasivo(
         quincenaSeleccionada,
-        fincasSeleccionadas.length > 0 ? fincasSeleccionadas.join(',') : null,
+        fincasSeleccionadas.length > 0 ? fincasSeleccionadas : null,
         estadosEnvioCorreo
       );
 
@@ -373,7 +373,7 @@ export default function NominaList() {
 
       {/* Botones de acción */}
       <div className="flex justify-end">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {quincenaSeleccionada && (
             <>
               {/* Botones de modificación - solo para ADMINISTRADOR y SUPERVISOR */}
