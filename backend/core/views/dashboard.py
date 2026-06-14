@@ -3,10 +3,13 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.db.models import Sum, Count, F, Q
+import logging
+from django.db.models import Sum, Count, F
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+logger = logging.getLogger(__name__)
 
 from ..models import (
     Trabajador, Finca, Quincena, Nomina, Prestamo,
@@ -17,6 +20,15 @@ from ..models import (
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_resumen(request):
+    try:
+        return _dashboard_resumen_impl(request)
+    except Exception as exc:
+        logger.exception('Error en dashboard_resumen')
+        from rest_framework import status
+        return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def _dashboard_resumen_impl(request):
     hoy = date.today()
 
     # 1. Trabajadores activos total y por finca
