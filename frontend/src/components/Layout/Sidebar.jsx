@@ -108,7 +108,7 @@ function SidebarContent({ onClose }) {
                 to={item.path}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ' +
+                  'flex items-center gap-2.5 px-3 py-2 rounded-md text-lg transition-colors ' +
                   (isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white')
                 }
               >
@@ -126,7 +126,7 @@ function SidebarContent({ onClose }) {
               <button
                 onClick={() => toggle(group.label)}
                 className={
-                  'w-full flex items-center justify-between px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-colors ' +
+                  'w-full flex items-center justify-between px-3 py-1.5 rounded-md text-sm font-semibold uppercase tracking-wider transition-colors ' +
                   (isGroupActive ? 'text-blue-400' : 'text-gray-500 hover:text-gray-300')
                 }
               >
@@ -142,7 +142,7 @@ function SidebarContent({ onClose }) {
                       end={item.path === '/registros'}
                       onClick={onClose}
                       className={({ isActive }) =>
-                        'flex items-center gap-2.5 pl-5 pr-3 py-2 rounded-md text-sm transition-colors ' +
+                        'flex items-center gap-2.5 pl-5 pr-3 py-2 rounded-md text-lg transition-colors ' +
                         (isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white')
                       }
                     >
