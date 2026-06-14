@@ -3,11 +3,15 @@ import { useForm } from 'react-hook-form';
 import variablesNominaService from '../../services/variablesNominaService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
-import { Save, TrendingUp, DollarSign, Heart, Shield, History, X, AlertTriangle, Plus } from 'lucide-react';
+import { Save, TrendingUp, DollarSign, Heart, Shield, History, X, AlertTriangle, Plus, Settings } from 'lucide-react';
+import api from '../../services/api';
 
 export default function ConfiguracionVariables() {
   const [variables, setVariables] = useState({});
   const [loading, setLoading] = useState(true);
+  const [empresa, setEmpresa] = useState(null);
+  const [savingEmpresa, setSavingEmpresa] = useState(false);
+  const [empresaForm, setEmpresaForm] = useState({ umbral_desviacion_produccion: '', umbral_matas_sin_reportar: '' });
   const [guardando, setGuardando] = useState(false);
   const [variableEditando, setVariableEditando] = useState(null);
   const [mostrarHistorial, setMostrarHistorial] = useState(null);
@@ -17,6 +21,7 @@ export default function ConfiguracionVariables() {
 
   useEffect(() => {
     loadVariables();
+    api.get('/configuracion-empresa/1/').then((r) => { setEmpresa(r.data); setEmpresaForm({ umbral_desviacion_produccion: r.data.umbral_desviacion_produccion, umbral_matas_sin_reportar: r.data.umbral_matas_sin_reportar }); }).catch(() => {});
   }, []);
 
   const loadVariables = async () => {
@@ -111,6 +116,19 @@ export default function ConfiguracionVariables() {
         return 'purple';
       default:
         return 'gray';
+    }
+  };
+
+  const handleSaveEmpresa = async (e) => {
+    e.preventDefault();
+    setSavingEmpresa(true);
+    try {
+      await api.patch('/configuracion-empresa/1/', empresaForm);
+      toast.success('Configuracion de produccion guardada');
+    } catch {
+      toast.error('Error al guardar');
+    } finally {
+      setSavingEmpresa(false);
     }
   };
 
@@ -309,6 +327,42 @@ export default function ConfiguracionVariables() {
             </div>
           );
         })}
+      </div>
+
+      {/* Configuracion de Produccion */}
+      <div className="mt-8 bg-white rounded-lg shadow-md border-l-4 border-green-600 overflow-hidden">
+        <div className="bg-green-50 p-4 flex items-center gap-3">
+          <Settings className="w-5 h-5 text-green-600" />
+          <h2 className="text-lg font-semibold text-green-900">Alertas de Produccion</h2>
+        </div>
+        <div className="p-5">
+          <p className="text-sm text-gray-500 mb-4">Umbrales usados en la validacion cruzada de embarques.</p>
+          <form onSubmit={handleSaveEmpresa} className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Desviacion maxima (%)</label>
+              <input type="number" step="0.5" min="1" max="100"
+                value={empresaForm.umbral_desviacion_produccion}
+                onChange={(e) => setEmpresaForm((f) => ({ ...f, umbral_desviacion_produccion: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              <p className="text-xs text-gray-400 mt-0.5">Alerta si las cajas netas se desvian mas de este % de lo esperado.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Matas sin reportar max</label>
+              <input type="number" min="0"
+                value={empresaForm.umbral_matas_sin_reportar}
+                onChange={(e) => setEmpresaForm((f) => ({ ...f, umbral_matas_sin_reportar: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              <p className="text-xs text-gray-400 mt-0.5">Alerta si hay mas de N matas encintadas que no llegaron al corte.</p>
+            </div>
+            <div className="col-span-2 flex justify-end">
+              <button type="submit" disabled={savingEmpresa}
+                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400 text-sm font-medium">
+                <Save className="w-4 h-4" />
+                {savingEmpresa ? 'Guardando...' : 'Guardar umbrales'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
 
       {/* Modal Historial */}

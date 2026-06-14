@@ -1,4 +1,4 @@
-// frontend/src/App.jsx
+﻿// frontend/src/App.jsx
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useContext } from 'react';
@@ -10,52 +10,45 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import TrabajadoresList from './pages/Trabajadores/TrabajadoresList';
 import TrabajadorForm from './pages/Trabajadores/TrabajadorForm';
+import TrabajadorDetail from './pages/Trabajadores/TrabajadorDetail';
 import Navbar from './components/Layout/Navbar';
 import Sidebar from './components/Layout/Sidebar';
 import RegistroLabores from './pages/Registros/RegistroLabores';
+import HistorialRegistros from './pages/Registros/HistorialRegistros';
 import NominaList from './pages/Nomina/NominaList';
 import NominaDetail from './pages/Nomina/NominaDetail';
 import LaboresList from './pages/Labores/LaboresList';
 import LaborForm from './pages/Labores/LaborForm';
 import LaborPrecios from './pages/Labores/LaborPrecios';
+import LaborInsumos from './pages/Labores/LaborInsumos';
 import FincasList from './pages/Fincas/FincasList';
 import FincaForm from './pages/Fincas/FincaForm';
 import FincaLotes from './pages/Fincas/FincaLotes';
 import PrestamosList from './pages/Prestamos/PrestamosList';
 import PrestamoForm from './pages/Prestamos/PrestamoForm';
 import PrestamoDetail from './pages/Prestamos/PrestamoDetail';
-import TrabajadorDetail from './pages/Trabajadores/TrabajadorDetail';
 import ContratosList from './pages/Contratos/ContratosList';
 import ContratoDetail from './pages/Contratos/ContratoDetail';
 import ContratoForm from './pages/Contratos/ContratoForm';
 import ConfiguracionVariables from './pages/Configuracion/ConfiguracionVariables';
-import ConfiguracionEmpresa from './pages/Configuracion/ConfiguracionEmpresa';
 import ReportesList from './pages/Reportes/ReportesList';
 import ReportesNomina from './pages/Reportes/ReportesNomina';
+import ReportesProduccion from './pages/Reportes/ReportesProduccion';
 import UsuariosList from './pages/Usuarios/UsuariosList';
 import UsuarioForm from './pages/Usuarios/UsuarioForm';
-import HistorialRegistros from './pages/Registros/HistorialRegistros';
 import ProductosList from './pages/Inventario/ProductosList';
 import ProductoDetail from './pages/Inventario/ProductoDetail';
 import ProductoForm from './pages/Inventario/ProductoForm';
 import BodegasList from './pages/Inventario/BodegasList';
-import LaborInsumos from './pages/Labores/LaborInsumos';
 import MatasCaidasList from './pages/Produccion/MatasCaidasList';
 import EmbarquesList from './pages/Produccion/EmbarquesList';
-import ReportesProduccion from './pages/Reportes/ReportesProduccion';
-
-// Obligaciones Laborales
 import PILAList from './pages/ObligacionesLaborales/PILA/PILAList';
 import PILADetail from './pages/ObligacionesLaborales/PILA/PILADetail';
 import PrestacionesList from './pages/ObligacionesLaborales/Prestaciones/PrestacionesList';
 import PrestacionesDetail from './pages/ObligacionesLaborales/Prestaciones/PrestacionesDetail';
 
-// Componente para rutas protegidas
-// adminOnly  → solo ADMINISTRADOR
-// modifyOnly → ADMINISTRADOR o SUPERVISOR
 function ProtectedRoute({ children, adminOnly = false, modifyOnly = false }) {
   const { isAuthenticated, loading, isAdmin, canModify } = useContext(AuthContext);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -66,11 +59,9 @@ function ProtectedRoute({ children, adminOnly = false, modifyOnly = false }) {
       </div>
     );
   }
-
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (adminOnly && !isAdmin()) return <Navigate to="/dashboard" replace />;
   if (modifyOnly && !canModify()) return <Navigate to="/dashboard" replace />;
-
   return children;
 }
 
@@ -80,7 +71,6 @@ ProtectedRoute.propTypes = {
   modifyOnly: PropTypes.bool,
 };
 
-// Layout para páginas internas
 function MainLayout({ children }) {
   return (
     <div className="flex h-screen bg-gray-100">
@@ -95,428 +85,91 @@ function MainLayout({ children }) {
   );
 }
 
+const P = ({ children, admin, modify }) => (
+  <ProtectedRoute adminOnly={!!admin} modifyOnly={!!modify}>
+    <MainLayout>{children}</MainLayout>
+  </ProtectedRoute>
+);
+
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Toaster position="top-right" />
         <Routes>
-          {/* Ruta pública - Landing Page */}
           <Route path="/" element={<Landing />} />
-          
-          {/* Ruta de Login */}
           <Route path="/login" element={<Login />} />
-          
-          {/* Dashboard - Redirige si está autenticado */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Dashboard />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+
+          <Route path="/dashboard" element={<P><Dashboard /></P>} />
 
           {/* Trabajadores */}
-          <Route path="/trabajadores/:id" 
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <TrabajadorDetail />
-                </MainLayout>
-              </ProtectedRoute>
-            } 
-          />
-          <Route
-            path="/trabajadores"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <TrabajadoresList />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/trabajadores/nuevo"
-            element={
-              <ProtectedRoute modifyOnly>
-                <MainLayout>
-                  <TrabajadorForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/trabajadores/:id/editar"
-            element={
-              <ProtectedRoute modifyOnly>
-                <MainLayout>
-                  <TrabajadorForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/trabajadores" element={<P><TrabajadoresList /></P>} />
+          <Route path="/trabajadores/nuevo" element={<P modify><TrabajadorForm /></P>} />
+          <Route path="/trabajadores/:id" element={<P><TrabajadorDetail /></P>} />
+          <Route path="/trabajadores/:id/editar" element={<P modify><TrabajadorForm /></P>} />
 
           {/* Contratos */}
-          <Route
-            path="/contratos"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <ContratosList />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/contratos/nuevo"
-            element={
-              <ProtectedRoute modifyOnly>
-                <MainLayout>
-                  <ContratoForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/contratos/:id"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <ContratoDetail />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/contratos/:id/editar"
-            element={
-              <ProtectedRoute modifyOnly>
-                <MainLayout>
-                  <ContratoForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/contratos" element={<P><ContratosList /></P>} />
+          <Route path="/contratos/nuevo" element={<P modify><ContratoForm /></P>} />
+          <Route path="/contratos/:id" element={<P><ContratoDetail /></P>} />
+          <Route path="/contratos/:id/editar" element={<P modify><ContratoForm /></P>} />
 
           {/* Préstamos */}
-          <Route
-            path="/prestamos"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <PrestamosList />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/prestamos/nuevo"
-            element={
-              <ProtectedRoute modifyOnly>
-                <MainLayout>
-                  <PrestamoForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/prestamos/:id"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <PrestamoDetail />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/prestamos" element={<P><PrestamosList /></P>} />
+          <Route path="/prestamos/nuevo" element={<P modify><PrestamoForm /></P>} />
+          <Route path="/prestamos/:id" element={<P><PrestamoDetail /></P>} />
 
           {/* Labores */}
-          <Route
-            path="/labores"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <LaboresList />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/labores/nueva"
-            element={
-              <ProtectedRoute adminOnly>
-                <MainLayout>
-                  <LaborForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/labores/:id/editar"
-            element={
-              <ProtectedRoute adminOnly>
-                <MainLayout>
-                  <LaborForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/labores/:id/precios"
-            element={
-              <ProtectedRoute adminOnly>
-                <MainLayout>
-                  <LaborPrecios />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/labores/insumos"
-            element={
-              <ProtectedRoute adminOnly>
-                <MainLayout>
-                  <LaborInsumos />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/labores" element={<P><LaboresList /></P>} />
+          <Route path="/labores/nueva" element={<P admin><LaborForm /></P>} />
+          <Route path="/labores/:id/editar" element={<P admin><LaborForm /></P>} />
+          <Route path="/labores/:id/precios" element={<P admin><LaborPrecios /></P>} />
+          <Route path="/labores/insumos" element={<P admin><LaborInsumos /></P>} />
 
           {/* Fincas */}
-          <Route
-            path="/fincas"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <FincasList />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/fincas/nueva"
-            element={
-              <ProtectedRoute adminOnly>
-                <MainLayout>
-                  <FincaForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/fincas/:id/editar"
-            element={
-              <ProtectedRoute adminOnly>
-                <MainLayout>
-                  <FincaForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/fincas/:id/lotes"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <FincaLotes />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/fincas" element={<P><FincasList /></P>} />
+          <Route path="/fincas/nueva" element={<P admin><FincaForm /></P>} />
+          <Route path="/fincas/:id/editar" element={<P admin><FincaForm /></P>} />
+          <Route path="/fincas/:id/lotes" element={<P><FincaLotes /></P>} />
 
           {/* Registros */}
-          <Route
-            path="/registros"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <RegistroLabores />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/registros/historial"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <HistorialRegistros />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/registros" element={<P><RegistroLabores /></P>} />
+          <Route path="/registros/historial" element={<P><HistorialRegistros /></P>} />
 
           {/* Inventario */}
-          <Route
-            path="/inventario"
-            element={<ProtectedRoute><MainLayout><ProductosList /></MainLayout></ProtectedRoute>}
-          />
-          <Route
-            path="/inventario/bodegas"
-            element={<ProtectedRoute><MainLayout><BodegasList /></MainLayout></ProtectedRoute>}
-          />
+          <Route path="/inventario" element={<P><ProductosList /></P>} />
+          <Route path="/inventario/bodegas" element={<P><BodegasList /></P>} />
+          <Route path="/inventario/productos/nuevo" element={<P modify><ProductoForm /></P>} />
+          <Route path="/inventario/productos/:id" element={<P><ProductoDetail /></P>} />
+          <Route path="/inventario/productos/:id/editar" element={<P modify><ProductoForm /></P>} />
 
           {/* Producción */}
-          <Route
-            path="/produccion/matas-caidas"
-            element={<ProtectedRoute modifyOnly><MainLayout><MatasCaidasList /></MainLayout></ProtectedRoute>}
-          />
-          <Route
-            path="/produccion/embarques"
-            element={<ProtectedRoute modifyOnly><MainLayout><EmbarquesList /></MainLayout></ProtectedRoute>}
-          />
-          <Route
-            path="/inventario/productos/nuevo"
-            element={<ProtectedRoute modifyOnly><MainLayout><ProductoForm /></MainLayout></ProtectedRoute>}
-          />
-          <Route
-            path="/inventario/productos/:id"
-            element={<ProtectedRoute><MainLayout><ProductoDetail /></MainLayout></ProtectedRoute>}
-          />
-          <Route
-            path="/inventario/productos/:id/editar"
-            element={<ProtectedRoute modifyOnly><MainLayout><ProductoForm /></MainLayout></ProtectedRoute>}
-          />
+          <Route path="/produccion/matas-caidas" element={<P modify><MatasCaidasList /></P>} />
+          <Route path="/produccion/embarques" element={<P modify><EmbarquesList /></P>} />
 
           {/* Nómina */}
-          <Route
-            path="/nomina"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <NominaList />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/nomina/:id"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <NominaDetail />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/nomina" element={<P><NominaList /></P>} />
+          <Route path="/nomina/:id" element={<P><NominaDetail /></P>} />
 
           {/* Configuración */}
-          <Route
-            path="/configuracion/variables"
-            element={
-              <ProtectedRoute adminOnly>
-                <MainLayout>
-                  <ConfiguracionVariables />
-            <Route path="/configuracion/empresa" element={<ConfiguracionEmpresa />} />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/configuracion/variables" element={<P admin><ConfiguracionVariables /></P>} />
 
           {/* Reportes */}
-          <Route
-            path="/reportes"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <ReportesList />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/reportes/nomina"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <ReportesNomina />
-            <Route path="/reportes/produccion" element={<ReportesProduccion />} />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/reportes" element={<P><ReportesList /></P>} />
+          <Route path="/reportes/nomina" element={<P><ReportesNomina /></P>} />
+          <Route path="/reportes/produccion" element={<P><ReportesProduccion /></P>} />
 
           {/* Obligaciones Laborales */}
-          <Route
-            path="/obligaciones"
-            element={<Navigate to="/obligaciones/pila" replace />}
-          />
-          <Route
-            path="/obligaciones/pila"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <PILAList />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/obligaciones/pila/:id"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <PILADetail />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/obligaciones/prestaciones"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <PrestacionesList />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/obligaciones/prestaciones/:id"
-            element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <PrestacionesDetail />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/obligaciones" element={<Navigate to="/obligaciones/pila" replace />} />
+          <Route path="/obligaciones/pila" element={<P><PILAList /></P>} />
+          <Route path="/obligaciones/pila/:id" element={<P><PILADetail /></P>} />
+          <Route path="/obligaciones/prestaciones" element={<P><PrestacionesList /></P>} />
+          <Route path="/obligaciones/prestaciones/:id" element={<P><PrestacionesDetail /></P>} />
 
-          {/* Usuarios - Solo Administrador */}
-          <Route
-            path="/usuarios"
-            element={
-              <ProtectedRoute adminOnly>
-                <MainLayout>
-                  <UsuariosList />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/usuarios/nuevo"
-            element={
-              <ProtectedRoute adminOnly>
-                <MainLayout>
-                  <UsuarioForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/usuarios/:id/editar"
-            element={
-              <ProtectedRoute adminOnly>
-                <MainLayout>
-                  <UsuarioForm />
-                </MainLayout>
-              </ProtectedRoute>
-            }
-          />
+          {/* Usuarios */}
+          <Route path="/usuarios" element={<P admin><UsuariosList /></P>} />
+          <Route path="/usuarios/nuevo" element={<P admin><UsuarioForm /></P>} />
+          <Route path="/usuarios/:id/editar" element={<P admin><UsuarioForm /></P>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
