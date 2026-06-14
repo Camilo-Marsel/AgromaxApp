@@ -54,5 +54,6 @@ def health_check(request):
 
 urlpatterns = [
     path('health/', health_check, name='health_check'),
+    path('dashboard/resumen/', dashboard_resumen, name='dashboard_resumen'),
     path('', include(router.urls)),
 ]
