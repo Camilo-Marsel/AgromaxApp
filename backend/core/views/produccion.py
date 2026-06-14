@@ -97,11 +97,11 @@ class EmbarqueViewSet(viewsets.ModelViewSet):
 
         # Filtro base: por lote si existe, si no por finca
         if lote_id:
-            labor_filter = dict(lote_id=lote_id, color_cinta=color, labor__nombre='Control')
+            labor_filter = dict(lote_id=lote_id, color_cinta=color, labor__nombre='Embolse')
             caida_filter = dict(lote_id=lote_id, color_cinta=color)
             ratio_qs = Embarque.objects.filter(finca_id=finca_id, lote_id=lote_id)
         else:
-            labor_filter = dict(lote__finca_id=finca_id, color_cinta=color, labor__nombre='Control')
+            labor_filter = dict(lote__finca_id=finca_id, color_cinta=color, labor__nombre='Embolse')
             caida_filter = dict(finca_id=finca_id, color_cinta=color)
             ratio_qs = Embarque.objects.filter(finca_id=finca_id, lote__isnull=True)
 

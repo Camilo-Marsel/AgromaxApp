@@ -432,7 +432,7 @@ export default function RegistroLabores() {
     );
   }
 
-  const esControl = laborSeleccionada?.nombre === 'Control';
+  const esEmbolse = laborSeleccionada?.nombre === 'Embolse';
 
   return (
     <div className="space-y-6">
@@ -596,8 +596,8 @@ export default function RegistroLabores() {
                 </div>
               )}
 
-              {/* Color de Cinta — solo para labor Control */}
-              {esControl && (
+              {/* Color de Cinta — solo para labor Embolse */}
+              {esEmbolse && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Color de Cinta <span className="text-gray-400 font-normal">(opcional)</span>
