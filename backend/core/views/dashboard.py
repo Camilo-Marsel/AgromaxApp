@@ -97,13 +97,13 @@ def _dashboard_resumen_impl(request):
     stocks_bajos = (
         StockFinca.objects
         .filter(stock_minimo__gt=0, stock_actual__lte=F('stock_minimo'))
-        .select_related('producto', 'finca')
-        .order_by('finca__nombre', 'producto__nombre')
+        .select_related('producto', 'bodega', 'bodega__finca')
+        .order_by('bodega__finca__nombre', 'producto__nombre')
     )
     alertas_stock = [
         {
             'producto': s.producto.nombre,
-            'finca': s.finca.nombre,
+            'finca': s.bodega.finca.nombre if s.bodega and s.bodega.finca else s.bodega.nombre if s.bodega else '—',
             'stock_actual': float(s.stock_actual),
             'stock_minimo': float(s.stock_minimo),
             'unidad': s.producto.get_unidad_display(),
