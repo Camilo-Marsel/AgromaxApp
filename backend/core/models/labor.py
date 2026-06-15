@@ -295,7 +295,8 @@ class RegistroLabor(models.Model):
             raise ValidationError('La fecha debe estar dentro de la quincena')
 
         # Labores especiales que pueden agregarse como "adicionales" a cualquier día
-        LABORES_ADICIONALES = ['Control', 'Resiembra CabezaToro', 'Siembra Nueva', 'Amarre', 'Amarre 3 pitas']
+        # Horas Trabajadas también es libre (validación de duplicado en serializer)
+        LABORES_ADICIONALES = ['Control', 'Resiembra CabezaToro', 'Siembra Nueva', 'Amarre', 'Amarre 3 pitas', 'Horas Trabajadas']
 
         # Embolse permite múltiples registros por día, uno por combinación color+lote
         if self.labor.nombre == 'Embolse':

@@ -247,10 +247,11 @@ class TrabajadorDetailSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         request = self.context.get('request')
         
-        # Si no es SUPER_ADMIN, ocultar cuenta completa
+        # Solo ADMINISTRADOR y SUPERVISOR ven la cuenta completa
         if request and hasattr(request, 'user'):
             user = request.user
-            if not user.rol or user.rol.nombre != Rol.SUPER_ADMIN:
+            roles_con_acceso = {Rol.ADMINISTRADOR, Rol.SUPERVISOR}
+            if not user.rol or user.rol.nombre not in roles_con_acceso:
                 data['numero_cuenta_bancaria'] = instance.cuenta_oculta
         
         return data
@@ -272,6 +273,14 @@ class TrabajadorCreateUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
+        # Si el número de cuenta llega enmascarado (contiene '*'), preservar el valor real
+        cuenta_enviada = data.get('numero_cuenta_bancaria', '')
+        if cuenta_enviada and '*' in str(cuenta_enviada):
+            if self.instance and self.instance.numero_cuenta_bancaria:
+                data['numero_cuenta_bancaria'] = self.instance.numero_cuenta_bancaria
+            else:
+                data.pop('numero_cuenta_bancaria', None)
+
         # Validar que si es administrativo, tenga salario
         if data.get('es_administrativo') and not data.get('salario_quincenal'):
             raise serializers.ValidationError({
@@ -598,67 +607,23 @@ class RegistroLaborCreateUpdateSerializer(serializers.ModelSerializer):
                 "Esta quincena ya no permite registros (fecha límite superada)"
             )
 
-        # Validaciones específicas para "Horas Trabajadas"
-        # Lista de labores adicionales que pueden combinarse libremente
-        LABORES_ADICIONALES = ['Control', 'Resiembra CabezaToro', 'Siembra Nueva', 'Amarre', 'Amarre 3 pitas']
-
+        # Validación específica para "Horas Trabajadas": máximo 1 por día, máx 8h
+        # Puede combinarse con cualquier otra labor sin restricción
         if labor and labor.nombre == 'Horas Trabajadas':
-            # Validación 1: No más de 8 horas por día
             if cantidad > 8:
                 raise serializers.ValidationError(
-                    "No se pueden registrar más de 8 horas por día. "
-                    "Si trabajó horas extras, debe registrarlas con otra labor."
+                    "No se pueden registrar más de 8 horas por día."
                 )
-
-            # Validación 2: No se puede combinar con otras labores NORMALES
-            # Pero SÍ puede combinarse con labores adicionales
-            registros_existentes = RegistroLabor.objects.filter(
-                trabajador=trabajador,
-                fecha=fecha,
-                quincena=quincena
-            ).select_related('labor')
-
-            # Si estamos editando, excluir el registro actual
-            if self.instance:
-                registros_existentes = registros_existentes.exclude(pk=self.instance.pk)
-
-            if registros_existentes.exists():
-                # Verificar si hay otra "Horas Trabajadas"
-                tiene_horas = registros_existentes.filter(labor__nombre='Horas Trabajadas').exists()
-                if tiene_horas:
-                    raise serializers.ValidationError(
-                        f"Ya existe un registro de 'Horas Trabajadas' para el {fecha.strftime('%d/%m/%Y')}."
-                    )
-
-                # Verificar si hay labores normales (no adicionales)
-                labores_normales = registros_existentes.exclude(labor__nombre__in=LABORES_ADICIONALES)
-                if labores_normales.exists():
-                    labor_normal = labores_normales.first().labor.nombre
-                    raise serializers.ValidationError(
-                        f"No se puede combinar 'Horas Trabajadas' con '{labor_normal}' (labor normal). "
-                        f"Solo puede combinarse con labores adicionales."
-                    )
-                # Si solo hay labores adicionales, permitir (no hacer nada)
-
-        # Validación inversa: Si se intenta registrar otra labor normal y ya existe "Horas Trabajadas"
-        if labor and labor.nombre != 'Horas Trabajadas' and labor.nombre not in LABORES_ADICIONALES:
             registros_horas = RegistroLabor.objects.filter(
-                trabajador=trabajador,
-                fecha=fecha,
-                quincena=quincena,
+                trabajador=trabajador, fecha=fecha, quincena=quincena,
                 labor__nombre='Horas Trabajadas'
             )
-
-            # Si estamos editando, excluir el registro actual
             if self.instance:
                 registros_horas = registros_horas.exclude(pk=self.instance.pk)
-
             if registros_horas.exists():
                 raise serializers.ValidationError(
-                    f"El trabajador ya tiene registrado 'Horas Trabajadas' para el {fecha.strftime('%d/%m/%Y')}. "
-                    f"No se pueden combinar con otras labores normales."
+                    f"Ya existe un registro de 'Horas Trabajadas' para el {fecha.strftime('%d/%m/%Y')}."
                 )
-        # Si es una labor adicional, la validación se maneja en el modelo RegistroLabor.clean()
 
         return data
 
