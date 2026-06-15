@@ -49,7 +49,9 @@ export default function MultipleDatePicker({
       const tieneRegistro = laboresEnFecha.length > 0;
       
       // Labores especiales que pueden agregarse como "adicionales" (debe coincidir con el backend)
-      const LABORES_ADICIONALES = ['Control', 'Resiembra CabezaToro', 'Siembra Nueva', 'Amarre', 'Amarre 3 pitas'];
+      // Embolse: múltiples por día (validación color+lote se hace al guardar)
+      // Horas Trabajadas: puede ir sobre cualquier labor
+      const LABORES_ADICIONALES = ['Control', 'Resiembra CabezaToro', 'Siembra Nueva', 'Amarre', 'Amarre 3 pitas', 'Embolse', 'Horas Trabajadas'];
 
       // Labores que SOLO pueden registrarse en domingos
       const LABORES_SOLO_DOMINGOS = ['Domingo extra'];
@@ -90,7 +92,9 @@ export default function MultipleDatePicker({
 
         // Si la labor actual es adicional
         if (LABORES_ADICIONALES.includes(laborActualNombre)) {
-          if (laboresEnFecha.includes(laborActualNombre)) {
+          // Embolse permite múltiples por día — nunca bloquear por duplicado de nombre
+          const esEmbolseOHoras = laborActualNombre === 'Embolse' || laborActualNombre === 'Horas Trabajadas';
+          if (!esEmbolseOHoras && laboresEnFecha.includes(laborActualNombre)) {
             disabled = true;
             mensajeTooltip = `Ya tiene ${laborActualNombre} registrado.`;
           } else {
