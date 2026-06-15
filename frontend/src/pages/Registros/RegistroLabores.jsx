@@ -474,8 +474,10 @@ export default function RegistroLabores() {
         }
       }
 
-      if (trabajadorWatch && quincenaActual) {
-        await loadRegistrosByTrabajadorQuincena(trabajadorWatch, quincenaActual.id);
+      // Recargar registros del panel derecho
+      const trabajadorId = trabajadorWatch || trabajadorFiltro;
+      if (trabajadorId && quincenaActual) {
+        await loadRegistrosByTrabajadorQuincena(trabajadorId, quincenaActual.id);
       }
 
       reset({
@@ -491,8 +493,14 @@ export default function RegistroLabores() {
       setLaborInsumo(null);
       setEsTipoDia(false);
       setEsDesmache(false);
+      setFilasEmbolse([]);
     } catch (error) {
       console.error('Error al crear registro:', error);
+      // Recargar de todos modos para reflejar lo que sí se guardó
+      const trabajadorId = trabajadorWatch || trabajadorFiltro;
+      if (trabajadorId && quincenaActual) {
+        loadRegistrosByTrabajadorQuincena(trabajadorId, quincenaActual.id);
+      }
       if (error.response?.data) {
         Object.values(error.response.data).forEach((err) => {
           toast.error(Array.isArray(err) ? err[0] : err);

@@ -213,16 +213,16 @@ class RegistroLabor(models.Model):
     """Registro diario de labores realizadas por cada trabajador"""
 
     COLORES_CINTA = [
-        ('ROJO',     'Rojo'),
-        ('VERDE',    'Verde'),
-        ('AZUL',     'Azul'),
-        ('AMARILLO', 'Amarillo'),
-        ('NEGRO',    'Negro'),
-        ('BLANCO',   'Blanco'),
-        ('NARANJA',  'Naranja'),
-        ('MORADO',   'Morado'),
-        ('ROSADO',   'Rosado'),
+        ('MORADA',   'Morada'),
         ('CAFE',     'Café'),
+        ('NEGRA',    'Negra'),
+        ('NARANJA',  'Naranja'),
+        ('VERDE',    'Verde'),
+        ('AMARILLO', 'Amarillo'),
+        ('BLANCA',   'Blanca'),
+        ('AZUL',     'Azul'),
+        ('HABANO',   'Habano'),
+        ('GRIS',     'Gris'),
     ]
 
     trabajador = models.ForeignKey(
@@ -297,18 +297,23 @@ class RegistroLabor(models.Model):
         # Labores especiales que pueden agregarse como "adicionales" a cualquier día
         LABORES_ADICIONALES = ['Control', 'Resiembra CabezaToro', 'Siembra Nueva', 'Amarre', 'Amarre 3 pitas']
 
-        # Validar duplicados: NO permitir múltiples labores "normales" el mismo día
-        # EXCEPCIÓN: Las labores adicionales pueden agregarse libremente
-        #
-        # Regla: Máximo 1 labor normal + cualquier combinación de labores adicionales
-        #
-        # Ejemplos válidos:
-        # - Día Básico (1 normal)
-        # - Día Básico + Control (1 normal + 1 adicional)
-        # - Día Básico + Resiembra CabezaToro + Siembra Nueva (1 normal + 2 adicionales)
-        # - Control + Resiembra CabezaToro + Siembra Nueva (3 adicionales)
-        # - Resiembra CabezaToro + Siembra Nueva (2 adicionales)
-        # - Día Básico + Amarre + Amarre 3 pitas (1 normal + 2 adicionales)
+        # Embolse permite múltiples registros por día, uno por combinación color+lote
+        if self.labor.nombre == 'Embolse':
+            duplicado = RegistroLabor.objects.filter(
+                trabajador=self.trabajador,
+                fecha=self.fecha,
+                quincena=self.quincena,
+                labor=self.labor,
+                color_cinta=self.color_cinta,
+                lote=self.lote,
+            )
+            if self.pk:
+                duplicado = duplicado.exclude(pk=self.pk)
+            if duplicado.exists():
+                raise ValidationError(
+                    'Ya existe un registro de Embolse con ese color de cinta y lote para este día.'
+                )
+            return  # Embolse no necesita más validaciones de duplicado
 
         registros_mismo_dia = RegistroLabor.objects.filter(
             trabajador=self.trabajador,
@@ -326,8 +331,7 @@ class RegistroLabor(models.Model):
             labor_actual = self.labor.nombre
 
             # Clasificar labores existentes
-            labores_normales_existentes = [l for l in labores_existentes if l not in LABORES_ADICIONALES]
-            labores_adicionales_existentes = [l for l in labores_existentes if l in LABORES_ADICIONALES]
+            labores_normales_existentes = [l for l in labores_existentes if l not in LABORES_ADICIONALES and l != 'Embolse']
 
             # Si la labor actual es adicional, siempre puede agregarse
             if labor_actual in LABORES_ADICIONALES:
@@ -336,18 +340,13 @@ class RegistroLabor(models.Model):
                     raise ValidationError(
                         f'Ya existe un registro de {labor_actual} para este día.'
                     )
-                # Si no está duplicada, permitir agregarla
-                pass
             else:
                 # Es una labor normal, verificar que no haya otra labor normal
                 if labores_normales_existentes:
-                    # Ya existe una labor normal, no permitir otra
                     raise ValidationError(
                         f'Ya existe un registro de {labores_normales_existentes[0]} para este día. '
                         f'Solo puede agregar labores adicionales (Control, Resiembra CabezaToro, Siembra Nueva, Amarre, Amarre 3 pitas).'
                     )
-                # Si no hay labores normales, permitir agregar esta
-                pass
 
     def save(self, *args, **kwargs):
         self.clean()
