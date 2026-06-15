@@ -46,8 +46,8 @@ class FincaAdmin(admin.ModelAdmin):
 
 @admin.register(Lote)
 class LoteAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'finca', 'medida', 'unidad_medida', 'activo']
-    list_filter = ['finca', 'activo', 'unidad_medida']
+    list_display = ['nombre', 'finca', 'numero_lote', 'area_bruta', 'area_neta', 'activo']
+    list_filter = ['finca', 'activo']
     search_fields = ['nombre', 'finca__nombre']
 
 @admin.register(TipoContrato)

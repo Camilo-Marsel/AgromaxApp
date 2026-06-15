@@ -124,14 +124,17 @@ class UsuarioCreateSerializer(serializers.ModelSerializer):
 
 class LoteSerializer(serializers.ModelSerializer):
     finca_nombre = serializers.CharField(source='finca.nombre', read_only=True)
-    unidad_medida_display = serializers.CharField(source='get_unidad_medida_display', read_only=True)
-    
+
     class Meta:
         model = Lote
         fields = [
-            'id', 'finca', 'finca_nombre', 'nombre', 'medida',
-            'unidad_medida', 'unidad_medida_display', 'activo',
-            'created_at', 'updated_at'
+            'id', 'finca', 'finca_nombre', 'nombre', 'numero_lote',
+            'canal_primario_longitud', 'canal_primario_area',
+            'canal_secundario_longitud', 'canal_secundario_area',
+            'canal_terciario_longitud', 'canal_terciario_area',
+            'cables_longitud', 'cables_area',
+            'area_bruta', 'area_neta',
+            'activo', 'created_at', 'updated_at',
         ]
         read_only_fields = ['created_at', 'updated_at']
 

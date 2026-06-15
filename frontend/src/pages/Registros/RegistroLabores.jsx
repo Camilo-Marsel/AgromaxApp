@@ -576,8 +576,8 @@ export default function RegistroLabores() {
                 </div>
               )}
 
-              {/* Lote — solo si la labor tiene LaborInsumo configurado */}
-              {laborInsumo && lotes.length > 0 && (
+              {/* Lote — para Embolse o si la labor tiene LaborInsumo configurado */}
+              {(esEmbolse || laborInsumo) && lotes.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Lote <span className="text-gray-400 font-normal">(opcional)</span>

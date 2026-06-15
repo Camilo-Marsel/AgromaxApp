@@ -52,10 +52,6 @@ class Finca(models.Model):
 
 class Lote(models.Model):
     """Lotes que pertenecen a una finca"""
-    UNIDAD_MEDIDA_CHOICES = [
-        ('HECTAREA', 'Hectárea'),
-        ('METRO_CUADRADO', 'Metro Cuadrado'),
-    ]
 
     finca = models.ForeignKey(
         Finca,
@@ -63,12 +59,24 @@ class Lote(models.Model):
         related_name='lotes'
     )
     nombre = models.CharField(max_length=100)
-    medida = models.DecimalField(max_digits=10, decimal_places=2)
-    unidad_medida = models.CharField(
-        max_length=20,
-        choices=UNIDAD_MEDIDA_CHOICES,
-        default='HECTAREA'
-    )
+    numero_lote = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    # Canales (longitud en m, área en m²)
+    canal_primario_longitud = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    canal_primario_area = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    canal_secundario_longitud = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    canal_secundario_area = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    canal_terciario_longitud = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    canal_terciario_area = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    # Cables (longitud en m, área en m²)
+    cables_longitud = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    cables_area = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    # Áreas totales (m²)
+    area_bruta = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    area_neta = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+
     activo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -77,7 +85,7 @@ class Lote(models.Model):
         db_table = 'lotes'
         verbose_name = 'Lote'
         verbose_name_plural = 'Lotes'
-        ordering = ['finca', 'nombre']
+        ordering = ['finca', 'numero_lote', 'nombre']
         unique_together = [['finca', 'nombre']]
 
     def __str__(self):
