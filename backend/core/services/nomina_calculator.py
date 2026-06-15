@@ -69,16 +69,11 @@ class NominaCalculator:
         for reg in todos_registros:
             self._registros_cache[reg.trabajador_id].append(reg)
 
-        # 1 sola query para todos los préstamos activos con sus cuotas
+        # Caché de préstamos: solo IDs por trabajador para saber cuáles existen.
+        # Las cuotas y saldo se leen siempre desde DB para evitar datos obsoletos
+        # cuando un trabajador anterior ya modificó el mismo préstamo en el mismo lote.
         todos_prestamos = list(
-            Prestamo.objects.filter(estado='ACTIVO')
-            .prefetch_related(
-                Prefetch(
-                    'cuotas',
-                    queryset=CuotaPrestamo.objects.filter(estado='PENDIENTE').order_by('numero_cuota'),
-                    to_attr='cuotas_pendientes'
-                )
-            )
+            Prestamo.objects.filter(estado='ACTIVO').only('id', 'trabajador_id')
         )
         self._prestamos_cache = defaultdict(list)
         for prestamo in todos_prestamos:
@@ -819,87 +814,85 @@ class NominaCalculator:
         if hasattr(self, '_prestamos_cache'):
             prestamos = self._prestamos_cache.get(trabajador.id, [])
         else:
-            from django.db.models import Prefetch
             prestamos = list(
                 Prestamo.objects.filter(trabajador=trabajador, estado='ACTIVO')
-                .prefetch_related(
-                    Prefetch(
-                        'cuotas',
-                        queryset=CuotaPrestamo.objects.filter(estado='PENDIENTE').order_by('numero_cuota'),
-                        to_attr='cuotas_pendientes'
-                    )
-                )
             )
 
         for prestamo in prestamos:
             if prestamo.tipo_pago == 'UNICO':
-                # Descontar el total del préstamo (sin exceder devengado)
-                valor_descuento = min(prestamo.saldo_pendiente, total_devengado_actual - total)
+                # Para pago único siempre leer saldo real desde DB (evita corrupción por caché)
+                saldo_real = Prestamo.objects.values_list('saldo_pendiente', flat=True).get(pk=prestamo.pk)
+                valor_descuento = min(saldo_real, total_devengado_actual - total)
 
                 if valor_descuento > 0:
                     DetalleNomina.objects.create(
                         nomina=nomina,
                         tipo='DEDUCCION',
-                        concepto='PRESTAMO',  # Mantener código interno
+                        concepto='PRESTAMO',
                         descripcion=f'Adelanto #{prestamo.id} (Pago Único)',
                         valor_total=valor_descuento
                     )
-
-                    # Actualizar préstamo
-                    prestamo.saldo_pendiente -= valor_descuento
-                    if prestamo.saldo_pendiente <= 0:
-                        prestamo.estado = 'PAGADO'
-                    prestamo.save()
-
+                    nuevo_saldo = saldo_real - valor_descuento
+                    Prestamo.objects.filter(pk=prestamo.pk).update(
+                        saldo_pendiente=nuevo_saldo,
+                        estado='PAGADO' if nuevo_saldo <= 0 else 'ACTIVO',
+                    )
                     total += valor_descuento
 
             else:  # CUOTAS
-                # Buscar siguiente cuota pendiente (desde cuotas_pendientes pre-cargadas)
-                cuotas = getattr(prestamo, 'cuotas_pendientes', None)
-                if cuotas is not None:
-                    cuota = cuotas[0] if cuotas else None
-                else:
-                    cuota = CuotaPrestamo.objects.filter(
-                        prestamo=prestamo,
-                        estado='PENDIENTE'
-                    ).order_by('numero_cuota').first()
-                
+                # Siempre consultar la DB para obtener la cuota real pendiente,
+                # ignorando el caché que puede estar desactualizado tras un recálculo.
+                cuota = CuotaPrestamo.objects.filter(
+                    prestamo=prestamo,
+                    estado='PENDIENTE'
+                ).order_by('numero_cuota').first()
+
                 if cuota:
-                    # Validar que no exceda el devengado disponible
                     valor_descuento = min(cuota.valor_cuota, total_devengado_actual - total)
-                    
+
                     if valor_descuento > 0:
                         DetalleNomina.objects.create(
                             nomina=nomina,
                             tipo='DEDUCCION',
-                            concepto='PRESTAMO',  # Mantener código interno
+                            concepto='PRESTAMO',
                             descripcion=f'Adelanto #{prestamo.id} - Cuota {cuota.numero_cuota}/{prestamo.numero_cuotas}',
                             valor_total=valor_descuento
                         )
-                        
-                        # Si se paga la cuota completa, marcarla como descontada
+
                         if valor_descuento >= cuota.valor_cuota:
+                            # Cuota completa: marcarla y recalcular saldo desde cuotas reales
                             cuota.quincena = self.quincena
                             cuota.nomina = nomina
                             cuota.fecha_descuento = timezone.now().date()
                             cuota.estado = 'DESCONTADA'
                             cuota.save()
-                            
-                            # Actualizar saldo del préstamo
-                            prestamo.saldo_pendiente -= valor_descuento
-                            if prestamo.saldo_pendiente <= 0:
-                                prestamo.estado = 'PAGADO'
-                            prestamo.save()
+
+                            # saldo = suma de cuotas aún pendientes (excluye la que acabamos de cerrar)
+                            saldo_real = CuotaPrestamo.objects.filter(
+                                prestamo=prestamo,
+                                estado='PENDIENTE'
+                            ).aggregate(total=Sum('valor_cuota'))['total'] or Decimal('0')
+
+                            Prestamo.objects.filter(pk=prestamo.pk).update(
+                                saldo_pendiente=saldo_real,
+                                estado='PAGADO' if saldo_real <= 0 else 'ACTIVO',
+                            )
                         else:
-                            # Abono parcial - actualizar valor de cuota
+                            # Abono parcial: reducir valor de cuota y recalcular saldo
                             cuota.valor_cuota -= valor_descuento
                             cuota.save()
-                            
-                            prestamo.saldo_pendiente -= valor_descuento
-                            prestamo.save()
-                        
+
+                            saldo_real = CuotaPrestamo.objects.filter(
+                                prestamo=prestamo,
+                                estado='PENDIENTE'
+                            ).aggregate(total=Sum('valor_cuota'))['total'] or Decimal('0')
+
+                            Prestamo.objects.filter(pk=prestamo.pk).update(
+                                saldo_pendiente=saldo_real,
+                            )
+
                         total += valor_descuento
-        
+
         return total
     
     def _get_precio_vigente(self, labor):
