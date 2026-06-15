@@ -150,7 +150,7 @@ export default function PrestamoDetail() {
             </button>
           )}
 
-          {prestamo.estado === 'ACTIVO' && (
+          {prestamo.estado !== 'CANCELADO' && (
             <button
               onClick={() => setConfirmCancel(true)}
               className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"

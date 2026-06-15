@@ -33,9 +33,9 @@ class PrestamoViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         """Cancelar un préstamo (marca como CANCELADO)"""
         prestamo = self.get_object()
 
-        if prestamo.estado == 'PAGADO':
+        if prestamo.estado == 'CANCELADO':
             return Response(
-                {'error': 'No se puede cancelar un préstamo ya pagado'},
+                {'error': 'Este adelanto ya está cancelado'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -44,7 +44,7 @@ class PrestamoViewSet(FincaFilterMixin, viewsets.ModelViewSet):
 
         CuotaPrestamo.objects.filter(
             prestamo=prestamo,
-            estado='PENDIENTE'
+            estado__in=['PENDIENTE', 'DESCONTADA']
         ).update(estado='CANCELADA')
 
         serializer = self.get_serializer(prestamo)
