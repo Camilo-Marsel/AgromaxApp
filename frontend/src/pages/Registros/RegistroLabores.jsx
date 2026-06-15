@@ -18,16 +18,16 @@ import { Plus, Trash2, Calendar, Package } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 const COLORES_CINTA = [
-  { value: 'ROJO', label: 'Rojo' },
-  { value: 'VERDE', label: 'Verde' },
-  { value: 'AZUL', label: 'Azul' },
+  { value: 'MORADA',   label: 'Morada' },
+  { value: 'CAFE',     label: 'Café' },
+  { value: 'NEGRA',    label: 'Negra' },
+  { value: 'NARANJA',  label: 'Naranja' },
+  { value: 'VERDE',    label: 'Verde' },
   { value: 'AMARILLO', label: 'Amarillo' },
-  { value: 'NEGRO', label: 'Negro' },
-  { value: 'BLANCO', label: 'Blanco' },
-  { value: 'NARANJA', label: 'Naranja' },
-  { value: 'MORADO', label: 'Morado' },
-  { value: 'ROSADO', label: 'Rosado' },
-  { value: 'CAFE', label: 'Café' },
+  { value: 'BLANCA',   label: 'Blanca' },
+  { value: 'AZUL',     label: 'Azul' },
+  { value: 'HABANO',   label: 'Habano' },
+  { value: 'GRIS',     label: 'Gris' },
 ];
 
 // Modal para confirmar/ajustar el movimiento de inventario propuesto
@@ -150,6 +150,9 @@ export default function RegistroLabores() {
   // Modal de propuesta de movimiento
   const [movimientoProposal, setMovimientoProposal] = useState(null);
 
+  // Filas multi-entrada para Embolse
+  const [filasEmbolse, setFilasEmbolse] = useState([]);
+
   // Confirm dialog
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
 
@@ -199,6 +202,13 @@ export default function RegistroLabores() {
       }
 
       setFechasSeleccionadas([]);
+
+      // Inicializar fila vacía si es Embolse
+      if (labor?.nombre === 'Embolse') {
+        setFilasEmbolse([{ uid: Date.now(), cantidad: '', color_cinta: '', lote: '' }]);
+      } else {
+        setFilasEmbolse([]);
+      }
     }
   }, [laborWatch, labores]);
 
@@ -314,6 +324,65 @@ export default function RegistroLabores() {
     }
   };
 
+  // ── Helpers multi-fila Embolse ──────────────────────────────────────────
+  const agregarFilaEmbolse = () => {
+    setFilasEmbolse((prev) => [
+      ...prev,
+      { uid: Date.now(), cantidad: '', color_cinta: '', lote: '' },
+    ]);
+  };
+
+  const eliminarFilaEmbolse = (uid) => {
+    setFilasEmbolse((prev) => prev.filter((f) => f.uid !== uid));
+  };
+
+  const updateFilaEmbolse = (uid, field, value) => {
+    setFilasEmbolse((prev) =>
+      prev.map((f) => (f.uid === uid ? { ...f, [field]: value } : f))
+    );
+  };
+
+  const validarFilasEmbolse = (fecha) => {
+    // Todos con cantidad
+    for (let i = 0; i < filasEmbolse.length; i++) {
+      if (!filasEmbolse[i].cantidad || parseFloat(filasEmbolse[i].cantidad) <= 0) {
+        toast.error(`Fila ${i + 1}: ingresa una cantidad válida`);
+        return false;
+      }
+    }
+    // Sin duplicados color+lote dentro de las filas
+    const combos = new Set();
+    for (const fila of filasEmbolse) {
+      const key = `${fila.color_cinta}|${fila.lote}`;
+      if (combos.has(key)) {
+        toast.error('Dos filas tienen el mismo color y lote. Corrígelas antes de guardar.');
+        return false;
+      }
+      combos.add(key);
+    }
+    // Sin duplicados contra registros ya guardados en BD
+    for (const fila of filasEmbolse) {
+      const existente = registros.find(
+        (r) =>
+          r.labor_info?.nombre === 'Embolse' &&
+          r.fecha === fecha &&
+          (r.color_cinta || '') === (fila.color_cinta || '') &&
+          String(r.lote ?? '') === String(fila.lote ?? '')
+      );
+      if (existente) {
+        const colorLabel = COLORES_CINTA.find((c) => c.value === fila.color_cinta)?.label || 'Sin color';
+        const loteLabel = lotes.find((l) => String(l.id) === String(fila.lote))?.nombre || 'Sin lote';
+        toast.error(
+          `Ya existe un Embolse con "${colorLabel}" en "${loteLabel}" para esta fecha (registro #${existente.id}). Elimínalo si deseas corregirlo.`,
+          { duration: 6000 }
+        );
+        return false;
+      }
+    }
+    return true;
+  };
+  // ────────────────────────────────────────────────────────────────────────
+
   const onSubmit = async (data) => {
     try {
       setSubmitting(true);
@@ -351,6 +420,32 @@ export default function RegistroLabores() {
         const result = await registroLaborService.crearMultiples(payload);
         if (result.errores?.length > 0) result.errores.forEach((e) => toast.error(e));
         toast.success(result.message);
+
+      } else if (esEmbolse) {
+        const fecha = fechasSeleccionadas.length > 0 ? fechasSeleccionadas[0] : null;
+        if (!fecha) { toast.error('Seleccione una fecha'); return; }
+        if (filasEmbolse.length === 0) { toast.error('Agrega al menos una fila de embolse'); return; }
+        if (!validarFilasEmbolse(fecha)) return;
+
+        await Promise.all(
+          filasEmbolse.map((fila) =>
+            registroLaborService.create({
+              trabajador: data.trabajador,
+              labor: data.labor,
+              fecha,
+              cantidad: fila.cantidad,
+              quincena: quincenaActual.id,
+              observaciones: data.observaciones || '',
+              lote: fila.lote || null,
+              color_cinta: fila.color_cinta || '',
+            })
+          )
+        );
+        toast.success(
+          filasEmbolse.length === 1
+            ? 'Registro de Embolse creado'
+            : `${filasEmbolse.length} registros de Embolse creados`
+        );
 
       } else {
         const fecha = fechasSeleccionadas.length > 0 ? fechasSeleccionadas[0] : null;
@@ -539,8 +634,8 @@ export default function RegistroLabores() {
                 />
               )}
 
-              {/* Cantidad */}
-              {(!esTipoDia || esDesmache) && laborSeleccionada && (
+              {/* Cantidad — solo para labores no-Embolse */}
+              {(!esTipoDia || esDesmache) && laborSeleccionada && !esEmbolse && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {esDesmache ? 'Cantidad Total (hectáreas) *' : 'Cantidad *'}
@@ -576,8 +671,8 @@ export default function RegistroLabores() {
                 </div>
               )}
 
-              {/* Lote — para Embolse o si la labor tiene LaborInsumo configurado */}
-              {(esEmbolse || laborInsumo) && lotes.length > 0 && (
+              {/* Lote — solo para labores con LaborInsumo (no Embolse, ese va en la tabla) */}
+              {!esEmbolse && laborInsumo && lotes.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Lote <span className="text-gray-400 font-normal">(opcional)</span>
@@ -596,25 +691,95 @@ export default function RegistroLabores() {
                 </div>
               )}
 
-              {/* Color de Cinta — solo para labor Embolse */}
+              {/* ── EMBOLSE: tabla multi-fila ─────────────────────────────── */}
               {esEmbolse && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Color de Cinta <span className="text-gray-400 font-normal">(opcional)</span>
-                  </label>
-                  <select
-                    {...register('color_cinta')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Sin color</option>
-                    {COLORES_CINTA.map((c) => (
-                      <option key={c.value} value={c.value}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Embolses <span className="text-gray-400 font-normal">(cantidad · color · lote)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={agregarFilaEmbolse}
+                      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Agregar fila
+                    </button>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-md overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-2 py-2 text-left text-xs text-gray-500 font-medium w-20">Cant. *</th>
+                          <th className="px-2 py-2 text-left text-xs text-gray-500 font-medium">Color cinta</th>
+                          <th className="px-2 py-2 text-left text-xs text-gray-500 font-medium">Lote</th>
+                          <th className="w-8"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {filasEmbolse.map((fila, idx) => (
+                          <tr key={fila.uid} className="bg-white">
+                            <td className="px-2 py-1.5">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={fila.cantidad}
+                                onChange={(e) => updateFilaEmbolse(fila.uid, 'cantidad', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                placeholder="0"
+                              />
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <select
+                                value={fila.color_cinta}
+                                onChange={(e) => updateFilaEmbolse(fila.uid, 'color_cinta', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              >
+                                <option value="">Sin color</option>
+                                {COLORES_CINTA.map((c) => (
+                                  <option key={c.value} value={c.value}>{c.label}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <select
+                                value={fila.lote}
+                                onChange={(e) => updateFilaEmbolse(fila.uid, 'lote', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              >
+                                <option value="">Sin lote</option>
+                                {lotes.map((lote) => (
+                                  <option key={lote.id} value={lote.id}>{lote.nombre}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-1 py-1.5 text-center">
+                              {filasEmbolse.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => eliminarFilaEmbolse(fila.uid)}
+                                  className="text-red-400 hover:text-red-600"
+                                  title="Eliminar fila"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {filasEmbolse.length > 1 && (
+                    <p className="text-xs text-gray-400">
+                      Total: {filasEmbolse.reduce((s, f) => s + (parseFloat(f.cantidad) || 0), 0).toFixed(2)} unidades en {filasEmbolse.length} filas
+                    </p>
+                  )}
                 </div>
               )}
+              {/* ──────────────────────────────────────────────────────────── */}
 
               {/* Observaciones */}
               <div>
