@@ -73,7 +73,10 @@ class NominaCalculator:
         # Las cuotas y saldo se leen siempre desde DB para evitar datos obsoletos
         # cuando un trabajador anterior ya modificó el mismo préstamo en el mismo lote.
         todos_prestamos = list(
-            Prestamo.objects.filter(estado='ACTIVO').only('id', 'trabajador_id')
+            Prestamo.objects.filter(
+                estado='ACTIVO',
+                fecha_prestamo__lte=self.quincena.fecha_fin,
+            ).only('id', 'trabajador_id', 'fecha_prestamo')
         )
         self._prestamos_cache = defaultdict(list)
         for prestamo in todos_prestamos:
@@ -819,6 +822,11 @@ class NominaCalculator:
             )
 
         for prestamo in prestamos:
+            # Solo descontar préstamos cuya fecha sea anterior al fin de la quincena
+            # (no desconta un préstamo creado después de que cerró la quincena)
+            if prestamo.fecha_prestamo > self.quincena.fecha_fin:
+                continue
+
             if prestamo.tipo_pago == 'UNICO':
                 # Para pago único siempre leer saldo real desde DB (evita corrupción por caché)
                 saldo_real = Prestamo.objects.values_list('saldo_pendiente', flat=True).get(pk=prestamo.pk)
