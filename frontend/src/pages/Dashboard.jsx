@@ -155,10 +155,10 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Contratos por vencer */}
+        {/* Contratos vencidos o por vencer */}
         <div className="bg-white rounded-xl shadow p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-yellow-500" /> Contratos por vencer (30 días)
+            <FileText className="w-4 h-4 text-yellow-500" /> Contratos críticos
           </h2>
           {alertas_contratos?.length > 0 ? (
             <ul className="space-y-2">
@@ -172,15 +172,25 @@ export default function Dashboard() {
                     <p className="font-medium text-gray-800">{c.trabajador}</p>
                     <p className="text-xs text-gray-400">{c.finca}</p>
                   </div>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ml-2 whitespace-nowrap ${c.dias_restantes <= 7 ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                    {c.dias_restantes}d
-                  </span>
+                  {c.vencido ? (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full ml-2 whitespace-nowrap bg-red-100 text-red-700">
+                      Vencido
+                    </span>
+                  ) : c.dias_restantes <= 7 ? (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full ml-2 whitespace-nowrap bg-red-100 text-red-700">
+                      {c.dias_restantes}d
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full ml-2 whitespace-nowrap bg-yellow-100 text-yellow-700">
+                      {c.dias_restantes}d
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
           ) : (
             <div className="flex items-center gap-2 text-sm text-green-600">
-              <CheckCircle className="w-4 h-4" /> Sin contratos próximos a vencer
+              <CheckCircle className="w-4 h-4" /> Sin contratos vencidos ni por vencer
             </div>
           )}
         </div>

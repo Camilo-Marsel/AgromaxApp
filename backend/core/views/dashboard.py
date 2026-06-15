@@ -111,14 +111,13 @@ def _dashboard_resumen_impl(request):
         for s in stocks_bajos
     ]
 
-    # 6. Contratos que vencen en los próximos 30 días
+    # 6. Contratos vencidos o por vencer (próximos 30 días)
     limite = hoy + timedelta(days=30)
-    contratos_por_vencer = (
+    contratos_criticos = (
         Contrato.objects
         .filter(
             estado='ACTIVO',
             tipo_contrato='TERMINO_FIJO',
-            fecha_fin__gte=hoy,
             fecha_fin__lte=limite,
         )
         .select_related('trabajador', 'trabajador__finca')
@@ -131,8 +130,9 @@ def _dashboard_resumen_impl(request):
             'finca': c.trabajador.finca.nombre if c.trabajador.finca else '—',
             'fecha_fin': c.fecha_fin,
             'dias_restantes': (c.fecha_fin - hoy).days,
+            'vencido': c.fecha_fin < hoy,
         }
-        for c in contratos_por_vencer
+        for c in contratos_criticos
     ]
 
     return Response({
