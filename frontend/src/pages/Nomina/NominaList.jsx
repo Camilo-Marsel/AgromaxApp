@@ -38,7 +38,7 @@ export default function NominaList() {
   const [sinCorreoAlert, setSinCorreoAlert] = useState([]);
   const [procesandoMasivo, setProcesandoMasivo] = useState(false);
   const [enviandoCorreos, setEnviandoCorreos] = useState(false);
-  const [estadosEnvioCorreo, setEstadosEnvioCorreo] = useState(['APROBADA']);
+  const [estadosEnvioCorreo, setEstadosEnvioCorreo] = useState(['APROBADA', 'CALCULADA']);
 
   useEffect(() => {
     loadInitialData();
@@ -463,7 +463,7 @@ export default function NominaList() {
               {/* Botón Enviar Recibos por Correo */}
               <button
                 onClick={() => setConfirmEnviarCorreosMasivo(true)}
-                disabled={enviandoCorreos || nominasEnEstado.length === 0}
+                disabled={enviandoCorreos || nominasFiltradas.length === 0}
                 className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400"
                 title="Enviar recibos por correo electrónico"
               >
@@ -579,7 +579,7 @@ export default function NominaList() {
           </div>
         }
         confirmText={enviandoCorreos ? "Enviando..." : `Enviar ${nominasConCorreo.length} Correo(s)`}
-        disabled={enviandoCorreos || nominasEnEstado.length === 0}
+        disabled={enviandoCorreos || nominasFiltradas.length === 0}
       />
 
       {/* Alerta post-envío: trabajadores sin correo */}
