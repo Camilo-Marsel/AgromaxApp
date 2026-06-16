@@ -35,6 +35,7 @@ export default function NominaList() {
   // Estados para acciones masivas
   const [confirmAprobarMasivo, setConfirmAprobarMasivo] = useState(false);
   const [confirmEnviarCorreosMasivo, setConfirmEnviarCorreosMasivo] = useState(false);
+  const [sinCorreoAlert, setSinCorreoAlert] = useState([]);
   const [procesandoMasivo, setProcesandoMasivo] = useState(false);
   const [enviandoCorreos, setEnviandoCorreos] = useState(false);
   const [estadosEnvioCorreo, setEstadosEnvioCorreo] = useState(['APROBADA']);
@@ -216,14 +217,21 @@ export default function NominaList() {
         estadosEnvioCorreo
       );
 
+      setConfirmEnviarCorreosMasivo(false);
+
       if (result.exitosos > 0) {
         toast.success(`${result.exitosos} recibo(s) enviado(s) correctamente`);
+      } else if (nominasConCorreo.length === 0) {
+        toast.error('Ningún trabajador tiene correo registrado. No se enviaron recibos.');
       }
       if (result.fallidos > 0) {
-        toast.error(`${result.fallidos} envío(s) fallido(s)`);
+        toast.error(`${result.fallidos} envío(s) fallido(s) por error técnico`);
       }
 
-      setConfirmEnviarCorreosMasivo(false);
+      // Mostrar alerta con trabajadores sin correo
+      if (nominasSinCorreo.length > 0) {
+        setSinCorreoAlert(nominasSinCorreo.map(n => n.trabajador_info?.nombre_completo));
+      }
     } catch (error) {
       console.error('Error al enviar correos:', error);
       const errorMsg = error.response?.data?.error || 'Error al enviar correos';
@@ -233,10 +241,12 @@ export default function NominaList() {
     }
   };
 
-  // Contar nóminas con correo para envío masivo
-  const nominasConCorreo = nominasFiltradas.filter(
-    n => estadosEnvioCorreo.includes(n.estado) && n.trabajador_info?.correo
-  );
+  // Nóminas en el estado seleccionado (con o sin correo)
+  const nominasEnEstado = nominasFiltradas.filter(n => estadosEnvioCorreo.includes(n.estado));
+  // Subconjunto con correo
+  const nominasConCorreo = nominasEnEstado.filter(n => n.trabajador_info?.correo);
+  // Subconjunto sin correo (para mostrar alerta post-envío)
+  const nominasSinCorreo = nominasEnEstado.filter(n => !n.trabajador_info?.correo);
 
   const handleDescargarPDF = async (nomina) => {
     try {
@@ -453,7 +463,7 @@ export default function NominaList() {
               {/* Botón Enviar Recibos por Correo */}
               <button
                 onClick={() => setConfirmEnviarCorreosMasivo(true)}
-                disabled={enviandoCorreos || nominasConCorreo.length === 0}
+                disabled={enviandoCorreos || nominasEnEstado.length === 0}
                 className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400"
                 title="Enviar recibos por correo electrónico"
               >
@@ -569,8 +579,33 @@ export default function NominaList() {
           </div>
         }
         confirmText={enviandoCorreos ? "Enviando..." : `Enviar ${nominasConCorreo.length} Correo(s)`}
-        disabled={enviandoCorreos || nominasConCorreo.length === 0}
+        disabled={enviandoCorreos || nominasEnEstado.length === 0}
       />
+
+      {/* Alerta post-envío: trabajadores sin correo */}
+      {sinCorreoAlert.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-sm font-semibold text-orange-800 mb-2">
+                ⚠️ {sinCorreoAlert.length} trabajador(es) no recibieron su colilla por no tener correo registrado:
+              </p>
+              <ul className="text-sm text-orange-700 space-y-0.5 list-disc list-inside">
+                {sinCorreoAlert.map((nombre, i) => (
+                  <li key={i}>{nombre}</li>
+                ))}
+              </ul>
+            </div>
+            <button
+              onClick={() => setSinCorreoAlert([])}
+              className="text-orange-400 hover:text-orange-600 ml-4 text-lg leading-none"
+              title="Cerrar"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Resumen */}
       {nominasFiltradas.length > 0 && (
