@@ -6,11 +6,13 @@ import trabajadorService from '../../services/trabajadorService';
 import prestamoService from '../../services/prestamoService';
 import nominaService from '../../services/nominaService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
+import LiquidacionModal from './LiquidacionModal';
 import toast from 'react-hot-toast';
-import { 
-  ArrowLeft, Edit, UserCheck, UserX, DollarSign, 
-  FileText, Calendar, Briefcase, MapPin, Phone, 
-  Mail, CreditCard, Building2, Plus, Eye, Download
+import {
+  ArrowLeft, Edit, UserCheck, UserX, DollarSign,
+  FileText, Calendar, Briefcase, MapPin, Phone,
+  Mail, CreditCard, Building2, Plus, Eye, Download,
+  Calculator,
 } from 'lucide-react';
 
 export default function TrabajadorDetail() {
@@ -22,6 +24,7 @@ export default function TrabajadorDetail() {
   const [nominas, setNominas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('info'); // info, prestamos, nominas
+  const [showLiquidacion, setShowLiquidacion] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -168,13 +171,22 @@ export default function TrabajadorDetail() {
           </div>
         </div>
 
-        <button
-          onClick={() => navigate(`/trabajadores/${id}/editar`)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-        >
-          <Edit className="w-5 h-5" />
-          Editar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowLiquidacion(true)}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+          >
+            <Calculator className="w-5 h-5" />
+            Liquidación
+          </button>
+          <button
+            onClick={() => navigate(`/trabajadores/${id}/editar`)}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            <Edit className="w-5 h-5" />
+            Editar
+          </button>
+        </div>
       </div>
 
       {/* Resumen Rápido */}
@@ -544,6 +556,13 @@ export default function TrabajadorDetail() {
           )}
         </div>
       </div>
+
+      {showLiquidacion && (
+        <LiquidacionModal
+          trabajador={trabajador}
+          onClose={() => setShowLiquidacion(false)}
+        />
+      )}
     </div>
   );
 }

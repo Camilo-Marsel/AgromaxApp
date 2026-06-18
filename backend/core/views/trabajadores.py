@@ -100,6 +100,52 @@ class TrabajadorViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         serializer = self.get_serializer(trabajador)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['get'], url_path='liquidacion')
+    def liquidacion(self, request, pk=None):
+        """
+        Calcula la liquidación de contrato de un trabajador.
+        Query params:
+          - fecha_retiro: YYYY-MM-DD (requerido)
+          - pdf: 'true' para descargar el PDF
+        """
+        from datetime import date
+        from django.http import HttpResponse
+        from ..services.liquidacion_calculator import calcular_liquidacion
+        from ..services.liquidacion_pdf import generar_liquidacion_pdf
+
+        trabajador = self.get_object()
+
+        fecha_str = request.query_params.get('fecha_retiro')
+        if not fecha_str:
+            return Response(
+                {'error': 'El parámetro fecha_retiro (YYYY-MM-DD) es requerido.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            fecha_retiro = date.fromisoformat(fecha_str)
+        except ValueError:
+            return Response(
+                {'error': 'Formato de fecha inválido. Use YYYY-MM-DD.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if fecha_retiro < trabajador.fecha_ingreso:
+            return Response(
+                {'error': 'La fecha de retiro no puede ser anterior a la fecha de ingreso.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        data = calcular_liquidacion(trabajador, fecha_retiro)
+
+        if request.query_params.get('pdf') == 'true':
+            buffer = generar_liquidacion_pdf(data)
+            nombre = f"liquidacion_{trabajador.numero_documento}_{fecha_str}.pdf"
+            response = HttpResponse(buffer, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{nombre}"'
+            return response
+
+        return Response(data)
+
     @action(detail=False, methods=['get'], url_path='lista-simple')
     def lista_simple(self, request):
         """Lista simple sin paginación (útil para selects en formularios)"""

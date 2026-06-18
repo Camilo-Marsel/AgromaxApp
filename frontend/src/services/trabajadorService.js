@@ -61,6 +61,23 @@ const trabajadorService = {
     const response = await api.get('/tipos-contrato/');
     return response.data;
   },
+
+  // Calcular liquidación de contrato
+  getLiquidacion: async (id, fechaRetiro) => {
+    const response = await api.get(`/trabajadores/${id}/liquidacion/`, {
+      params: { fecha_retiro: fechaRetiro },
+    });
+    return response.data;
+  },
+
+  // Descargar PDF de liquidación
+  descargarLiquidacionPDF: async (id, fechaRetiro) => {
+    const response = await api.get(`/trabajadores/${id}/liquidacion/`, {
+      params: { fecha_retiro: fechaRetiro, pdf: 'true' },
+      responseType: 'blob',
+    });
+    return response.data;
+  },
 };
 
 export default trabajadorService;
