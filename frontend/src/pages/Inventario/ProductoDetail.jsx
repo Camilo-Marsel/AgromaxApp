@@ -106,7 +106,10 @@ export default function ProductoDetail() {
   const [showMovForm, setShowMovForm]       = useState(false);
   const [tipoMovForm, setTipoMovForm]       = useState('ENTRADA');
   const [showStockForm, setShowStockForm]   = useState(false);
-  const [editandoMinimo, setEditandoMinimo] = useState(null); // stock obj | null
+  const [editandoMinimo, setEditandoMinimo] = useState(null);
+  const [vistaHistorial, setVistaHistorial] = useState('bodega'); // 'bodega' | 'todas'
+  const [offsetMovs, setOffsetMovs]         = useState(0);
+  const LIMIT_MOVS = 30;
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -129,19 +132,54 @@ export default function ProductoDetail() {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  useEffect(() => {
-    if (!stockSeleccionado) return;
+  const cargarMovimientos = useCallback(async (reset = false) => {
+    const offset = reset ? 0 : offsetMovs;
+    if (reset) setOffsetMovs(0);
     setLoadingMovs(true);
-    inventarioService.getMovimientosPorStock(stockSeleccionado.id, { limit: 30 })
-      .then(data => {
-        setMovimientos(data.results ?? data);
-        setTotalMovs(data.count ?? (data.results ?? data).length);
-      })
-      .catch(() => toast.error('Error cargando movimientos'))
-      .finally(() => setLoadingMovs(false));
-  }, [stockSeleccionado]);
+    try {
+      let data;
+      if (vistaHistorial === 'todas') {
+        data = await inventarioService.getMovimientosPorProducto(id, { limit: LIMIT_MOVS, offset });
+      } else {
+        if (!stockSeleccionado) return;
+        data = await inventarioService.getMovimientosPorStock(stockSeleccionado.id, { limit: LIMIT_MOVS, offset });
+      }
+      const nuevos = data.results ?? data;
+      setMovimientos(prev => reset || offset === 0 ? nuevos : [...prev, ...nuevos]);
+      setTotalMovs(data.count ?? nuevos.length);
+    } catch {
+      toast.error('Error cargando movimientos');
+    } finally {
+      setLoadingMovs(false);
+    }
+  }, [stockSeleccionado, vistaHistorial, id, offsetMovs]);
+
+  useEffect(() => {
+    setMovimientos([]);
+    setOffsetMovs(0);
+    cargarMovimientos(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stockSeleccionado, vistaHistorial]);
 
   const abrirMovimiento = (tipo) => { setTipoMovForm(tipo); setShowMovForm(true); };
+
+  const cargarMas = () => {
+    const nuevoOffset = offsetMovs + LIMIT_MOVS;
+    setOffsetMovs(nuevoOffset);
+    // Llamar directamente con el nuevo offset sin esperar el state
+    setLoadingMovs(true);
+    const fetchFn = vistaHistorial === 'todas'
+      ? inventarioService.getMovimientosPorProducto(id, { limit: LIMIT_MOVS, offset: nuevoOffset })
+      : inventarioService.getMovimientosPorStock(stockSeleccionado.id, { limit: LIMIT_MOVS, offset: nuevoOffset });
+    fetchFn
+      .then(data => {
+        const nuevos = data.results ?? data;
+        setMovimientos(prev => [...prev, ...nuevos]);
+        setTotalMovs(data.count ?? nuevos.length);
+      })
+      .catch(() => toast.error('Error cargando más movimientos'))
+      .finally(() => setLoadingMovs(false));
+  };;
 
   const refrescarStock = (stockId) => {
     inventarioService.getStock(stockId).then(updated => {
@@ -259,7 +297,7 @@ export default function ProductoDetail() {
                     <div className="mt-1.5">
                       <div className="h-1.5 rounded-full bg-gray-200">
                         <div
-                          className={`h-1.5 rounded-full ${pct <= 100 ? 'bg-red-400' : 'bg-green-400'}`}
+                          className={`h-1.5 rounded-full ${bajo ? 'bg-red-400' : 'bg-green-400'}`}
                           style={{ width: `${Math.min(pct, 100)}%` }}
                         />
                       </div>
@@ -295,59 +333,91 @@ export default function ProductoDetail() {
         )}
       </div>
 
-      {/* Historial de movimientos del stock seleccionado */}
-      {hayStocks && stockSeleccionado && (
+      {/* Historial de movimientos */}
+      {hayStocks && (stockSeleccionado || vistaHistorial === 'todas') && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-wrap gap-3">
+            <div className="flex items-center gap-3">
               <Clock className="w-4 h-4 text-gray-400" />
-              <h2 className="font-semibold text-gray-800">
-                Historial — {stockSeleccionado.bodega_nombre ?? '—'}
-              </h2>
+              <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setVistaHistorial('bodega')}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${vistaHistorial === 'bodega' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  {stockSeleccionado?.bodega_nombre ?? 'Esta bodega'}
+                </button>
+                <button
+                  onClick={() => setVistaHistorial('todas')}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${vistaHistorial === 'todas' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Todas las bodegas
+                </button>
+              </div>
             </div>
-            <span className="text-xs text-gray-400">{totalMovs} en total · últimos 30</span>
+            <span className="text-xs text-gray-400">
+              {movimientos.length} de {totalMovs} movimiento(s)
+            </span>
           </div>
 
-          {loadingMovs ? (
+          {movimientos.length === 0 && loadingMovs ? (
             <div className="flex justify-center py-10"><LoadingSpinner /></div>
           ) : movimientos.length === 0 ? (
             <div className="flex flex-col items-center py-12 text-gray-400 gap-2">
               <Clock className="w-8 h-8" />
-              <p className="text-sm">Sin movimientos en esta bodega aún.</p>
+              <p className="text-sm">Sin movimientos aún.</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-50">
-              {movimientos.map(m => {
-                const cfg  = TIPO_CONFIG[m.tipo] ?? TIPO_CONFIG.AJUSTE;
-                const Icon = cfg.icon;
-                const signo = m.tipo === 'ENTRADA' ? '+' : m.tipo === 'SALIDA' ? '-' : '≈';
-                return (
-                  <div key={m.id} className="flex items-start gap-4 px-5 py-3 hover:bg-gray-50">
-                    <div className={`mt-0.5 p-1.5 rounded-lg border ${cfg.bg}`}>
-                      <Icon className={`w-4 h-4 ${cfg.color}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium text-sm text-gray-800">{cfg.label}</span>
-                        <span className={`text-sm font-semibold ${cfg.color}`}>
-                          {signo}{Number.parseFloat(m.cantidad).toLocaleString('es-CO', { maximumFractionDigits: 2 })} {producto.unidad_display}
-                        </span>
+            <>
+              <div className="divide-y divide-gray-50">
+                {movimientos.map(m => {
+                  const cfg  = TIPO_CONFIG[m.tipo] ?? TIPO_CONFIG.AJUSTE;
+                  const Icon = cfg.icon;
+                  const signo = m.tipo === 'ENTRADA' ? '+' : m.tipo === 'SALIDA' ? '-' : '≈';
+                  return (
+                    <div key={m.id} className="flex items-start gap-4 px-5 py-3 hover:bg-gray-50">
+                      <div className={`mt-0.5 p-1.5 rounded-lg border ${cfg.bg}`}>
+                        <Icon className={`w-4 h-4 ${cfg.color}`} />
                       </div>
-                      <div className="text-xs text-gray-400 flex items-center gap-3 mt-0.5">
-                        <span>{new Date(m.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                        {m.creado_por && <span>· {m.creado_por}</span>}
-                        <span>
-                          · {Number.parseFloat(m.stock_antes).toLocaleString('es-CO', { maximumFractionDigits: 2 })} → {Number.parseFloat(m.stock_despues).toLocaleString('es-CO', { maximumFractionDigits: 2 })} {producto.unidad_display}
-                        </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-sm text-gray-800">
+                            {cfg.label}
+                            {vistaHistorial === 'todas' && m.bodega_nombre && (
+                              <span className="ml-2 text-xs font-normal text-gray-400">· {m.bodega_nombre}</span>
+                            )}
+                          </span>
+                          <span className={`text-sm font-semibold ${cfg.color}`}>
+                            {signo}{Number.parseFloat(m.cantidad).toLocaleString('es-CO', { maximumFractionDigits: 2 })} {producto.unidad_display}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-400 flex items-center gap-3 mt-0.5">
+                          <span>{new Date(m.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                          {m.creado_por && <span>· {m.creado_por}</span>}
+                          <span>
+                            · {Number.parseFloat(m.stock_antes).toLocaleString('es-CO', { maximumFractionDigits: 2 })} → {Number.parseFloat(m.stock_despues).toLocaleString('es-CO', { maximumFractionDigits: 2 })} {producto.unidad_display}
+                          </span>
+                        </div>
+                        {m.observaciones && (
+                          <p className="text-xs text-gray-500 mt-0.5 italic">"{m.observaciones}"</p>
+                        )}
                       </div>
-                      {m.observaciones && (
-                        <p className="text-xs text-gray-500 mt-0.5 italic">"{m.observaciones}"</p>
-                      )}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+              {movimientos.length < totalMovs && (
+                <div className="px-5 py-3 border-t border-gray-100 flex justify-center">
+                  <button
+                    onClick={cargarMas}
+                    disabled={loadingMovs}
+                    className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                  >
+                    {loadingMovs ? <LoadingSpinner size="sm" /> : null}
+                    Cargar más ({totalMovs - movimientos.length} restantes)
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -361,13 +431,7 @@ export default function ProductoDetail() {
           onSuccess={() => {
             setShowMovForm(false);
             refrescarStock(stockSeleccionado.id);
-            setLoadingMovs(true);
-            inventarioService.getMovimientosPorStock(stockSeleccionado.id, { limit: 30 })
-              .then(data => {
-                setMovimientos(data.results ?? data);
-                setTotalMovs(data.count ?? (data.results ?? data).length);
-              })
-              .finally(() => setLoadingMovs(false));
+            cargarMovimientos(true);
           }}
         />
       )}

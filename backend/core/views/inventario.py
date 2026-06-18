@@ -22,12 +22,19 @@ logger = logging.getLogger(__name__)
 
 class BodegaViewSet(viewsets.ModelViewSet):
     """CRUD de bodegas. Una bodega puede estar asociada a una o más fincas."""
-    queryset = Bodega.objects.prefetch_related('fincas').all()
     permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['nombre']
     filterset_fields = ['activa']
     ordering = ['nombre']
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = Bodega.objects.prefetch_related('fincas').all()
+        if not user.es_administrador:
+            fincas = user.fincas_asignadas.all()
+            qs = qs.filter(fincas__in=fincas).distinct()
+        return qs
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -65,13 +72,18 @@ class ProductoViewSet(viewsets.ModelViewSet):
 
 class StockFincaViewSet(viewsets.ModelViewSet):
     """Stock de un producto en una bodega. Cada (producto, bodega) es único."""
-    queryset = StockFinca.objects.select_related(
-        'producto', 'bodega', 'created_by',
-    ).all()
     permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['producto', 'bodega', 'activo', 'producto__categoria']
     ordering = ['producto__categoria', 'producto__nombre']
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = StockFinca.objects.select_related('producto', 'bodega', 'created_by').all()
+        if not user.es_administrador:
+            fincas = user.fincas_asignadas.all()
+            qs = qs.filter(bodega__fincas__in=fincas).distinct()
+        return qs
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -123,7 +135,7 @@ class MovimientoInventarioViewSet(viewsets.ModelViewSet):
     ).all()
     permission_classes = [CanModifyData]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['stock_finca', 'tipo', 'lote', 'trabajador']
+    filterset_fields = ['stock_finca', 'tipo', 'lote', 'trabajador', 'stock_finca__producto']
     ordering = ['-fecha', '-created_at']
     http_method_names = ['get', 'post', 'head', 'options']
 

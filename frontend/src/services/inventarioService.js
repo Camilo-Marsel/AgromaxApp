@@ -103,6 +103,13 @@ const inventarioService = {
     return res.data;
   },
 
+  getMovimientosPorProducto: async (productoId, params = {}) => {
+    const res = await api.get('/inventario/movimientos/', {
+      params: { stock_finca__producto: productoId, ...params },
+    });
+    return res.data;
+  },
+
   registrarMovimiento: async (data) => {
     const res = await api.post('/inventario/movimientos/', data);
     return res.data;
