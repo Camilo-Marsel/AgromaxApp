@@ -69,8 +69,8 @@ export default function TrabajadorDetail() {
 
   const loadNominas = async () => {
     try {
-      const data = await nominaService.getAll({ trabajador: id });
-      setNominas((data.results || data).slice(0, 10)); // Últimas 10
+      const data = await nominaService.getAll({ trabajador: id, page_size: 100 });
+      setNominas(data.results || data);
     } catch (error) {
       console.error('Error al cargar nóminas:', error);
     }
