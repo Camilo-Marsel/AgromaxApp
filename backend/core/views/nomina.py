@@ -558,18 +558,8 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
             )
 
         try:
-            devengos_adicionales = nomina.devengos_adicionales
-            descripcion_devengos = nomina.descripcion_devengos_adicionales
-            deducciones_adicionales = nomina.deducciones_adicionales
-            descripcion_deducciones = nomina.descripcion_deducciones_adicionales
-
             calculator = NominaCalculator(nomina.quincena)
             nomina_actualizada = calculator.calcular_trabajador(nomina.trabajador, request.user)
-            nomina_actualizada.devengos_adicionales = devengos_adicionales
-            nomina_actualizada.descripcion_devengos_adicionales = descripcion_devengos
-            nomina_actualizada.deducciones_adicionales = deducciones_adicionales
-            nomina_actualizada.descripcion_deducciones_adicionales = descripcion_deducciones
-            nomina_actualizada.save()
 
             serializer = self.get_serializer(nomina_actualizada)
             return Response(serializer.data)
