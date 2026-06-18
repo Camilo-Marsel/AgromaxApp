@@ -1,6 +1,6 @@
 # AgromaxApp — Roadmap y Estado del Proyecto
 
-> **Actualizado:** 2026-06-14  
+> **Actualizado:** 2026-06-18  
 > **Estado general:** MVP funcional en producción. Nómina colombiana completa, producción de banano implementada, inventario parcial, pruebas pendientes.
 
 ---
@@ -29,7 +29,7 @@ El sistema reemplaza Excel para la gestión operativa de fincas bananeras: nómi
 | Producción de banano (Matas Caídas + Embarques) | ✅ Completo | Implementado en jun-2026 |
 | Reportes de producción | ✅ Completo | Gráficos históricos por finca/lote |
 | Inventario por finca | ⚠️ Parcial | Modelo y API listos, UI incompleta |
-| Dashboard e indicadores | ⚠️ Parcial | Página existe pero sin datos reales |
+| Dashboard e indicadores | ✅ Completo | KPIs reales, filtrado por finca según rol |
 | Auditoría de cambios | ⚠️ Parcial | Modelo existe, sin UI |
 | Sugerencias agronómicas | ❌ Pendiente | Fase futura |
 
@@ -46,6 +46,16 @@ El sistema reemplaza Excel para la gestión operativa de fincas bananeras: nómi
 - ✅ Fixes responsive: scroll horizontal en tablas, botones nómina flex-wrap
 - ✅ Bug "Enviar Correos" corregido: finca_ids como array, filtro `__in`
 - ✅ Navbar muestra nombre completo en lugar de username
+- ✅ Dashboard con KPIs reales (endpoint `/api/dashboard/resumen/`)
+- ✅ Dashboard filtra por fincas asignadas al usuario (SUPERVISOR ve solo sus fincas)
+- ✅ Tarjeta de contratos con scroll limitado (max-h) para no empujar accesos rápidos
+- ✅ Modelo Lote extendido con campos técnicos topográficos (canales, cables, áreas)
+- ✅ SQL de migración de lotes para Supabase (`docs/supabase_migration_0026_lotes.sql`)
+- ✅ Embolse multi-fila con validación color+lote por día
+- ✅ Horas Trabajadas libre sobre cualquier labor del día
+- ✅ Número de cuenta visible para Supervisor (antes solo Admin)
+- ✅ Botón Enviar Correos masivo habilitado correctamente (nominasFiltradas.length)
+- ✅ Estado inicial correos masivos: APROBADA + CALCULADA
 
 ---
 
@@ -53,17 +63,7 @@ El sistema reemplaza Excel para la gestión operativa de fincas bananeras: nómi
 
 ### 🔴 Alta prioridad — Antes de pruebas formales
 
-#### P1 — Dashboard con indicadores reales (HU-7.1)
-**Qué falta:** La página `/dashboard` existe pero está vacía o con datos de ejemplo.  
-**Qué debe mostrar:**
-- Número de trabajadores activos (total y por finca)
-- Estado de la quincena actual (abierta / calculada / aprobada)
-- Total nómina último período pagado
-- Adelantos activos pendientes de cobro
-- Productos con stock por debajo del mínimo
-- Contratos que vencen en los próximos 30 días
-
-**Cómo implementarlo:** Crear un endpoint `/api/dashboard/resumen/` que agregue estos datos en una sola llamada. El frontend los muestra en cards.
+#### ~~P1 — Dashboard con indicadores reales (HU-7.1)~~ ✅ Completo
 
 ---
 
@@ -248,7 +248,7 @@ Recorrer los flujos principales en el navegador antes de dar por cerrado el MVP:
 ```
 Hoy
  │
- ├── P1  Dashboard con indicadores reales        ← primera sesión siguiente
+ ├── P1  Dashboard con indicadores reales        ✅ Completo
  ├── P2  UI inventario (entradas/salidas)
  ├── P3  Alerta stock bajo (dashboard)
  ├── P4  Alerta contratos por vencer (dashboard)

@@ -30,9 +30,21 @@ def dashboard_resumen(request):
 
 def _dashboard_resumen_impl(request):
     hoy = date.today()
+    user = request.user
+
+    # Determinar fincas visibles según el rol
+    if user.es_administrador:
+        fincas_ids = None  # None = todas
+    else:
+        fincas_ids = list(user.fincas_asignadas.values_list('id', flat=True))
+
+    def finca_filter(field='finca__id'):
+        if fincas_ids is None:
+            return {}
+        return {f'{field}__in': fincas_ids}
 
     # 1. Trabajadores activos total y por finca
-    trabajadores_qs = Trabajador.objects.filter(estado='CONTRATADO')
+    trabajadores_qs = Trabajador.objects.filter(estado='CONTRATADO', **finca_filter('finca__id'))
     total_trabajadores = trabajadores_qs.count()
 
     por_finca = list(
@@ -57,7 +69,7 @@ def _dashboard_resumen_impl(request):
     )
     quincena_info = None
     if quincena_actual:
-        nominas_q = Nomina.objects.filter(quincena=quincena_actual)
+        nominas_q = Nomina.objects.filter(quincena=quincena_actual, **finca_filter('trabajador__finca__id'))
         quincena_info = {
             'id': quincena_actual.id,
             'nombre': str(quincena_actual),
@@ -70,33 +82,33 @@ def _dashboard_resumen_impl(request):
         }
 
     # 3. Total nómina del último período aprobado
+    nominas_aprobadas_qs = Nomina.objects.filter(estado='APROBADA', **finca_filter('trabajador__finca__id'))
     ultima_quincena_aprobada = (
         Quincena.objects.filter(
-            nominas__estado='APROBADA'
+            nominas__in=nominas_aprobadas_qs
         ).distinct().order_by('-fecha_inicio').first()
     )
     total_ultima_nomina = None
     ultima_quincena_nombre = None
     if ultima_quincena_aprobada:
         total_ultima_nomina = (
-            Nomina.objects.filter(
-                quincena=ultima_quincena_aprobada,
-                estado='APROBADA'
-            ).aggregate(total=Sum('total_neto'))['total'] or Decimal('0')
+            nominas_aprobadas_qs.filter(quincena=ultima_quincena_aprobada)
+            .aggregate(total=Sum('total_neto'))['total'] or Decimal('0')
         )
         ultima_quincena_nombre = str(ultima_quincena_aprobada)
 
     # 4. Adelantos activos pendientes de cobro
-    adelantos_activos = Prestamo.objects.filter(estado='ACTIVO')
+    adelantos_activos = Prestamo.objects.filter(estado='ACTIVO', **finca_filter('trabajador__finca__id'))
     total_adelantos_pendientes = (
         adelantos_activos.aggregate(total=Sum('saldo_pendiente'))['total'] or Decimal('0')
     )
     num_adelantos = adelantos_activos.count()
 
     # 5. Productos con stock bajo (stock_actual <= stock_minimo y stock_minimo > 0)
+    stock_filter = {} if fincas_ids is None else {'bodega__finca__id__in': fincas_ids}
     stocks_bajos = (
         StockFinca.objects
-        .filter(stock_minimo__gt=0, stock_actual__lte=F('stock_minimo'))
+        .filter(stock_minimo__gt=0, stock_actual__lte=F('stock_minimo'), **stock_filter)
         .select_related('producto', 'bodega')
         .order_by('bodega__nombre', 'producto__nombre')
     )
@@ -119,6 +131,7 @@ def _dashboard_resumen_impl(request):
             estado='ACTIVO',
             tipo_contrato='TERMINO_FIJO',
             fecha_fin__lte=limite,
+            **finca_filter('trabajador__finca__id'),
         )
         .select_related('trabajador', 'trabajador__finca')
         .order_by('fecha_fin')

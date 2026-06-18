@@ -161,7 +161,7 @@ export default function Dashboard() {
             <FileText className="w-4 h-4 text-yellow-500" /> Contratos críticos
           </h2>
           {alertas_contratos?.length > 0 ? (
-            <ul className="space-y-2">
+            <ul className="space-y-2 max-h-48 overflow-y-auto pr-1">
               {alertas_contratos.map(c => (
                 <li
                   key={c.contrato_id}
