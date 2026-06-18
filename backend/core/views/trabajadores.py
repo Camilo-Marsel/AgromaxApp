@@ -108,11 +108,12 @@ class TrabajadorViewSet(FincaFilterMixin, viewsets.ModelViewSet):
           - fecha_retiro: YYYY-MM-DD (requerido)
           - pdf: 'true' para descargar el PDF
         """
+        import logging
+        import traceback
         from datetime import date
-        from django.http import HttpResponse
         from ..services.liquidacion_calculator import calcular_liquidacion
-        from ..services.liquidacion_pdf import generar_liquidacion_pdf
 
+        logger = logging.getLogger(__name__)
         trabajador = self.get_object()
 
         fecha_str = request.query_params.get('fecha_retiro')
@@ -129,20 +130,42 @@ class TrabajadorViewSet(FincaFilterMixin, viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if not trabajador.fecha_ingreso:
+            return Response(
+                {'error': 'El trabajador no tiene fecha de ingreso registrada.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if fecha_retiro < trabajador.fecha_ingreso:
             return Response(
                 {'error': 'La fecha de retiro no puede ser anterior a la fecha de ingreso.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        data = calcular_liquidacion(trabajador, fecha_retiro)
+        try:
+            data = calcular_liquidacion(trabajador, fecha_retiro)
+        except Exception as exc:
+            logger.error('Error en liquidacion trabajador %s: %s\n%s', pk, exc, traceback.format_exc())
+            return Response(
+                {'error': f'Error al calcular la liquidación: {exc}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         if request.query_params.get('pdf') == 'true':
-            buffer = generar_liquidacion_pdf(data)
-            nombre = f"liquidacion_{trabajador.numero_documento}_{fecha_str}.pdf"
-            response = HttpResponse(buffer, content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="{nombre}"'
-            return response
+            try:
+                from django.http import HttpResponse
+                from ..services.liquidacion_pdf import generar_liquidacion_pdf
+                buffer = generar_liquidacion_pdf(data)
+                nombre = f"liquidacion_{trabajador.numero_documento}_{fecha_str}.pdf"
+                response = HttpResponse(buffer, content_type='application/pdf')
+                response['Content-Disposition'] = f'attachment; filename="{nombre}"'
+                return response
+            except Exception as exc:
+                logger.error('Error generando PDF liquidacion: %s\n%s', exc, traceback.format_exc())
+                return Response(
+                    {'error': f'Error al generar el PDF: {exc}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
         return Response(data)
 
