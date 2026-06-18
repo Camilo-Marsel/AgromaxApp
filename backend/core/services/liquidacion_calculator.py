@@ -17,31 +17,6 @@ def calcular_liquidacion(trabajador, fecha_retiro: date) -> dict:
 
     fecha_ingreso = trabajador.fecha_ingreso
 
-    # Sumar provisiones de todo el período de trabajo
-    provisiones = ProvisionPrestaciones.objects.filter(
-        trabajador=trabajador,
-        # Filtrar por año-mes: desde fecha_ingreso hasta fecha_retiro
-    ).filter(
-        # mes/año >= ingreso
-        año__gt=fecha_ingreso.year
-    ).union(
-        ProvisionPrestaciones.objects.filter(
-            trabajador=trabajador,
-            año=fecha_ingreso.year,
-            mes__gte=fecha_ingreso.month,
-        )
-    ).filter(
-        # mes/año <= retiro
-        año__lt=fecha_retiro.year
-    ).union(
-        ProvisionPrestaciones.objects.filter(
-            trabajador=trabajador,
-            año=fecha_retiro.year,
-            mes__lte=fecha_retiro.month,
-        )
-    )
-
-    # Reconstruir con una query simple y limpia
     provisiones = ProvisionPrestaciones.objects.filter(
         trabajador=trabajador,
     ).exclude(
