@@ -35,11 +35,11 @@ export default function PrestacionesList() {
   const [filtroAño, setFiltroAño]       = useState(currentYear);
 
   // Modal calcular
-  const [showModal, setShowModal]       = useState(false);
-  const [mesCalc, setMesCalc]           = useState(new Date().getMonth() + 1);
-  const [añoCalc, setAñoCalc]           = useState(currentYear);
-  const [fincaCalc, setFincaCalc]       = useState('');   // '' = todas
-  const [calculando, setCalculando]     = useState(false);
+  const [showModal, setShowModal]         = useState(false);
+  const [mesCalc, setMesCalc]             = useState(new Date().getMonth() + 1);
+  const [añoCalc, setAñoCalc]             = useState(currentYear);
+  const [fincasSeleccionadas, setFincasSeleccionadas] = useState([]);
+  const [calculando, setCalculando]       = useState(false);
 
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
 
@@ -73,14 +73,19 @@ export default function PrestacionesList() {
     }
   };
 
+  const toggleFinca = (id) =>
+    setFincasSeleccionadas(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
   const handleCalcular = async () => {
     try {
       setCalculando(true);
-      await prestacionesService.calcular(mesCalc, añoCalc, fincaCalc || null);
-      const fincaNombre = fincas.find(f => f.id === Number(fincaCalc))?.nombre ?? 'todas las fincas';
-      toast.success(`Prestaciones calculadas para ${MESES[mesCalc]}/${añoCalc} — ${fincaNombre}`);
+      await prestacionesService.calcular(mesCalc, añoCalc, fincasSeleccionadas);
+      const nombres = fincasSeleccionadas.length
+        ? fincas.filter(f => fincasSeleccionadas.includes(f.id)).map(f => f.nombre).join(', ')
+        : 'todas las fincas';
+      toast.success(`Prestaciones calculadas — ${MESES[mesCalc]}/${añoCalc} — ${nombres}`);
       setShowModal(false);
-      setFincaCalc('');
+      setFincasSeleccionadas([]);
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error al calcular prestaciones');
@@ -214,11 +219,11 @@ export default function PrestacionesList() {
                         <span className="font-medium">{MESES[r.mes]} {r.año}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm">
-                      {r.finca_nombre ? (
-                        <span className="flex items-center gap-1 text-gray-700">
-                          <Building2 className="w-3.5 h-3.5 text-gray-400" />
-                          {r.finca_nombre}
+                    <td className="px-4 py-4 text-sm">
+                      {r.fincas_nombres?.length > 0 ? (
+                        <span className="flex items-start gap-1 text-gray-700">
+                          <Building2 className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                          {r.fincas_nombres.join(', ')}
                         </span>
                       ) : (
                         <span className="text-gray-400 italic text-xs">Todas</span>
@@ -295,23 +300,35 @@ export default function PrestacionesList() {
               </div>
             </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Finca</label>
-              <select
-                value={fincaCalc}
-                onChange={(e) => setFincaCalc(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Todas las fincas</option>
-                {fincas.map((f) => (
-                  <option key={f.id} value={f.id}>{f.nombre}</option>
-                ))}
-              </select>
-            </div>
+            {fincas.length > 0 && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Fincas <span className="text-gray-400 font-normal">(vacío = todas)</span>
+                </label>
+                <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-1">
+                  {fincas.map((f) => (
+                    <label key={f.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={fincasSeleccionadas.includes(f.id)}
+                        onChange={() => toggleFinca(f.id)}
+                        className="text-purple-600 rounded"
+                      />
+                      <span className="text-sm">{f.nombre}</span>
+                    </label>
+                  ))}
+                </div>
+                {fincasSeleccionadas.length > 0 && (
+                  <p className="text-xs text-purple-600 mt-1">
+                    {fincasSeleccionadas.length} finca(s) seleccionada(s)
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => { setShowModal(false); setFincaCalc(''); }}
+                onClick={() => { setShowModal(false); setFincasSeleccionadas([]); }}
                 className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
               >
                 Cancelar

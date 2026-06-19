@@ -413,103 +413,75 @@ class PrestacionesViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def calcular(self, request):
         """Calcular provisiones de prestaciones para un mes específico.
-        Requiere: mes, año. Opcional: finca_id (None = todas las fincas)."""
+        Requiere: mes, año. Opcional: finca_ids (lista de IDs; vacío = todas)."""
         from ..models import Finca
 
         mes = request.data.get('mes')
         año = request.data.get('año')
-        finca_id = request.data.get('finca_id') or None
+        finca_ids = request.data.get('finca_ids') or []
 
         if not mes or not año:
-            return Response(
-                {'error': 'Se requieren mes y año'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': 'Se requieren mes y año'}, status=status.HTTP_400_BAD_REQUEST)
 
-        finca = None
-        if finca_id:
-            try:
-                finca = Finca.objects.get(pk=finca_id)
-            except Finca.DoesNotExist:
-                return Response({'error': 'Finca no encontrada'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if ResumenPrestaciones.objects.filter(mes=mes, año=año, finca=finca).exists():
-            sufijo = f' para {finca.nombre}' if finca else ' global'
-            return Response(
-                {'error': f'Ya existen provisiones para {mes:02d}/{año}{sufijo}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        fincas_qs = Finca.objects.filter(pk__in=finca_ids) if finca_ids else Finca.objects.none()
+        if finca_ids and fincas_qs.count() != len(finca_ids):
+            return Response({'error': 'Una o más fincas no existen'}, status=status.HTTP_400_BAD_REQUEST)
 
         quincenas = Quincena.objects.filter(mes=mes, año=año)
-
         if not quincenas.exists():
-            return Response(
-                {'error': f'No hay quincenas para {mes:02d}/{año}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': f'No hay quincenas para {mes:02d}/{año}'}, status=status.HTTP_400_BAD_REQUEST)
 
         nominas = Nomina.objects.filter(
             quincena__in=quincenas,
-            estado='APROBADA'
+            estado='APROBADA',
         ).select_related('trabajador', 'quincena')
 
-        if finca:
-            nominas = nominas.filter(trabajador__finca=finca)
+        if finca_ids:
+            nominas = nominas.filter(trabajador__finca__id__in=finca_ids)
 
         if not nominas.exists():
-            sufijo = f' en {finca.nombre}' if finca else ''
+            sufijo = f' en {", ".join(fincas_qs.values_list("nombre", flat=True))}' if finca_ids else ''
             return Response(
                 {'error': f'No hay nóminas aprobadas para {mes:02d}/{año}{sufijo}'},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         trabajadores_salario = defaultdict(lambda: {'salario': Decimal('0'), 'nominas': []})
-
         for nomina in nominas:
-            trab_id = nomina.trabajador_id
-            trabajadores_salario[trab_id]['salario'] += nomina.total_devengado
-            trabajadores_salario[trab_id]['nominas'].append(nomina)
+            trabajadores_salario[nomina.trabajador_id]['salario'] += nomina.total_devengado
+            trabajadores_salario[nomina.trabajador_id]['nominas'].append(nomina)
 
-        total_salario = Decimal('0')
-        total_cesantias = Decimal('0')
-        total_intereses = Decimal('0')
-        total_prima = Decimal('0')
-        total_vacaciones = Decimal('0')
+        total_salario = total_cesantias = total_intereses = total_prima = total_vacaciones = Decimal('0')
 
         for trab_id, data in trabajadores_salario.items():
             salario = data['salario']
-
-            cesantias = salario * PORCENTAJE_CESANTIAS
-            intereses = cesantias * PORCENTAJE_INTERESES_CESANTIAS
-            prima = salario * PORCENTAJE_PRIMA
+            cesantias  = salario * PORCENTAJE_CESANTIAS
+            intereses  = cesantias * PORCENTAJE_INTERESES_CESANTIAS
+            prima      = salario * PORCENTAJE_PRIMA
             vacaciones = salario * PORCENTAJE_VACACIONES
-            total_provision = cesantias + intereses + prima + vacaciones
 
             ProvisionPrestaciones.objects.update_or_create(
-                mes=mes,
-                año=año,
-                trabajador_id=trab_id,
+                mes=mes, año=año, trabajador_id=trab_id,
                 defaults=dict(
                     salario_base=salario,
                     cesantias=cesantias,
                     intereses_cesantias=intereses,
                     prima=prima,
                     vacaciones=vacaciones,
-                    total_provision=total_provision,
+                    total_provision=cesantias + intereses + prima + vacaciones,
                     nomina=data['nominas'][-1],
                 )
             )
 
-            total_salario += salario
-            total_cesantias += cesantias
-            total_intereses += intereses
-            total_prima += prima
+            total_salario    += salario
+            total_cesantias  += cesantias
+            total_intereses  += intereses
+            total_prima      += prima
             total_vacaciones += vacaciones
 
         resumen = ResumenPrestaciones.objects.create(
             mes=mes,
             año=año,
-            finca=finca,
             total_salario_base=total_salario,
             total_cesantias=total_cesantias,
             total_intereses_cesantias=total_intereses,
@@ -517,14 +489,16 @@ class PrestacionesViewSet(viewsets.ModelViewSet):
             total_vacaciones=total_vacaciones,
             total_provisiones=total_cesantias + total_intereses + total_prima + total_vacaciones,
             num_trabajadores=len(trabajadores_salario),
-            created_by=request.user
+            created_by=request.user,
         )
+        if finca_ids:
+            resumen.fincas.set(finca_ids)
 
+        nombres = ', '.join(fincas_qs.values_list('nombre', flat=True)) if finca_ids else 'todas las fincas'
         serializer = ResumenPrestacionesDetailSerializer(resumen)
-        sufijo = f' para {finca.nombre}' if finca else ''
         return Response({
-            'message': f'Prestaciones calculadas para {mes:02d}/{año}{sufijo} con {len(trabajadores_salario)} trabajadores',
-            'resumen': serializer.data
+            'message': f'Prestaciones calculadas para {mes:02d}/{año} — {nombres} ({len(trabajadores_salario)} trabajadores)',
+            'resumen': serializer.data,
         }, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['get'])

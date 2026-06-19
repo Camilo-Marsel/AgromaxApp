@@ -284,11 +284,9 @@ class ResumenPrestaciones(models.Model):
     mes = models.IntegerField(validators=[MinValueValidator(1)])
     año = models.IntegerField(validators=[MinValueValidator(2020)])
 
-    # Finca (opcional — NULL = global)
-    finca = models.ForeignKey(
+    # Fincas incluidas (vacío = global / todas)
+    fincas = models.ManyToManyField(
         'Finca',
-        on_delete=models.SET_NULL,
-        null=True,
         blank=True,
         related_name='resumenes_prestaciones',
     )
@@ -331,12 +329,7 @@ class ResumenPrestaciones(models.Model):
         verbose_name = 'Resumen Prestaciones'
         verbose_name_plural = 'Resúmenes Prestaciones'
         ordering = ['-año', '-mes']
-        constraints = [
-            models.UniqueConstraint(
-                fields=['mes', 'año', 'finca'],
-                name='unique_resumen_prestaciones_periodo_finca'
-            )
-        ]
+        constraints = []
 
     def __str__(self):
         return f"Prestaciones {self.mes:02d}/{self.año}"
