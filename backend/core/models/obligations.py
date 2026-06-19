@@ -276,13 +276,22 @@ class ProvisionPrestaciones(models.Model):
 
 class ResumenPrestaciones(models.Model):
     """
-    Resumen consolidado mensual de todas las provisiones.
-    Permite ver el total a provisionar por la empresa cada mes.
+    Resumen consolidado mensual de provisiones, opcionalmente por finca.
+    Si finca=None representa un cálculo global (todas las fincas).
     """
 
     # Periodo
     mes = models.IntegerField(validators=[MinValueValidator(1)])
     año = models.IntegerField(validators=[MinValueValidator(2020)])
+
+    # Finca (opcional — NULL = global)
+    finca = models.ForeignKey(
+        'Finca',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='resumenes_prestaciones',
+    )
 
     # Totales consolidados
     total_salario_base = models.DecimalField(
@@ -324,8 +333,8 @@ class ResumenPrestaciones(models.Model):
         ordering = ['-año', '-mes']
         constraints = [
             models.UniqueConstraint(
-                fields=['mes', 'año'],
-                name='unique_resumen_prestaciones_periodo'
+                fields=['mes', 'año', 'finca'],
+                name='unique_resumen_prestaciones_periodo_finca'
             )
         ]
 

@@ -63,7 +63,7 @@ export default function PILAList() {
 
   const loadFincas = async () => {
     try {
-      const data = await fincaService.getAll();
+      const data = await fincaService.getAll({ todas: 'true' });
       setFincas(data.results || data);
     } catch (error) {
       console.error('Error al cargar fincas:', error);

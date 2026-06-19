@@ -15,9 +15,9 @@ const prestacionesService = {
     return response.data;
   },
 
-  // Calcular prestaciones para un mes específico
-  calcular: async (mes, año) => {
-    const response = await api.post('/prestaciones/calcular/', { mes, año });
+  // Calcular prestaciones para un mes específico (finca_id opcional)
+  calcular: async (mes, año, finca_id = null) => {
+    const response = await api.post('/prestaciones/calcular/', { mes, año, finca_id });
     return response.data;
   },
 

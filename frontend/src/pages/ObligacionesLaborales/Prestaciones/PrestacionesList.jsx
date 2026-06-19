@@ -4,30 +4,47 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import prestacionesService from '../../../services/prestacionesService';
 import pilaService from '../../../services/pilaService';
+import fincaService from '../../../services/fincaService';
 import LoadingSpinner from '../../../components/Common/LoadingSpinner';
 import ConfirmDialog from '../../../components/Common/ConfirmDialog';
 import toast from 'react-hot-toast';
 import {
-  Plus, Eye, Trash2, Calculator, TrendingUp,
-  PiggyBank, Calendar, Users, DollarSign
+  Eye, Trash2, Calculator, TrendingUp,
+  PiggyBank, Calendar, Users, Building2,
 } from 'lucide-react';
+
+const MESES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+const currentYear = new Date().getFullYear();
+const AÑOS = Array.from({ length: 4 }, (_, i) => currentYear - i);
+
+function fmt(value) {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency', currency: 'COP', minimumFractionDigits: 0,
+  }).format(value || 0);
+}
 
 export default function PrestacionesList() {
   const navigate = useNavigate();
-  const [resumenes, setResumenes] = useState([]);
-  const [acumulado, setAcumulado] = useState(null);
-  const [porcentajes, setPorcentajes] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [filtroAño, setFiltroAño] = useState(new Date().getFullYear());
-  const [showCalcularModal, setShowCalcularModal] = useState(false);
-  const [mesCalcular, setMesCalcular] = useState(new Date().getMonth() + 1);
-  const [añoCalcular, setAñoCalcular] = useState(new Date().getFullYear());
-  const [calculando, setCalculando] = useState(false);
+  const [resumenes, setResumenes]       = useState([]);
+  const [acumulado, setAcumulado]       = useState(null);
+  const [porcentajes, setPorcentajes]   = useState(null);
+  const [fincas, setFincas]             = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [filtroAño, setFiltroAño]       = useState(currentYear);
+
+  // Modal calcular
+  const [showModal, setShowModal]       = useState(false);
+  const [mesCalc, setMesCalc]           = useState(new Date().getMonth() + 1);
+  const [añoCalc, setAñoCalc]           = useState(currentYear);
+  const [fincaCalc, setFincaCalc]       = useState('');   // '' = todas
+  const [calculando, setCalculando]     = useState(false);
+
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
 
-  useEffect(() => {
-    loadData();
-  }, [filtroAño]);
+  useEffect(() => { loadData(); }, [filtroAño]);
+  useEffect(() => { loadFincas(); }, []);
 
   const loadData = async () => {
     try {
@@ -40,25 +57,33 @@ export default function PrestacionesList() {
       setResumenes(resumenesData.results || resumenesData);
       setAcumulado(acumuladoData);
       setPorcentajes(pilaResumen?.porcentajes?.prestaciones);
-    } catch (error) {
-      console.error('Error al cargar datos:', error);
+    } catch {
       toast.error('Error al cargar prestaciones');
     } finally {
       setLoading(false);
     }
   };
 
+  const loadFincas = async () => {
+    try {
+      const data = await fincaService.getAll({ todas: 'true' });
+      setFincas(data.results || data);
+    } catch {
+      // silencioso
+    }
+  };
+
   const handleCalcular = async () => {
     try {
       setCalculando(true);
-      await prestacionesService.calcular(mesCalcular, añoCalcular);
-      toast.success(`Prestaciones calculadas para ${mesCalcular}/${añoCalcular}`);
-      setShowCalcularModal(false);
+      await prestacionesService.calcular(mesCalc, añoCalc, fincaCalc || null);
+      const fincaNombre = fincas.find(f => f.id === Number(fincaCalc))?.nombre ?? 'todas las fincas';
+      toast.success(`Prestaciones calculadas para ${MESES[mesCalc]}/${añoCalc} — ${fincaNombre}`);
+      setShowModal(false);
+      setFincaCalc('');
       loadData();
-    } catch (error) {
-      console.error('Error al calcular prestaciones:', error);
-      const errorMsg = error.response?.data?.error || 'Error al calcular prestaciones';
-      toast.error(errorMsg);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al calcular prestaciones');
     } finally {
       setCalculando(false);
     }
@@ -70,37 +95,13 @@ export default function PrestacionesList() {
       toast.success('Provisión eliminada correctamente');
       setConfirmDelete({ isOpen: false, id: null });
       loadData();
-    } catch (error) {
-      console.error('Error al eliminar:', error);
+    } catch {
       toast.error('Error al eliminar provisión');
     }
   };
 
-  const formatMoney = (value) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-    }).format(value || 0);
-  };
-
-  const meses = [
-    '', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-  ];
-
-  const años = [];
-  const currentYear = new Date().getFullYear();
-  for (let y = currentYear; y >= currentYear - 3; y--) {
-    años.push(y);
-  }
-
   if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
+    return <div className="flex justify-center items-center h-64"><LoadingSpinner size="lg" /></div>;
   }
 
   return (
@@ -109,10 +110,10 @@ export default function PrestacionesList() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Prestaciones Sociales</h1>
-          <p className="text-gray-600">Provisiones mensuales para prestaciones</p>
+          <p className="text-gray-600">Provisiones mensuales por finca</p>
         </div>
         <button
-          onClick={() => setShowCalcularModal(true)}
+          onClick={() => setShowModal(true)}
           className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
         >
           <Calculator className="w-5 h-5" />
@@ -120,7 +121,7 @@ export default function PrestacionesList() {
         </button>
       </div>
 
-      {/* Porcentajes Vigentes */}
+      {/* Porcentajes vigentes */}
       {porcentajes && (
         <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg shadow border border-purple-200">
           <h2 className="text-lg font-semibold text-purple-800 mb-4 flex items-center gap-2">
@@ -128,44 +129,26 @@ export default function PrestacionesList() {
             Porcentajes de Provisión
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="bg-white p-3 rounded-lg shadow-sm">
-              <p className="text-xs text-gray-600">Cesantías</p>
-              <p className="text-xl font-bold text-purple-600">
-                {porcentajes.cesantias}%
-              </p>
-            </div>
-            <div className="bg-white p-3 rounded-lg shadow-sm">
-              <p className="text-xs text-gray-600">Int. Cesantías</p>
-              <p className="text-xl font-bold text-pink-600">
-                {porcentajes.intereses_cesantias}%
-              </p>
-            </div>
-            <div className="bg-white p-3 rounded-lg shadow-sm">
-              <p className="text-xs text-gray-600">Prima</p>
-              <p className="text-xl font-bold text-indigo-600">
-                {porcentajes.prima}%
-              </p>
-            </div>
-            <div className="bg-white p-3 rounded-lg shadow-sm">
-              <p className="text-xs text-gray-600">Vacaciones</p>
-              <p className="text-xl font-bold text-blue-600">
-                {porcentajes.vacaciones}%
-              </p>
-            </div>
+            {[
+              { label: 'Cesantías',      value: porcentajes.cesantias,           color: 'text-purple-600' },
+              { label: 'Int. Cesantías', value: porcentajes.intereses_cesantias, color: 'text-pink-600' },
+              { label: 'Prima',          value: porcentajes.prima,               color: 'text-indigo-600' },
+              { label: 'Vacaciones',     value: porcentajes.vacaciones,          color: 'text-blue-600' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="bg-white p-3 rounded-lg shadow-sm">
+                <p className="text-xs text-gray-600">{label}</p>
+                <p className={`text-xl font-bold ${color}`}>{value}%</p>
+              </div>
+            ))}
             <div className="bg-purple-100 p-3 rounded-lg shadow-sm">
               <p className="text-xs text-purple-700">Total Mensual</p>
-              <p className="text-xl font-bold text-purple-800">
-                {porcentajes.total.toFixed(2)}%
-              </p>
+              <p className="text-xl font-bold text-purple-800">{porcentajes.total?.toFixed(2)}%</p>
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-3">
-            * Provisiones mensuales sobre salario devengado. Se pagan al trabajador según calendario legal.
-          </p>
         </div>
       )}
 
-      {/* Acumulado del Año */}
+      {/* Acumulado del año */}
       {acumulado?.acumulado && (
         <div className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -173,47 +156,24 @@ export default function PrestacionesList() {
             Acumulado {filtroAño} ({acumulado.meses_calculados} meses)
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-            <div className="p-4 bg-purple-50 rounded-lg">
-              <p className="text-xs text-purple-600">Cesantías</p>
-              <p className="text-lg font-bold text-purple-700">
-                {formatMoney(acumulado.acumulado.total_cesantias)}
-              </p>
-            </div>
-            <div className="p-4 bg-pink-50 rounded-lg">
-              <p className="text-xs text-pink-600">Int. Cesantías</p>
-              <p className="text-lg font-bold text-pink-700">
-                {formatMoney(acumulado.acumulado.total_intereses)}
-              </p>
-            </div>
-            <div className="p-4 bg-indigo-50 rounded-lg">
-              <p className="text-xs text-indigo-600">Prima</p>
-              <p className="text-lg font-bold text-indigo-700">
-                {formatMoney(acumulado.acumulado.total_prima)}
-              </p>
-            </div>
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <p className="text-xs text-blue-600">Vacaciones</p>
-              <p className="text-lg font-bold text-blue-700">
-                {formatMoney(acumulado.acumulado.total_vacaciones)}
-              </p>
-            </div>
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-600">Base Salarial</p>
-              <p className="text-lg font-bold text-gray-700">
-                {formatMoney(acumulado.acumulado.total_salarios)}
-              </p>
-            </div>
-            <div className="p-4 bg-green-50 rounded-lg border-2 border-green-200">
-              <p className="text-xs text-green-600">Total Provisionado</p>
-              <p className="text-lg font-bold text-green-700">
-                {formatMoney(acumulado.acumulado.total_provisiones)}
-              </p>
-            </div>
+            {[
+              { label: 'Cesantías',        value: acumulado.acumulado.total_cesantias,   cls: 'bg-purple-50 text-purple-700' },
+              { label: 'Int. Cesantías',   value: acumulado.acumulado.total_intereses,   cls: 'bg-pink-50 text-pink-700' },
+              { label: 'Prima',            value: acumulado.acumulado.total_prima,        cls: 'bg-indigo-50 text-indigo-700' },
+              { label: 'Vacaciones',       value: acumulado.acumulado.total_vacaciones,  cls: 'bg-blue-50 text-blue-700' },
+              { label: 'Base Salarial',    value: acumulado.acumulado.total_salarios,    cls: 'bg-gray-50 text-gray-700' },
+              { label: 'Total Provisionado', value: acumulado.acumulado.total_provisiones, cls: 'bg-green-50 text-green-700 border-2 border-green-200' },
+            ].map(({ label, value, cls }) => (
+              <div key={label} className={`p-4 rounded-lg ${cls}`}>
+                <p className="text-xs opacity-75">{label}</p>
+                <p className="text-lg font-bold">{fmt(value)}</p>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Filtro por Año */}
+      {/* Filtro año */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="flex items-center gap-4">
           <label className="text-sm font-medium text-gray-700">Año:</label>
@@ -222,93 +182,69 @@ export default function PrestacionesList() {
             onChange={(e) => setFiltroAño(parseInt(e.target.value))}
             className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
-            {años.map((año) => (
-              <option key={año} value={año}>{año}</option>
-            ))}
+            {AÑOS.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Tabla de Provisiones Mensuales */}
+      {/* Tabla */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {resumenes.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
-            No se encontraron provisiones para {filtroAño}
+            No se encontraron provisiones para {filtroAño}.
+            <br />
+            <span className="text-sm">Use "Calcular Provisiones" para generar el registro de un mes.</span>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Periodo
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Cesantías
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Int. Cesantías
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Prima
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Vacaciones
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Trabajadores
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Acciones
-                  </th>
+                  {['Período', 'Finca', 'Cesantías', 'Int. Cesantías', 'Prima', 'Vacaciones', 'Total', 'Trabajadores', 'Acciones'].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {resumenes.map((resumen) => (
-                  <tr key={resumen.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                {resumenes.map((r) => (
+                  <tr key={r.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-gray-400" />
-                        <span className="font-medium">
-                          {meses[resumen.mes]} {resumen.año}
+                        <span className="font-medium">{MESES[r.mes]} {r.año}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm">
+                      {r.finca_nombre ? (
+                        <span className="flex items-center gap-1 text-gray-700">
+                          <Building2 className="w-3.5 h-3.5 text-gray-400" />
+                          {r.finca_nombre}
                         </span>
-                      </div>
+                      ) : (
+                        <span className="text-gray-400 italic text-xs">Todas</span>
+                      )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
-                      {formatMoney(resumen.total_cesantias)}
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-purple-600">{fmt(r.total_cesantias)}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-pink-600">{fmt(r.total_intereses_cesantias)}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-indigo-600">{fmt(r.total_prima)}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-blue-600">{fmt(r.total_vacaciones)}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-green-600">{fmt(r.total_provisiones)}</td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <span className="flex items-center gap-1 text-sm text-gray-600">
+                        <Users className="w-4 h-4" />{r.num_trabajadores}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-pink-600">
-                      {formatMoney(resumen.total_intereses_cesantias)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600">
-                      {formatMoney(resumen.total_prima)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                      {formatMoney(resumen.total_vacaciones)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                      {formatMoney(resumen.total_provisiones)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1 text-sm text-gray-600">
-                        <Users className="w-4 h-4" />
-                        {resumen.num_trabajadores}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => navigate(`/obligaciones/prestaciones/${resumen.id}`)}
+                          onClick={() => navigate(`/obligaciones/prestaciones/${r.id}`)}
                           className="text-purple-600 hover:text-purple-900"
                           title="Ver detalle"
                         >
                           <Eye className="w-5 h-5" />
                         </button>
                         <button
-                          onClick={() => setConfirmDelete({ isOpen: true, id: resumen.id })}
+                          onClick={() => setConfirmDelete({ isOpen: true, id: r.id })}
                           className="text-red-600 hover:text-red-900"
                           title="Eliminar"
                         >
@@ -324,50 +260,58 @@ export default function PrestacionesList() {
         )}
       </div>
 
-      {/* Modal Calcular Prestaciones */}
-      {showCalcularModal && (
+      {/* Modal Calcular */}
+      {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Calcular Provisiones</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Seleccione el mes y año para calcular las provisiones de prestaciones
-              sociales basadas en las nóminas aprobadas.
+            <h3 className="text-lg font-semibold mb-2">Calcular Provisiones</h3>
+            <p className="text-sm text-gray-600 mb-5">
+              Seleccione el período y la finca. Si deja "Todas las fincas" se calculan
+              todas juntas como un único registro.
             </p>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Mes
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mes</label>
                 <select
-                  value={mesCalcular}
-                  onChange={(e) => setMesCalcular(parseInt(e.target.value))}
+                  value={mesCalc}
+                  onChange={(e) => setMesCalc(parseInt(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
-                  {meses.slice(1).map((mes, index) => (
-                    <option key={index + 1} value={index + 1}>{mes}</option>
+                  {MESES.slice(1).map((m, i) => (
+                    <option key={i + 1} value={i + 1}>{m}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Año
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Año</label>
                 <select
-                  value={añoCalcular}
-                  onChange={(e) => setAñoCalcular(parseInt(e.target.value))}
+                  value={añoCalc}
+                  onChange={(e) => setAñoCalc(parseInt(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
-                  {años.map((año) => (
-                    <option key={año} value={año}>{año}</option>
-                  ))}
+                  {AÑOS.map((a) => <option key={a} value={a}>{a}</option>)}
                 </select>
               </div>
             </div>
 
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Finca</label>
+              <select
+                value={fincaCalc}
+                onChange={(e) => setFincaCalc(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="">Todas las fincas</option>
+                {fincas.map((f) => (
+                  <option key={f.id} value={f.id}>{f.nombre}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setShowCalcularModal(false)}
+                onClick={() => { setShowModal(false); setFincaCalc(''); }}
                 className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
               >
                 Cancelar
@@ -377,24 +321,13 @@ export default function PrestacionesList() {
                 disabled={calculando}
                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-400"
               >
-                {calculando ? (
-                  <>
-                    <LoadingSpinner size="sm" />
-                    Calculando...
-                  </>
-                ) : (
-                  <>
-                    <Calculator className="w-4 h-4" />
-                    Calcular
-                  </>
-                )}
+                {calculando ? <><LoadingSpinner size="sm" /> Calculando...</> : <><Calculator className="w-4 h-4" /> Calcular</>}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Confirm Delete Dialog */}
       <ConfirmDialog
         isOpen={confirmDelete.isOpen}
         onClose={() => setConfirmDelete({ isOpen: false, id: null })}

@@ -197,6 +197,10 @@ class FincaViewSet(viewsets.ModelViewSet):
         if user.es_administrador:
             return queryset
 
+        # ?todas=true permite ver todas las fincas (para modales de PILA/Prestaciones)
+        if self.request.query_params.get('todas') == 'true':
+            return queryset
+
         return user.fincas_asignadas.all()
 
     @action(detail=True, methods=['get'])

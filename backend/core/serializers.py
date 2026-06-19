@@ -1110,11 +1110,13 @@ class ProvisionPrestacionesSerializer(serializers.ModelSerializer):
 class ResumenPrestacionesListSerializer(serializers.ModelSerializer):
     """Serializer para listado de resúmenes de prestaciones"""
     periodo_display = serializers.CharField(read_only=True)
+    finca_nombre = serializers.CharField(source='finca.nombre', read_only=True, default=None)
 
     class Meta:
         model = ResumenPrestaciones
         fields = [
             'id', 'mes', 'año', 'periodo_display',
+            'finca', 'finca_nombre',
             'total_salario_base', 'total_cesantias',
             'total_intereses_cesantias', 'total_prima',
             'total_vacaciones', 'total_provisiones',
@@ -1125,6 +1127,7 @@ class ResumenPrestacionesListSerializer(serializers.ModelSerializer):
 class ResumenPrestacionesDetailSerializer(serializers.ModelSerializer):
     """Serializer para detalle de resumen con provisiones individuales"""
     periodo_display = serializers.CharField(read_only=True)
+    finca_nombre = serializers.CharField(source='finca.nombre', read_only=True, default=None)
     provisiones = serializers.SerializerMethodField()
     created_by_info = UsuarioSerializer(source='created_by', read_only=True)
 
@@ -1132,6 +1135,7 @@ class ResumenPrestacionesDetailSerializer(serializers.ModelSerializer):
         model = ResumenPrestaciones
         fields = [
             'id', 'mes', 'año', 'periodo_display',
+            'finca', 'finca_nombre',
             'total_salario_base', 'total_cesantias',
             'total_intereses_cesantias', 'total_prima',
             'total_vacaciones', 'total_provisiones',
@@ -1142,7 +1146,8 @@ class ResumenPrestacionesDetailSerializer(serializers.ModelSerializer):
 
     def get_provisiones(self, obj):
         provisiones = ProvisionPrestaciones.objects.filter(
-            mes=obj.mes, año=obj.año
+            mes=obj.mes, año=obj.año,
+            **({'trabajador__finca': obj.finca} if obj.finca_id else {}),
         ).select_related('trabajador')
         return ProvisionPrestacionesSerializer(provisiones, many=True).data
 
@@ -1151,11 +1156,16 @@ class ResumenPrestacionesCreateSerializer(serializers.Serializer):
     """Serializer para calcular prestaciones de un periodo"""
     mes = serializers.IntegerField(min_value=1, max_value=12)
     año = serializers.IntegerField(min_value=2020)
+    finca_id = serializers.IntegerField(required=False, allow_null=True)
 
     def validate(self, data):
-        if ResumenPrestaciones.objects.filter(mes=data['mes'], año=data['año']).exists():
+        finca_id = data.get('finca_id')
+        if ResumenPrestaciones.objects.filter(
+            mes=data['mes'], año=data['año'], finca_id=finca_id
+        ).exists():
+            sufijo = f" para finca {finca_id}" if finca_id else " global"
             raise serializers.ValidationError(
-                f"Ya existe un resumen de prestaciones para {data['mes']:02d}/{data['año']}"
+                f"Ya existe un resumen de prestaciones para {data['mes']:02d}/{data['año']}{sufijo}"
             )
         return data
 

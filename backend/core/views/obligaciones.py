@@ -412,9 +412,13 @@ class PrestacionesViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def calcular(self, request):
-        """Calcular provisiones de prestaciones para un mes específico. Requiere: mes, año"""
+        """Calcular provisiones de prestaciones para un mes específico.
+        Requiere: mes, año. Opcional: finca_id (None = todas las fincas)."""
+        from ..models import Finca
+
         mes = request.data.get('mes')
         año = request.data.get('año')
+        finca_id = request.data.get('finca_id') or None
 
         if not mes or not año:
             return Response(
@@ -422,9 +426,17 @@ class PrestacionesViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if ResumenPrestaciones.objects.filter(mes=mes, año=año).exists():
+        finca = None
+        if finca_id:
+            try:
+                finca = Finca.objects.get(pk=finca_id)
+            except Finca.DoesNotExist:
+                return Response({'error': 'Finca no encontrada'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if ResumenPrestaciones.objects.filter(mes=mes, año=año, finca=finca).exists():
+            sufijo = f' para {finca.nombre}' if finca else ' global'
             return Response(
-                {'error': f'Ya existen provisiones para {mes:02d}/{año}'},
+                {'error': f'Ya existen provisiones para {mes:02d}/{año}{sufijo}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -441,9 +453,13 @@ class PrestacionesViewSet(viewsets.ModelViewSet):
             estado='APROBADA'
         ).select_related('trabajador', 'quincena')
 
+        if finca:
+            nominas = nominas.filter(trabajador__finca=finca)
+
         if not nominas.exists():
+            sufijo = f' en {finca.nombre}' if finca else ''
             return Response(
-                {'error': f'No hay nóminas aprobadas para {mes:02d}/{año}'},
+                {'error': f'No hay nóminas aprobadas para {mes:02d}/{año}{sufijo}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -460,8 +476,6 @@ class PrestacionesViewSet(viewsets.ModelViewSet):
         total_prima = Decimal('0')
         total_vacaciones = Decimal('0')
 
-        provisiones_creadas = []
-
         for trab_id, data in trabajadores_salario.items():
             salario = data['salario']
 
@@ -471,19 +485,20 @@ class PrestacionesViewSet(viewsets.ModelViewSet):
             vacaciones = salario * PORCENTAJE_VACACIONES
             total_provision = cesantias + intereses + prima + vacaciones
 
-            provision = ProvisionPrestaciones.objects.create(
+            ProvisionPrestaciones.objects.update_or_create(
                 mes=mes,
                 año=año,
                 trabajador_id=trab_id,
-                salario_base=salario,
-                cesantias=cesantias,
-                intereses_cesantias=intereses,
-                prima=prima,
-                vacaciones=vacaciones,
-                total_provision=total_provision,
-                nomina=data['nominas'][-1]
+                defaults=dict(
+                    salario_base=salario,
+                    cesantias=cesantias,
+                    intereses_cesantias=intereses,
+                    prima=prima,
+                    vacaciones=vacaciones,
+                    total_provision=total_provision,
+                    nomina=data['nominas'][-1],
+                )
             )
-            provisiones_creadas.append(provision)
 
             total_salario += salario
             total_cesantias += cesantias
@@ -494,6 +509,7 @@ class PrestacionesViewSet(viewsets.ModelViewSet):
         resumen = ResumenPrestaciones.objects.create(
             mes=mes,
             año=año,
+            finca=finca,
             total_salario_base=total_salario,
             total_cesantias=total_cesantias,
             total_intereses_cesantias=total_intereses,
@@ -505,8 +521,9 @@ class PrestacionesViewSet(viewsets.ModelViewSet):
         )
 
         serializer = ResumenPrestacionesDetailSerializer(resumen)
+        sufijo = f' para {finca.nombre}' if finca else ''
         return Response({
-            'message': f'Prestaciones calculadas para {mes:02d}/{año} con {len(trabajadores_salario)} trabajadores',
+            'message': f'Prestaciones calculadas para {mes:02d}/{año}{sufijo} con {len(trabajadores_salario)} trabajadores',
             'resumen': serializer.data
         }, status=status.HTTP_201_CREATED)
 

@@ -51,7 +51,8 @@ const GROUPS = [
     items: [
       { path: '/nomina', icon: DollarSign, label: 'Nómina' },
       { path: '/prestamos', icon: DollarSign, label: 'Adelantos' },
-      { path: '/obligaciones', icon: Shield, label: 'Obligaciones' },
+      { path: '/obligaciones', icon: Shield, label: 'Seg. Social (PILA)' },
+      { path: '/obligaciones/prestaciones', icon: FileText, label: 'Prestaciones' },
     ],
   },
   {
