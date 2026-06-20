@@ -24,6 +24,7 @@ import {
   TrendingUp,
   Printer,
   Eye,
+  Calculator,
 } from 'lucide-react';
 
 export default function ContratoDetail() {
@@ -555,6 +556,16 @@ export default function ContratoDetail() {
                       className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                     >
                       Liquidar Contrato
+                    </button>
+                  )}
+
+                  {(contrato.estado === 'FINALIZADO' || contrato.estado === 'LIQUIDADO') && (
+                    <button
+                      onClick={() => navigate(`/liquidaciones?trabajador=${contrato.trabajador}`)}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                    >
+                      <Calculator className="w-4 h-4" />
+                      Calcular liquidación
                     </button>
                   )}
 

@@ -46,6 +46,8 @@ import PILAList from './pages/ObligacionesLaborales/PILA/PILAList';
 import PILADetail from './pages/ObligacionesLaborales/PILA/PILADetail';
 import PrestacionesList from './pages/ObligacionesLaborales/Prestaciones/PrestacionesList';
 import PrestacionesDetail from './pages/ObligacionesLaborales/Prestaciones/PrestacionesDetail';
+import LiquidacionesList from './pages/Liquidaciones/LiquidacionesList';
+import LiquidacionDetail from './pages/Liquidaciones/LiquidacionDetail';
 
 function ProtectedRoute({ children, adminOnly = false, modifyOnly = false }) {
   const { isAuthenticated, loading, isAdmin, canModify } = useContext(AuthContext);
@@ -159,6 +161,10 @@ function App() {
           <Route path="/reportes" element={<P><ReportesList /></P>} />
           <Route path="/reportes/nomina" element={<P><ReportesNomina /></P>} />
           <Route path="/reportes/produccion" element={<P><ReportesProduccion /></P>} />
+
+          {/* Liquidaciones */}
+          <Route path="/liquidaciones" element={<P><LiquidacionesList /></P>} />
+          <Route path="/liquidaciones/:id" element={<P><LiquidacionDetail /></P>} />
 
           {/* Obligaciones Laborales */}
           <Route path="/obligaciones" element={<Navigate to="/obligaciones/pila" replace />} />

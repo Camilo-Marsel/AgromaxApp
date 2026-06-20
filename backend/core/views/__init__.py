@@ -13,6 +13,7 @@ from .configuracion import ConfiguracionEmpresaViewSet
 from .obligaciones import PILAViewSet, PrestacionesViewSet
 from .inventario import BodegaViewSet, ProductoViewSet, StockFincaViewSet, MovimientoInventarioViewSet
 from .produccion import MataCaidaViewSet, EmbarqueViewSet
+from .liquidaciones import LiquidacionRegistroViewSet
 from .dashboard import dashboard_resumen
 
 __all__ = [
@@ -27,5 +28,6 @@ __all__ = [
     'PILAViewSet', 'PrestacionesViewSet',
     'BodegaViewSet', 'ProductoViewSet', 'StockFincaViewSet', 'MovimientoInventarioViewSet',
     'MataCaidaViewSet', 'EmbarqueViewSet',
+    'LiquidacionRegistroViewSet',
     'dashboard_resumen',
 ]

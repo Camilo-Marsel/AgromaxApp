@@ -1449,3 +1449,56 @@ class EmbarqueCreateSerializer(serializers.ModelSerializer):
         if lote and finca and lote.finca_id != finca.id:
             raise serializers.ValidationError({'lote': 'El lote no pertenece a la finca seleccionada.'})
         return data
+
+
+# ============================================================================
+# LIQUIDACIONES DE CONTRATO
+# ============================================================================
+
+class LiquidacionRegistroListSerializer(serializers.ModelSerializer):
+    trabajador_nombre = serializers.CharField(source='trabajador.nombre_completo', read_only=True)
+    trabajador_cedula = serializers.CharField(source='trabajador.numero_documento', read_only=True)
+    finca_nombre      = serializers.CharField(source='trabajador.finca.nombre', read_only=True, default=None)
+    contrato_numero   = serializers.CharField(source='contrato.numero_contrato', read_only=True, default=None)
+    estado_display    = serializers.CharField(source='get_estado_display', read_only=True)
+    fuente_display    = serializers.CharField(source='get_fuente_display', read_only=True)
+
+    class Meta:
+        from ..models import LiquidacionRegistro
+        model = LiquidacionRegistro
+        fields = [
+            'id', 'trabajador', 'trabajador_nombre', 'trabajador_cedula', 'finca_nombre',
+            'contrato', 'contrato_numero',
+            'fecha_ingreso', 'fecha_retiro', 'dias_trabajados',
+            'total', 'estado', 'estado_display', 'fuente', 'fuente_display',
+            'created_at',
+        ]
+
+
+class LiquidacionRegistroDetailSerializer(serializers.ModelSerializer):
+    trabajador_nombre  = serializers.CharField(source='trabajador.nombre_completo', read_only=True)
+    trabajador_cedula  = serializers.CharField(source='trabajador.numero_documento', read_only=True)
+    finca_nombre       = serializers.CharField(source='trabajador.finca.nombre', read_only=True, default=None)
+    contrato_numero    = serializers.CharField(source='contrato.numero_contrato', read_only=True, default=None)
+    estado_display     = serializers.CharField(source='get_estado_display', read_only=True)
+    fuente_display     = serializers.CharField(source='get_fuente_display', read_only=True)
+    created_by_nombre  = serializers.CharField(source='created_by.get_full_name', read_only=True, default=None)
+    aprobada_by_nombre = serializers.CharField(source='aprobada_by.get_full_name', read_only=True, default=None)
+
+    class Meta:
+        from ..models import LiquidacionRegistro
+        model = LiquidacionRegistro
+        fields = '__all__'
+
+
+class LiquidacionRegistroCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        from ..models import LiquidacionRegistro
+        model = LiquidacionRegistro
+        fields = [
+            'trabajador', 'contrato',
+            'fecha_ingreso', 'fecha_retiro', 'dias_trabajados', 'meses_calculados',
+            'fuente', 'salario_base_total',
+            'cesantias', 'intereses_cesantias', 'prima', 'vacaciones', 'total',
+            'notas',
+        ]

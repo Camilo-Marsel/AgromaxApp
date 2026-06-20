@@ -1,8 +1,9 @@
 // frontend/src/pages/Trabajadores/LiquidacionModal.jsx
 
 import { useState } from 'react';
-import { X, Calculator, Download, AlertTriangle, CheckCircle } from 'lucide-react';
+import { X, Calculator, Download, AlertTriangle, CheckCircle, Save } from 'lucide-react';
 import trabajadorService from '../../services/trabajadorService';
+import liquidacionService from '../../services/liquidacionService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -21,18 +22,21 @@ function fmtFecha(str) {
   return `${d}/${m}/${y}`;
 }
 
-export default function LiquidacionModal({ trabajador, onClose }) {
+export default function LiquidacionModal({ trabajador, contrato = null, onClose, onGuardada }) {
   const hoy = new Date().toISOString().split('T')[0];
   const [fechaRetiro, setFechaRetiro] = useState(
-    trabajador.fecha_retiro ?? hoy
+    contrato?.fecha_fin ?? trabajador.fecha_retiro ?? hoy
   );
-  const [resultado, setResultado] = useState(null);
+  const [resultado, setResultado]     = useState(null);
   const [calculando, setCalculando]   = useState(false);
   const [descargando, setDescargando] = useState(false);
+  const [guardando, setGuardando]     = useState(false);
+  const [guardada, setGuardada]       = useState(null);
 
   const calcular = async () => {
     setCalculando(true);
     setResultado(null);
+    setGuardada(null);
     try {
       const data = await trabajadorService.getLiquidacion(trabajador.id, fechaRetiro);
       setResultado(data);
@@ -41,6 +45,35 @@ export default function LiquidacionModal({ trabajador, onClose }) {
       toast.error(msg);
     } finally {
       setCalculando(false);
+    }
+  };
+
+  const guardar = async () => {
+    if (!resultado) return;
+    setGuardando(true);
+    try {
+      const reg = await liquidacionService.create({
+        trabajador: trabajador.id,
+        contrato: contrato?.id ?? null,
+        fecha_ingreso: resultado.fecha_ingreso,
+        fecha_retiro: resultado.fecha_retiro,
+        dias_trabajados: resultado.dias_trabajados,
+        meses_calculados: resultado.meses_calculados,
+        fuente: resultado.fuente,
+        salario_base_total: resultado.salario_base_total,
+        cesantias: resultado.cesantias,
+        intereses_cesantias: resultado.intereses_cesantias,
+        prima: resultado.prima,
+        vacaciones: resultado.vacaciones,
+        total: resultado.total,
+      });
+      setGuardada(reg);
+      toast.success('Liquidación guardada como borrador');
+      onGuardada?.(reg);
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? 'Error al guardar la liquidación');
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -186,7 +219,23 @@ export default function LiquidacionModal({ trabajador, onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+        <div className="flex gap-2 px-6 py-4 border-t border-gray-100 flex-wrap">
+          {resultado && !guardada && (
+            <button
+              onClick={guardar}
+              disabled={guardando}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
+            >
+              {guardando ? <LoadingSpinner size="sm" /> : <Save className="w-4 h-4" />}
+              Guardar liquidación
+            </button>
+          )}
+          {guardada && (
+            <span className="flex items-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm">
+              <CheckCircle className="w-4 h-4" />
+              Guardada como borrador #{guardada.id}
+            </span>
+          )}
           {resultado && (
             <button
               onClick={descargarPDF}

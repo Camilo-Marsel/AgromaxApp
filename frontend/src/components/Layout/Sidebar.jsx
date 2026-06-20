@@ -6,7 +6,7 @@ import {
   Home, Users, Briefcase, DollarSign, FileText, Settings,
   MapPin, FileCheck, UserCog, Shield, ClipboardList, Package,
   Warehouse, Layers, Leaf, Ship, ChevronDown, ChevronRight,
-  BarChart2, X,
+  BarChart2, X, Calculator,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -51,6 +51,7 @@ const GROUPS = [
     items: [
       { path: '/nomina', icon: DollarSign, label: 'Nómina' },
       { path: '/prestamos', icon: DollarSign, label: 'Adelantos' },
+      { path: '/liquidaciones', icon: Calculator, label: 'Liquidaciones' },
       { path: '/obligaciones', icon: Shield, label: 'Seg. Social (PILA)' },
       { path: '/obligaciones/prestaciones', icon: FileText, label: 'Prestaciones' },
     ],

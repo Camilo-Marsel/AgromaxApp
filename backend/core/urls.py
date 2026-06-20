@@ -33,6 +33,7 @@ router.register(r'configuracion-empresa', ConfiguracionEmpresaViewSet, basename=
 # Obligaciones Laborales
 router.register(r'pila', PILAViewSet, basename='pila')
 router.register(r'prestaciones', PrestacionesViewSet, basename='prestaciones')
+router.register(r'liquidaciones', LiquidacionRegistroViewSet, basename='liquidacion')
 
 # Inventario
 router.register(r'inventario/bodegas', BodegaViewSet, basename='bodega')

@@ -798,3 +798,90 @@ class DocumentoContrato(models.Model):
 
     def __str__(self):
         return f"{self.contrato.numero_contrato} - {self.get_tipo_documento_display()}"
+
+
+# ============================================================================
+# LIQUIDACIONES DE CONTRATO
+# ============================================================================
+
+class LiquidacionRegistro(models.Model):
+    """
+    Registro persistente de una liquidación de contrato calculada y aprobada.
+    Guarda el snapshot de todos los valores al momento de la aprobación.
+    """
+
+    BORRADOR  = 'BORRADOR'
+    APROBADA  = 'APROBADA'
+    ESTADO_CHOICES = [
+        (BORRADOR, 'Borrador'),
+        (APROBADA, 'Aprobada'),
+    ]
+
+    # Relaciones
+    trabajador = models.ForeignKey(
+        'Trabajador',
+        on_delete=models.PROTECT,
+        related_name='liquidaciones',
+    )
+    contrato = models.ForeignKey(
+        'Contrato',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='liquidaciones',
+    )
+
+    # Período
+    fecha_ingreso = models.DateField()
+    fecha_retiro  = models.DateField()
+    dias_trabajados = models.IntegerField(default=0)
+    meses_calculados = models.IntegerField(default=0)
+
+    # Fuente del cálculo
+    FUENTE_CHOICES = [
+        ('provisiones', 'Provisiones PILA'),
+        ('nominas',     'Nóminas aprobadas'),
+    ]
+    fuente = models.CharField(max_length=20, choices=FUENTE_CHOICES, default='nominas')
+
+    # Valores calculados (snapshot)
+    salario_base_total     = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    cesantias              = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    intereses_cesantias    = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    prima                  = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    vacaciones             = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total                  = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+
+    # Estado y notas
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default=BORRADOR)
+    notas  = models.TextField(blank=True)
+
+    # Auditoría
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+    created_by  = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='liquidaciones_creadas',
+    )
+    aprobada_by = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='liquidaciones_aprobadas',
+    )
+    aprobada_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Liquidación de Contrato'
+        verbose_name_plural = 'Liquidaciones de Contrato'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Liquidación {self.trabajador.nombre_completo} — {self.fecha_retiro}"
+
+    @property
+    def nombre_completo_trabajador(self):
+        return self.trabajador.nombre_completo
