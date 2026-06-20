@@ -1,7 +1,7 @@
 // frontend/src/pages/Contratos/ContratoForm.jsx
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import contratoService from '../../services/contratoService';
 import trabajadorService from '../../services/trabajadorService';
@@ -12,6 +12,7 @@ import { ArrowLeft, Save, User, AlertCircle } from 'lucide-react';
 export default function ContratoForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const isEditing = Boolean(id);
 
   const [loading, setLoading] = useState(false);
@@ -107,6 +108,11 @@ export default function ContratoForm() {
 
       console.log(`Filtrados: ${trabajadoresConContrato.length} de ${allTrabajadores.length} trabajadores`);
       setTrabajadores(trabajadoresConContrato);
+      // Pre-seleccionar trabajador desde query param (ej: desde liquidación aprobada)
+      const trabParam = searchParams.get('trabajador');
+      if (trabParam && !isEditing) {
+        setValue('trabajador', parseInt(trabParam));
+      }
     } catch (error) {
       console.error('Error al cargar trabajadores:', error);
       toast.error('Error al cargar trabajadores');

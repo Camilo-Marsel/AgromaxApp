@@ -226,6 +226,9 @@ class TrabajadorDetailSerializer(serializers.ModelSerializer):
     tipo_documento_display = serializers.CharField(source='get_tipo_documento_display', read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
     tipo_cuenta_display = serializers.CharField(source='get_tipo_cuenta_bancaria_display', read_only=True)
+    ultima_fecha_labor = serializers.SerializerMethodField()
+    fecha_inicio_liquidacion = serializers.SerializerMethodField()
+    contrato_activo = serializers.SerializerMethodField()
 
     class Meta:
         model = Trabajador
@@ -239,9 +242,48 @@ class TrabajadorDetailSerializer(serializers.ModelSerializer):
             'es_administrativo', 'salario_quincenal',
             'fecha_ingreso', 'fecha_retiro', 'estado', 'estado_display',
             'numero_cuenta_bancaria', 'banco', 'tipo_cuenta_bancaria', 'tipo_cuenta_display',
+            'ultima_fecha_labor', 'fecha_inicio_liquidacion', 'contrato_activo',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
+
+    def get_ultima_fecha_labor(self, obj):
+        from .models import RegistroLabor
+        from django.db.models import Max
+        result = RegistroLabor.objects.filter(trabajador=obj).aggregate(Max('fecha'))
+        fecha = result['fecha__max']
+        return str(fecha) if fecha else None
+
+    def get_fecha_inicio_liquidacion(self, obj):
+        """
+        Fecha sugerida de inicio para la próxima liquidación:
+        1. día después de la última liquidación aprobada
+        2. fecha_inicio del contrato activo
+        3. fecha_ingreso del trabajador
+        """
+        from datetime import timedelta
+        ultima = obj.liquidaciones.filter(estado='APROBADA').order_by('-fecha_retiro').first()
+        if ultima:
+            return str(ultima.fecha_retiro + timedelta(days=1))
+        contrato = obj.contratos.filter(estado='ACTIVO').first()
+        if contrato:
+            return str(contrato.fecha_inicio)
+        return str(obj.fecha_ingreso) if obj.fecha_ingreso else None
+
+    def get_contrato_activo(self, obj):
+        contrato = obj.contratos.filter(estado='ACTIVO').first()
+        if not contrato:
+            return None
+        return {
+            'id': contrato.id,
+            'numero_contrato': contrato.numero_contrato,
+            'fecha_inicio': str(contrato.fecha_inicio),
+            'fecha_fin': str(contrato.fecha_fin) if contrato.fecha_fin else None,
+            'salario': str(contrato.salario),
+            'tipo_contrato': contrato.tipo_contrato_id,
+            'finca': contrato.finca_id,
+            'lote': contrato.lote_id,
+        }
     
     def to_representation(self, instance):
         """Ocultar cuenta bancaria según rol del usuario"""

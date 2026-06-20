@@ -8,7 +8,7 @@ import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, CheckCircle, Clock, Download, RotateCcw,
-  User, Calendar, Building2, FileText,
+  User, Calendar, Building2, FileText, X, UserMinus, FilePlus, MinusCircle,
 } from 'lucide-react';
 
 function fmt(v) {
@@ -26,12 +26,107 @@ function fmtDT(s) {
   return new Date(s).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+function PostAprobacionDialog({ liq, onClose, navigate }) {
+  const [working, setWorking] = useState(false);
+
+  const retirarTrabajador = async () => {
+    setWorking(true);
+    try {
+      await trabajadorService.update(liq.trabajador, {
+        estado: 'RETIRADO',
+        fecha_retiro: liq.fecha_retiro,
+      });
+      toast.success('Trabajador marcado como retirado');
+      onClose();
+      navigate('/trabajadores');
+    } catch {
+      toast.error('Error al actualizar el trabajador');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const nuevoContrato = () => {
+    onClose();
+    // Navigate to contract form, pre-filling trabajador
+    navigate(`/contratos/nuevo?trabajador=${liq.trabajador}`);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              Liquidación aprobada
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">¿Qué desea hacer con el trabajador?</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-3">
+          <button
+            onClick={retirarTrabajador}
+            disabled={working}
+            className="w-full flex items-center gap-3 px-4 py-3 border-2 border-red-200 rounded-xl hover:bg-red-50 hover:border-red-400 transition-colors text-left disabled:opacity-50"
+          >
+            <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <UserMinus className="w-5 h-5 text-red-600" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Retirar trabajador</p>
+              <p className="text-xs text-gray-500">
+                Cambia el estado a Retirado y registra la fecha {fmtFecha(liq.fecha_retiro)} como fecha de salida
+              </p>
+            </div>
+          </button>
+
+          <button
+            onClick={nuevoContrato}
+            disabled={working}
+            className="w-full flex items-center gap-3 px-4 py-3 border-2 border-blue-200 rounded-xl hover:bg-blue-50 hover:border-blue-400 transition-colors text-left disabled:opacity-50"
+          >
+            <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <FilePlus className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Crear nuevo contrato</p>
+              <p className="text-xs text-gray-500">
+                Abre el formulario de contrato con el trabajador pre-seleccionado
+              </p>
+            </div>
+          </button>
+
+          <button
+            onClick={onClose}
+            disabled={working}
+            className="w-full flex items-center gap-3 px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors text-left disabled:opacity-50"
+          >
+            <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <MinusCircle className="w-5 h-5 text-gray-500" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Dejar como está</p>
+              <p className="text-xs text-gray-500">No realizar cambios adicionales al trabajador</p>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LiquidacionDetail() {
   const { id }    = useParams();
   const navigate  = useNavigate();
-  const [liq, setLiq]         = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [working, setWorking] = useState(false);
+  const [liq, setLiq]           = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [working, setWorking]   = useState(false);
+  const [showPostDialog, setShowPostDialog] = useState(false);
 
   useEffect(() => {
     liquidacionService.getById(id)
@@ -46,6 +141,7 @@ export default function LiquidacionDetail() {
       const updated = await liquidacionService.aprobar(id);
       setLiq(updated);
       toast.success('Liquidación aprobada');
+      setShowPostDialog(true);
     } catch (err) {
       toast.error(err.response?.data?.error ?? 'Error al aprobar');
     } finally {
@@ -101,6 +197,14 @@ export default function LiquidacionDetail() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
+      {showPostDialog && (
+        <PostAprobacionDialog
+          liq={liq}
+          navigate={navigate}
+          onClose={() => setShowPostDialog(false)}
+        />
+      )}
+
       {/* Nav */}
       <button onClick={() => navigate('/liquidaciones')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
         <ArrowLeft className="w-4 h-4" /> Volver a liquidaciones
@@ -223,14 +327,23 @@ export default function LiquidacionDetail() {
           </button>
         )}
         {aprobada && (
-          <button
-            onClick={revertir}
-            disabled={working}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm"
-          >
-            {working ? <LoadingSpinner size="sm" /> : <RotateCcw className="w-4 h-4" />}
-            Revertir a borrador
-          </button>
+          <>
+            <button
+              onClick={() => setShowPostDialog(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+            >
+              <User className="w-4 h-4" />
+              Acciones del trabajador
+            </button>
+            <button
+              onClick={revertir}
+              disabled={working}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm"
+            >
+              {working ? <LoadingSpinner size="sm" /> : <RotateCcw className="w-4 h-4" />}
+              Revertir a borrador
+            </button>
+          </>
         )}
         <button
           onClick={descargarPDF}
