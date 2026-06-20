@@ -17,6 +17,7 @@ from .models import (
     Producto, StockFinca, MovimientoInventario,
     Bodega, LaborInsumo,
     MataCaida, Embarque,
+    LiquidacionRegistro,
 )
 from decimal import Decimal
 from datetime import date
@@ -1464,7 +1465,6 @@ class LiquidacionRegistroListSerializer(serializers.ModelSerializer):
     fuente_display    = serializers.CharField(source='get_fuente_display', read_only=True)
 
     class Meta:
-        from ..models import LiquidacionRegistro
         model = LiquidacionRegistro
         fields = [
             'id', 'trabajador', 'trabajador_nombre', 'trabajador_cedula', 'finca_nombre',
@@ -1486,14 +1486,12 @@ class LiquidacionRegistroDetailSerializer(serializers.ModelSerializer):
     aprobada_by_nombre = serializers.CharField(source='aprobada_by.get_full_name', read_only=True, default=None)
 
     class Meta:
-        from ..models import LiquidacionRegistro
         model = LiquidacionRegistro
         fields = '__all__'
 
 
 class LiquidacionRegistroCreateSerializer(serializers.ModelSerializer):
     class Meta:
-        from ..models import LiquidacionRegistro
         model = LiquidacionRegistro
         fields = [
             'trabajador', 'contrato',
