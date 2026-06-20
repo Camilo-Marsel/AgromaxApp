@@ -55,7 +55,7 @@ const Landing = () => {
                 <span className="text-white font-bold text-xl">A</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">AgromaxApp</h1>
+                <h1 className="text-2xl font-bold text-gray-900">AgromaxD</h1>
                 <p className="text-sm text-gray-500">Sistema de Gestión de Nómina Agrícola</p>
               </div>
             </div>
@@ -167,7 +167,7 @@ const Landing = () => {
             ¿Listo para Optimizar tu Gestión?
           </h3>
           <p className="text-xl text-green-50 mb-8 max-w-2xl mx-auto">
-            Únete a los agricultores que ya confían en AgromaxApp para su gestión de nómina
+            Únete a los agricultores que ya confían en AgromaxD para su gestión de nómina
           </p>
           <Link
             to="/login"
@@ -183,7 +183,7 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <p className="text-sm">
-              © 2025 AgromaxApp. Sistema de Gestión de Nómina Agrícola.
+              © 2026 AgromaxD. Sistema de Gestión de Nómina Agrícola.
             </p>
             <p className="text-xs mt-2">
               Desarrollado con tecnología profesional para operaciones agrícolas en Colombia.

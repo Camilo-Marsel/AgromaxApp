@@ -31,6 +31,7 @@ import ContratosList from './pages/Contratos/ContratosList';
 import ContratoDetail from './pages/Contratos/ContratoDetail';
 import ContratoForm from './pages/Contratos/ContratoForm';
 import ConfiguracionVariables from './pages/Configuracion/ConfiguracionVariables';
+import ConfiguracionEmpresa from './pages/Configuracion/ConfiguracionEmpresa';
 import ReportesList from './pages/Reportes/ReportesList';
 import ReportesNomina from './pages/Reportes/ReportesNomina';
 import ReportesProduccion from './pages/Reportes/ReportesProduccion';
@@ -155,6 +156,7 @@ function App() {
           <Route path="/nomina/:id" element={<P><NominaDetail /></P>} />
 
           {/* Configuración */}
+          <Route path="/configuracion/empresa" element={<P admin><ConfiguracionEmpresa /></P>} />
           <Route path="/configuracion/variables" element={<P admin><ConfiguracionVariables /></P>} />
 
           {/* Reportes */}

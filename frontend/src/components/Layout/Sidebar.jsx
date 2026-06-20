@@ -6,7 +6,7 @@ import {
   Home, Users, Briefcase, DollarSign, FileText, Settings,
   MapPin, FileCheck, UserCog, Shield, ClipboardList, Package,
   Warehouse, Layers, Leaf, Ship, ChevronDown, ChevronRight,
-  BarChart2, X, Calculator,
+  BarChart2, X, Calculator, Building2,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -64,7 +64,8 @@ const GROUPS = [
     label: 'Sistema',
     adminOnly: true,
     items: [
-      { path: '/configuracion/variables', icon: Settings, label: 'Configuración' },
+      { path: '/configuracion/empresa', icon: Building2, label: 'Empresa' },
+      { path: '/configuracion/variables', icon: Settings, label: 'Variables' },
       { path: '/usuarios', icon: UserCog, label: 'Usuarios' },
     ],
   },
@@ -90,7 +91,7 @@ function SidebarContent({ onClose }) {
   return (
     <div className="w-56 bg-gray-900 flex flex-col h-full">
       <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-        <span className="text-white font-bold text-lg">AgroMax</span>
+        <span className="text-white font-bold text-lg">AgromaxD</span>
         {onClose && (
           <button onClick={onClose} className="lg:hidden text-gray-400 hover:text-white p-1">
             <X className="w-5 h-5" />
