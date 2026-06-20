@@ -2,6 +2,33 @@
 
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date
+import calendar
+
+
+def _dias_en_mes(año: int, mes: int) -> int:
+    return calendar.monthrange(año, mes)[1]
+
+
+def _factor_mes_parcial(año: int, mes: int, fecha_inicio: date, fecha_retiro: date) -> Decimal:
+    """
+    Retorna la fracción del mes que debe contabilizarse.
+    Si el mes es completo (ni el primero ni el último parcial) → 1.
+    Si el mes coincide con el mes de ingreso o retiro → días reales / días del mes.
+    """
+    dias_mes = _dias_en_mes(año, mes)
+    primer_dia = 1
+    ultimo_dia = dias_mes
+
+    # Ajustar por fecha de ingreso
+    if año == fecha_inicio.year and mes == fecha_inicio.month:
+        primer_dia = fecha_inicio.day
+
+    # Ajustar por fecha de retiro
+    if año == fecha_retiro.year and mes == fecha_retiro.month:
+        ultimo_dia = fecha_retiro.day
+
+    dias_a_contar = ultimo_dia - primer_dia + 1
+    return Decimal(dias_a_contar) / Decimal(dias_mes)
 
 
 def calcular_liquidacion(trabajador, fecha_retiro: date) -> dict:
@@ -9,7 +36,7 @@ def calcular_liquidacion(trabajador, fecha_retiro: date) -> dict:
     Calcula la liquidación de contrato de un trabajador a la fecha de retiro.
 
     Fuente de datos: ProvisionPrestaciones mensuales ya calculadas al liquidar PILA.
-    Si hay meses sin provisión (trabajador sin labores ese mes) se consideran en cero.
+    Los meses parciales (primero y último del período) se pro-ratean por días.
 
     Devuelve un dict con todos los componentes y el total.
     """
@@ -20,13 +47,11 @@ def calcular_liquidacion(trabajador, fecha_retiro: date) -> dict:
     provisiones = ProvisionPrestaciones.objects.filter(
         trabajador=trabajador,
     ).exclude(
-        # Excluir meses anteriores al ingreso
         año__lt=fecha_ingreso.year,
     ).exclude(
         año=fecha_ingreso.year,
         mes__lt=fecha_ingreso.month,
     ).exclude(
-        # Excluir meses posteriores al retiro
         año__gt=fecha_retiro.year,
     ).exclude(
         año=fecha_retiro.year,
@@ -41,12 +66,13 @@ def calcular_liquidacion(trabajador, fecha_retiro: date) -> dict:
 
     meses_con_datos = []
     for p in provisiones.order_by('año', 'mes'):
-        total_cesantias    += p.cesantias
-        total_intereses    += p.intereses_cesantias
-        total_prima        += p.prima
-        total_vacaciones   += p.vacaciones
-        total_salario_base += p.salario_base
-        meses_con_datos.append({'mes': p.mes, 'año': p.año, 'salario_base': float(p.salario_base)})
+        factor = _factor_mes_parcial(p.año, p.mes, fecha_ingreso, fecha_retiro)
+        total_cesantias    += (p.cesantias * factor).quantize(Decimal('0.01'), ROUND_HALF_UP)
+        total_intereses    += (p.intereses_cesantias * factor).quantize(Decimal('0.01'), ROUND_HALF_UP)
+        total_prima        += (p.prima * factor).quantize(Decimal('0.01'), ROUND_HALF_UP)
+        total_vacaciones   += (p.vacaciones * factor).quantize(Decimal('0.01'), ROUND_HALF_UP)
+        total_salario_base += (p.salario_base * factor).quantize(Decimal('0.01'), ROUND_HALF_UP)
+        meses_con_datos.append({'mes': p.mes, 'año': p.año, 'salario_base': float(p.salario_base * factor)})
 
     # Si no hay provisiones calculadas, estimamos desde las nóminas aprobadas
     if not meses_con_datos:
