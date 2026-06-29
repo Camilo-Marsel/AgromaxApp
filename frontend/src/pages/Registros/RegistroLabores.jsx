@@ -463,6 +463,16 @@ export default function RegistroLabores() {
         const fecha = fechasSeleccionadas.length > 0 ? fechasSeleccionadas[0] : null;
         if (!fecha) { toast.error('Seleccione una fecha'); return; }
 
+        // Validar stock antes de crear el registro
+        const filasValidas = filasAgroquimicos.filter((f) => f.stockFincaId && parseFloat(f.cantidad) > 0);
+        for (const fila of filasValidas) {
+          const stock = agroquimicosDisponibles.find((s) => String(s.id) === String(fila.stockFincaId));
+          if (stock && parseFloat(fila.cantidad) > parseFloat(stock.stock_actual)) {
+            toast.error(`Stock insuficiente de ${stock.producto_nombre}. Disponible: ${stock.stock_actual} L`);
+            return;
+          }
+        }
+
         const payload = {
           trabajador: data.trabajador,
           labor: data.labor,
