@@ -221,7 +221,8 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         serializer.save(updated_by=self.request.user)
 
     def perform_destroy(self, instance):
-        from ..models import AuditoriaLog
+        from ..models import AuditoriaLog, MovimientoInventario
+        from django.utils import timezone
         xff = self.request.META.get('HTTP_X_FORWARDED_FOR')
         ip = xff.split(',')[0].strip() if xff else self.request.META.get('REMOTE_ADDR', '0.0.0.0')
         AuditoriaLog.objects.create(
@@ -240,6 +241,23 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
             },
             ip_address=ip,
         )
+        # Revertir movimientos de inventario asociados a este registro
+        movimientos = MovimientoInventario.objects.filter(
+            referencia_tipo='RegistroLabor',
+            referencia_id=instance.id,
+            tipo='SALIDA',
+        )
+        for mov in movimientos:
+            MovimientoInventario.objects.create(
+                stock_finca=mov.stock_finca,
+                tipo='ENTRADA',
+                cantidad=mov.cantidad,
+                fecha=timezone.now().date(),
+                trabajador=mov.trabajador,
+                referencia_tipo='RegistroLabor',
+                referencia_id=instance.id,
+                observaciones=f'Reversión automática por eliminación de registro #{instance.id} ({instance.labor.nombre})',
+            )
         instance.delete()
 
     @action(detail=False, methods=['get'])

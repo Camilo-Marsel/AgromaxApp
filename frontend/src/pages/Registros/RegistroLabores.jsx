@@ -312,7 +312,7 @@ export default function RegistroLabores() {
         trabajador: trabajadorId,
         referencia_tipo: 'RegistroLabor',
         referencia_id: registroId,
-        notas: `Auto: ${laborNombre}`,
+        observaciones: `Auto: ${laborNombre}`,
       });
     } catch (err) {
       const msg = err.response?.data;

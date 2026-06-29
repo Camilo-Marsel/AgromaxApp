@@ -1380,7 +1380,7 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
 class MovimientoCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = MovimientoInventario
-        fields = ['stock_finca', 'tipo', 'cantidad', 'fecha', 'fecha_consumo', 'lote', 'trabajador', 'observaciones']
+        fields = ['stock_finca', 'tipo', 'cantidad', 'fecha', 'fecha_consumo', 'lote', 'trabajador', 'observaciones', 'referencia_tipo', 'referencia_id']
 
     def validate(self, data):
         if data.get('tipo') == 'SALIDA':
