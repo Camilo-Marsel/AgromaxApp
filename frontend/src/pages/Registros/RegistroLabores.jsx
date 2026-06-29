@@ -145,10 +145,12 @@ export default function RegistroLabores() {
   const [laborInsumo, setLaborInsumo] = useState(null);
   const [esTipoDia, setEsTipoDia] = useState(false);
   const [esDesmache, setEsDesmache] = useState(false);
+  const [esFumigacion, setEsFumigacion] = useState(false);
   const [fechasSeleccionadas, setFechasSeleccionadas] = useState([]);
 
-  // Modal de propuesta de movimiento
-  const [movimientoProposal, setMovimientoProposal] = useState(null);
+  // Agroquímicos para Fumigación al Día
+  const [agroquimicosDisponibles, setAgroquimicosDisponibles] = useState([]);
+  const [filasAgroquimicos, setFilasAgroquimicos] = useState([]);
 
   // Filas multi-entrada para Embolse
   const [filasEmbolse, setFilasEmbolse] = useState([]);
@@ -194,11 +196,31 @@ export default function RegistroLabores() {
         setEsTipoDia(laboresTipoDia.includes(labor.nombre));
         setEsDesmache(labor.nombre === 'Desmache');
 
+        const esFumig = labor.nombre === 'Fumigación al Día';
+        setEsFumigacion(esFumig);
+
         // Load LaborInsumo config for this labor
         laborInsumoService.getByLabor(labor.id).then((data) => {
           const items = data.results || data;
           setLaborInsumo(items.length > 0 ? items[0] : null);
         }).catch(() => {});
+
+        // Cargar agroquímicos disponibles para Fumigación al Día
+        if (esFumig && fincaData?.bodega) {
+          inventarioService.getStocks({ bodega: fincaData.bodega, producto__categoria: 'AGROQUIMICOS' })
+            .then((data) => {
+              const items = data.results || data;
+              setAgroquimicosDisponibles(items);
+              setFilasAgroquimicos([{ uid: Date.now(), stockFincaId: '', cantidad: '' }]);
+            }).catch(() => {});
+        } else {
+          setAgroquimicosDisponibles([]);
+          setFilasAgroquimicos([]);
+        }
+      } else {
+        setEsFumigacion(false);
+        setAgroquimicosDisponibles([]);
+        setFilasAgroquimicos([]);
       }
 
       setFechasSeleccionadas([]);
@@ -278,51 +300,81 @@ export default function RegistroLabores() {
     }
   };
 
-  const proposerMovimiento = (registroCreado, cantidadLabor, fecha) => {
-    if (!laborInsumo || !fincaData) return null;
-    const cantidadPropuesta = parseFloat(
-      (parseFloat(cantidadLabor) / parseFloat(laborInsumo.factor)).toFixed(2)
-    );
-    return {
-      registroId: registroCreado.id,
-      laborNombre: laborSeleccionada?.nombre,
-      productoNombre: laborInsumo.producto_nombre,
-      productoId: laborInsumo.producto,
-      bodegaId: fincaData.bodega,
-      bodegaNombre: fincaData.bodega_nombre || '—',
-      unidadProducto: laborInsumo.unidad_display || '',
-      cantidadLabor,
-      factor: laborInsumo.factor,
-      esAproximado: laborInsumo.es_aproximado,
-      cantidadPropuesta,
-      fecha,
-      trabajadorId: trabajadorWatch,
-    };
-  };
-
-  const confirmarMovimiento = async (cantidad) => {
-    if (!movimientoProposal) return;
+  // Registra un movimiento de salida de bodega usando el stock_finca correcto
+  const registrarSalidaBodega = async ({ stockFincaId, cantidad, fecha, registroId, laborNombre, trabajadorId }) => {
     try {
       await inventarioService.registrarMovimiento({
         tipo: 'SALIDA',
-        bodega: movimientoProposal.bodegaId,
-        producto: movimientoProposal.productoId,
+        stock_finca: stockFincaId,
         cantidad,
-        fecha_consumo: movimientoProposal.fecha,
-        trabajador: movimientoProposal.trabajadorId,
+        fecha,
+        fecha_consumo: fecha,
+        trabajador: trabajadorId,
         referencia_tipo: 'RegistroLabor',
-        referencia_id: movimientoProposal.registroId,
-        notas: `Auto: ${movimientoProposal.laborNombre}`,
+        referencia_id: registroId,
+        notas: `Auto: ${laborNombre}`,
       });
-      toast.success('Salida de bodega registrada');
     } catch (err) {
       const msg = err.response?.data;
-      const text = msg ? (typeof msg === 'string' ? msg : JSON.stringify(msg)) : 'Error al registrar movimiento';
+      const text = msg ? (typeof msg === 'string' ? msg : JSON.stringify(msg)) : 'Error al registrar salida de bodega';
       toast.error(text);
-    } finally {
-      setMovimientoProposal(null);
     }
   };
+
+  // Descuenta automáticamente el insumo asociado a la labor (ej. pitas)
+  const autoDescontarInsumoLabor = async (registroCreado, cantidadLabor, fecha) => {
+    if (!laborInsumo || !fincaData?.bodega) return;
+    const cantidadPropuesta = parseFloat(
+      (parseFloat(cantidadLabor) / parseFloat(laborInsumo.factor)).toFixed(2)
+    );
+    // Buscar el stock_finca que une este producto con la bodega de la finca
+    try {
+      const stocks = await inventarioService.getStocks({
+        bodega: fincaData.bodega,
+        producto: laborInsumo.producto,
+      });
+      const items = stocks.results || stocks;
+      if (!items.length) { toast.error('No se encontró stock del insumo en la bodega'); return; }
+      await registrarSalidaBodega({
+        stockFincaId: items[0].id,
+        cantidad: cantidadPropuesta,
+        fecha,
+        registroId: registroCreado.id,
+        laborNombre: laborSeleccionada?.nombre,
+        trabajadorId: trabajadorWatch,
+      });
+      toast.success(`Salida de bodega registrada: ${cantidadPropuesta} de ${laborInsumo.producto_nombre}`);
+    } catch {
+      toast.error('Error al buscar stock del insumo');
+    }
+  };
+
+  // Descuenta agroquímicos seleccionados manualmente en Fumigación al Día
+  const descontarAgroquimicos = async (registroId, fecha) => {
+    const filas = filasAgroquimicos.filter((f) => f.stockFincaId && parseFloat(f.cantidad) > 0);
+    if (!filas.length) return;
+    await Promise.all(filas.map((f) =>
+      registrarSalidaBodega({
+        stockFincaId: f.stockFincaId,
+        cantidad: parseFloat(f.cantidad),
+        fecha,
+        registroId,
+        laborNombre: 'Fumigación al Día',
+        trabajadorId: trabajadorWatch,
+      })
+    ));
+    if (filas.length) toast.success(`${filas.length} agroquímico(s) descontados de bodega`);
+  };
+
+  // ── Helpers multi-fila Agroquímicos ────────────────────────────────────
+  const agregarFilaAgroquimico = () =>
+    setFilasAgroquimicos((prev) => [...prev, { uid: Date.now(), stockFincaId: '', cantidad: '' }]);
+
+  const eliminarFilaAgroquimico = (uid) =>
+    setFilasAgroquimicos((prev) => prev.filter((f) => f.uid !== uid));
+
+  const updateFilaAgroquimico = (uid, field, value) =>
+    setFilasAgroquimicos((prev) => prev.map((f) => f.uid === uid ? { ...f, [field]: value } : f));
 
   // ── Helpers multi-fila Embolse ──────────────────────────────────────────
   const agregarFilaEmbolse = () => {
@@ -465,12 +517,11 @@ export default function RegistroLabores() {
         const registro = await registroLaborService.create(payload);
         toast.success('Registro creado correctamente');
 
-        // Propose inventory movement if labor has LaborInsumo
-        if (laborInsumo && fincaData?.bodega) {
-          const proposal = proposerMovimiento(registro, data.cantidad, fecha);
-          if (proposal) {
-            setMovimientoProposal(proposal);
-          }
+        // Descontar insumos de bodega automáticamente (sin confirmación)
+        if (esFumigacion) {
+          await descontarAgroquimicos(registro.id, fecha);
+        } else if (laborInsumo && fincaData?.bodega) {
+          await autoDescontarInsumoLabor(registro, data.cantidad, fecha);
         }
       }
 
@@ -787,6 +838,86 @@ export default function RegistroLabores() {
                   )}
                 </div>
               )}
+              {/* ── Agroquímicos para Fumigación al Día ───────────────────── */}
+              {esFumigacion && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Agroquímicos usados <span className="text-gray-400 font-normal">(producto · litros)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={agregarFilaAgroquimico}
+                      className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-medium"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Agregar producto
+                    </button>
+                  </div>
+
+                  {agroquimicosDisponibles.length === 0 ? (
+                    <p className="text-xs text-amber-600 bg-amber-50 rounded px-3 py-2">
+                      No hay agroquímicos registrados en la bodega de esta finca.
+                    </p>
+                  ) : (
+                    <div className="border border-gray-200 rounded-md overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-green-50">
+                          <tr>
+                            <th className="px-2 py-2 text-left text-xs text-gray-600 font-medium">Producto</th>
+                            <th className="px-2 py-2 text-left text-xs text-gray-600 font-medium w-24">Litros *</th>
+                            <th className="w-8"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {filasAgroquimicos.map((fila, idx) => (
+                            <tr key={fila.uid} className="bg-white">
+                              <td className="px-2 py-1.5">
+                                <select
+                                  value={fila.stockFincaId}
+                                  onChange={(e) => updateFilaAgroquimico(fila.uid, 'stockFincaId', e.target.value)}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                >
+                                  <option value="">Seleccionar...</option>
+                                  {agroquimicosDisponibles.map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.producto_nombre} ({s.stock_actual} {s.producto_unidad || 'L'} disp.)
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.1"
+                                  value={fila.cantidad}
+                                  onChange={(e) => updateFilaAgroquimico(fila.uid, 'cantidad', e.target.value)}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                  placeholder="0.0"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5 text-center">
+                                {filasAgroquimicos.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => eliminarFilaAgroquimico(fila.uid)}
+                                    className="text-red-400 hover:text-red-600"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-400">
+                    Los productos se descontarán automáticamente de la bodega al guardar.
+                  </p>
+                </div>
+              )}
               {/* ──────────────────────────────────────────────────────────── */}
 
               {/* Observaciones */}
@@ -923,14 +1054,6 @@ export default function RegistroLabores() {
         type="danger"
       />
 
-      {/* Movimiento de Inventario Proposal Modal */}
-      {movimientoProposal && (
-        <MovimientoProposalModal
-          proposal={movimientoProposal}
-          onConfirm={confirmarMovimiento}
-          onSkip={() => setMovimientoProposal(null)}
-        />
-      )}
     </div>
   );
 }
