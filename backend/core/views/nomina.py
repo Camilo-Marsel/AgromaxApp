@@ -1,5 +1,8 @@
 # backend/core/views/nomina.py - v2 2026-05-30
 
+import logging
+logger = logging.getLogger(__name__)
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -243,33 +246,37 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         )
         # Revertir movimientos de inventario asociados a este registro
         from .inventario import registrar_movimiento_inventario
+        from django.db.models import Q as _Q
         labor_nombre = instance.labor.nombre
-        # Búsqueda primaria: por referencia explícita (movimientos post-fix)
+        # Búsqueda primaria: por referencia explícita
         movimientos = MovimientoInventario.objects.filter(
             referencia_tipo='RegistroLabor',
             referencia_id=instance.id,
             tipo='SALIDA',
         )
-        # Fallback: movimientos sin referencia pero con observaciones+fecha+trabajador coincidentes
+        # Fallback: por observaciones + fecha + trabajador (movimientos previos al fix)
         if not movimientos.exists():
             movimientos = MovimientoInventario.objects.filter(
-                observaciones=f'Auto: {labor_nombre}',
+                _Q(referencia_tipo='') | _Q(referencia_tipo__isnull=True),
+                observaciones__startswith='Auto:',
                 fecha=instance.fecha,
-                trabajador=instance.trabajador,
+                trabajador_id=instance.trabajador_id,
                 tipo='SALIDA',
-                referencia_tipo='',
             )
         for mov in movimientos:
-            registrar_movimiento_inventario(
-                stock_finca_id=mov.stock_finca_id,
-                tipo='ENTRADA',
-                cantidad=mov.cantidad,
-                fecha=timezone.now().date(),
-                trabajador=mov.trabajador,
-                referencia_tipo='RegistroLabor',
-                referencia_id=instance.id,
-                observaciones=f'Reversión automática por eliminación de registro #{instance.id} ({instance.labor.nombre})',
-            )
+            try:
+                registrar_movimiento_inventario(
+                    stock_finca_id=mov.stock_finca_id,
+                    tipo='ENTRADA',
+                    cantidad=mov.cantidad,
+                    fecha=timezone.now().date(),
+                    trabajador=mov.trabajador,
+                    referencia_tipo='RegistroLabor',
+                    referencia_id=instance.id,
+                    observaciones=f'Reversión: eliminación registro #{instance.id} ({labor_nombre})',
+                )
+            except Exception as e:
+                logger.error('Error revirtiendo movimiento %s al eliminar RegistroLabor %s: %s', mov.id, instance.id, e)
         instance.delete()
 
     @action(detail=False, methods=['get'])

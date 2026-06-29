@@ -574,7 +574,10 @@ export default function RegistroLabores() {
       setLaborInsumo(null);
       setEsTipoDia(false);
       setEsDesmache(false);
+      setEsFumigacion(false);
       setFilasEmbolse([]);
+      setFilasAgroquimicos([{ stockFincaId: '', cantidad: '' }]);
+      setAgroquimicosDisponibles([]);
     } catch (error) {
       console.error('Error al crear registro:', error);
       // Recargar de todos modos para reflejar lo que sí se guardó
