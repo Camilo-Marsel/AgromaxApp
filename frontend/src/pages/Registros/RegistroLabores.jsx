@@ -193,10 +193,12 @@ export default function RegistroLabores() {
           'Permiso Remunerado', 'Permiso No Remunerado', 'Ausencia No Justificada',
           'Incapacidad Médica', 'Oficios Varios', 'Desmache',
         ];
-        setEsTipoDia(laboresTipoDia.includes(labor.nombre));
-        setEsDesmache(labor.nombre === 'Desmache');
-
-        const esFumig = labor.nombre === 'Fumigación al Día';
+        // Normaliza tildes/mayúsculas para comparar nombres de labor
+        const normalizar = (s) => s?.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+        const nombreNorm = normalizar(labor.nombre);
+        const esFumig = nombreNorm.includes('fumigac') && nombreNorm.includes('dia');
+        setEsTipoDia(laboresTipoDia.some((l) => normalizar(l) === nombreNorm) || esFumig);
+        setEsDesmache(nombreNorm === normalizar('Desmache'));
         setEsFumigacion(esFumig);
 
         // Load LaborInsumo config for this labor
@@ -457,6 +459,24 @@ export default function RegistroLabores() {
         if (result.errores?.length > 0) result.errores.forEach((e) => toast.error(e));
         toast.success(result.message);
 
+      } else if (esFumigacion) {
+        const fecha = fechasSeleccionadas.length > 0 ? fechasSeleccionadas[0] : null;
+        if (!fecha) { toast.error('Seleccione una fecha'); return; }
+
+        const payload = {
+          trabajador: data.trabajador,
+          labor: data.labor,
+          fecha,
+          cantidad: 1,
+          quincena: quincenaActual.id,
+          observaciones: data.observaciones || '',
+          lote: data.lote || null,
+          color_cinta: '',
+        };
+        const registro = await registroLaborService.create(payload);
+        toast.success('Registro creado correctamente');
+        await descontarAgroquimicos(registro.id, fecha);
+
       } else if (esTipoDia) {
         if (fechasSeleccionadas.length === 0) { toast.error('Seleccione al menos una fecha'); return; }
 
@@ -689,12 +709,12 @@ export default function RegistroLabores() {
                   registrosExistentes={registrosExistentes}
                   registrosDetallados={registrosDetallados}
                   laborActualNombre={laborSeleccionada?.nombre || ''}
-                  singleSelection={!esTipoDia && !esDesmache}
+                  singleSelection={(!esTipoDia && !esDesmache) || esFumigacion}
                 />
               )}
 
               {/* Cantidad — solo para labores no-Embolse */}
-              {(!esTipoDia || esDesmache) && laborSeleccionada && !esEmbolse && (
+              {(!esTipoDia || esDesmache) && !esFumigacion && laborSeleccionada && !esEmbolse && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {esDesmache ? 'Cantidad Total (hectáreas) *' : 'Cantidad *'}
