@@ -145,6 +145,7 @@ export default function RegistroLabores() {
   const [laborInsumo, setLaborInsumo] = useState(null);
   const [esTipoDia, setEsTipoDia] = useState(false);
   const [esDesmache, setEsDesmache] = useState(false);
+  const [trabajoCompartido, setTrabajoCompartido] = useState(false);
   const [esFumigacion, setEsFumigacion] = useState(false);
   const [fechasSeleccionadas, setFechasSeleccionadas] = useState([]);
 
@@ -574,6 +575,7 @@ export default function RegistroLabores() {
       setLaborInsumo(null);
       setEsTipoDia(false);
       setEsDesmache(false);
+      setTrabajoCompartido(false);
       setEsFumigacion(false);
       setFilasEmbolse([]);
       setFilasAgroquimicos([{ stockFincaId: '', cantidad: '' }]);
@@ -726,15 +728,69 @@ export default function RegistroLabores() {
                 />
               )}
 
-              {/* Cantidad — solo para labores no-Embolse */}
+              {/* Desmache: selector de lote + conversión automática m² → ha */}
+              {esDesmache && lotes.length > 0 && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Lote desmachado *
+                    </label>
+                    <select
+                      value={watch('lote') || ''}
+                      onChange={(e) => {
+                        const loteId = e.target.value;
+                        setValue('lote', loteId || null);
+                        const loteObj = lotes.find((l) => String(l.id) === String(loteId));
+                        if (loteObj?.area_neta) {
+                          const ha = parseFloat((parseFloat(loteObj.area_neta) / 10000).toFixed(4));
+                          const final = trabajoCompartido ? parseFloat((ha / 2).toFixed(4)) : ha;
+                          setValue('cantidad', String(final));
+                        } else {
+                          setValue('cantidad', '');
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Seleccione un lote...</option>
+                      {lotes.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.nombre}{l.area_neta ? ` — ${(parseFloat(l.area_neta) / 10000).toFixed(4)} ha` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+                    <input
+                      type="checkbox"
+                      checked={trabajoCompartido}
+                      onChange={(e) => {
+                        const shared = e.target.checked;
+                        setTrabajoCompartido(shared);
+                        const loteId = watch('lote');
+                        const loteObj = lotes.find((l) => String(l.id) === String(loteId));
+                        if (loteObj?.area_neta) {
+                          const ha = parseFloat((parseFloat(loteObj.area_neta) / 10000).toFixed(4));
+                          setValue('cantidad', String(shared ? parseFloat((ha / 2).toFixed(4)) : ha));
+                        }
+                      }}
+                      className="w-4 h-4 rounded accent-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">Trabajo compartido <span className="text-gray-400">(registra media hectárea)</span></span>
+                  </label>
+                </div>
+              )}
+
+              {/* Cantidad — solo para labores no-Embolse, no-Desmache */}
               {(!esTipoDia || esDesmache) && !esFumigacion && laborSeleccionada && !esEmbolse && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {esDesmache ? 'Cantidad Total (hectáreas) *' : 'Cantidad *'}
+                    {esDesmache ? 'Hectáreas (calculado automáticamente)' : 'Cantidad *'}
                   </label>
                   <input
                     type="text"
                     inputMode="decimal"
+                    readOnly={esDesmache}
                     {...register('cantidad', {
                       required: !esTipoDia || esDesmache,
                       pattern: {
@@ -742,12 +798,8 @@ export default function RegistroLabores() {
                         message: 'Ingrese un número válido (ej: 1, 1.5, 2.2654)',
                       },
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder={
-                      esDesmache
-                        ? 'Ej: 2.2654 (total de hectáreas en los días seleccionados)'
-                        : 'Ingrese la cantidad'
-                    }
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${esDesmache ? 'bg-gray-50 text-gray-600 border-gray-200 cursor-default' : 'border-gray-300'}`}
+                    placeholder={esDesmache ? 'Se calcula al seleccionar el lote' : 'Ingrese la cantidad'}
                     onWheel={(e) => e.target.blur()}
                   />
                   {esDesmache && fechasSeleccionadas.length > 0 && (
