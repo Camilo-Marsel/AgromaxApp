@@ -254,7 +254,17 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
             referencia_id=instance.id,
             tipo='SALIDA',
         )
-        # Fallback: por observaciones + fecha + trabajador (movimientos previos al fix)
+        # Fallback 1: referencia_tipo correcto pero referencia_id nunca se guardó (bug serializer)
+        if not movimientos.exists():
+            movimientos = MovimientoInventario.objects.filter(
+                referencia_tipo='RegistroLabor',
+                referencia_id__isnull=True,
+                observaciones__startswith='Auto:',
+                fecha=instance.fecha,
+                trabajador_id=instance.trabajador_id,
+                tipo='SALIDA',
+            )
+        # Fallback 2: sin referencia en absoluto (movimientos muy anteriores al fix)
         if not movimientos.exists():
             movimientos = MovimientoInventario.objects.filter(
                 _Q(referencia_tipo='') | _Q(referencia_tipo__isnull=True),

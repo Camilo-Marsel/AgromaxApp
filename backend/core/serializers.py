@@ -622,7 +622,8 @@ class RegistroLaborSerializer(serializers.ModelSerializer):
 class RegistroLaborCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = RegistroLabor
-        fields = ['trabajador', 'labor', 'quincena', 'fecha', 'cantidad', 'observaciones', 'lote', 'color_cinta']
+        fields = ['id', 'trabajador', 'labor', 'quincena', 'fecha', 'cantidad', 'observaciones', 'lote', 'color_cinta']
+        read_only_fields = ['id']
     
     def validate(self, data):
         """Validaciones de negocio"""
