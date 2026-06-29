@@ -242,14 +242,15 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
             ip_address=ip,
         )
         # Revertir movimientos de inventario asociados a este registro
+        from ..views.inventario import registrar_movimiento_inventario
         movimientos = MovimientoInventario.objects.filter(
             referencia_tipo='RegistroLabor',
             referencia_id=instance.id,
             tipo='SALIDA',
         )
         for mov in movimientos:
-            MovimientoInventario.objects.create(
-                stock_finca=mov.stock_finca,
+            registrar_movimiento_inventario(
+                stock_finca_id=mov.stock_finca_id,
                 tipo='ENTRADA',
                 cantidad=mov.cantidad,
                 fecha=timezone.now().date(),

@@ -127,6 +127,32 @@ class StockFincaViewSet(viewsets.ModelViewSet):
         })
 
 
+def registrar_movimiento_inventario(stock_finca_id, tipo, cantidad, fecha, **kwargs):
+    """Crea un MovimientoInventario y actualiza stock_actual en StockFinca de forma atómica."""
+    from django.db import transaction as _tx
+    from ..models import MovimientoInventario as _Mov
+    with _tx.atomic():
+        sf = StockFinca.objects.select_for_update().get(pk=stock_finca_id)
+        stock_antes = sf.stock_actual
+        if tipo == 'ENTRADA':
+            stock_despues = stock_antes + cantidad
+        elif tipo == 'SALIDA':
+            stock_despues = max(stock_antes - cantidad, 0)
+        else:
+            stock_despues = cantidad
+        sf.stock_actual = stock_despues
+        sf.save(update_fields=['stock_actual', 'updated_at'])
+        return _Mov.objects.create(
+            stock_finca=sf,
+            tipo=tipo,
+            cantidad=cantidad,
+            fecha=fecha,
+            stock_antes=stock_antes,
+            stock_despues=stock_despues,
+            **kwargs,
+        )
+
+
 class MovimientoInventarioViewSet(viewsets.ModelViewSet):
     """Entradas, salidas y ajustes de inventario por stock_finca."""
     queryset = MovimientoInventario.objects.select_related(
