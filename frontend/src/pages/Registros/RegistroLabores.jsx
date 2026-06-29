@@ -730,8 +730,8 @@ export default function RegistroLabores() {
                 </div>
               )}
 
-              {/* Lote — solo para labores con LaborInsumo (no Embolse, ese va en la tabla) */}
-              {!esEmbolse && laborInsumo && lotes.length > 0 && (
+              {/* Lote — labores con LaborInsumo o que requieren trazabilidad de lote */}
+              {!esEmbolse && (laborInsumo || laborSeleccionada?.nombre === 'Amarre 3 pitas vieja') && lotes.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Lote <span className="text-gray-400 font-normal">(opcional)</span>
