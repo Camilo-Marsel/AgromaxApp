@@ -391,8 +391,9 @@ export default function ProductoDetail() {
                           </span>
                         </div>
                         <div className="text-xs text-gray-400 flex items-center gap-3 mt-0.5">
-                          <span>{new Date(m.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                          {m.creado_por && <span>· {m.creado_por}</span>}
+                          <span>{(() => { const d = m.fecha_consumo || m.fecha; return new Date(d + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }); })()}</span>
+                          {m.trabajador_nombre && <span className="text-gray-600 font-medium">· {m.trabajador_nombre}</span>}
+                          {m.creado_por && <span>· registrado por {m.creado_por}</span>}
                           <span>
                             · {Number.parseFloat(m.stock_antes).toLocaleString('es-CO', { maximumFractionDigits: 2 })} → {Number.parseFloat(m.stock_despues).toLocaleString('es-CO', { maximumFractionDigits: 2 })} {producto.unidad_display}
                           </span>
