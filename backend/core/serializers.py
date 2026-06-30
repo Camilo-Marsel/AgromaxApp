@@ -279,10 +279,9 @@ class TrabajadorDetailSerializer(serializers.ModelSerializer):
             'numero_contrato': contrato.numero_contrato,
             'fecha_inicio': str(contrato.fecha_inicio),
             'fecha_fin': str(contrato.fecha_fin) if contrato.fecha_fin else None,
-            'salario': str(contrato.salario),
-            'tipo_contrato': contrato.tipo_contrato_id,
-            'finca': contrato.finca_id,
-            'lote': contrato.lote_id,
+            'salario_pactado': str(contrato.salario_pactado),
+            'cargo': contrato.cargo,
+            'tipo_contrato': contrato.tipo_contrato,
         }
     
     def to_representation(self, instance):
