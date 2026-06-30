@@ -8,7 +8,7 @@ from .models import (
     UnidadMedida, Labor, ListaPrecios, VariablesNomina,
     Quincena, RegistroLabor, Nomina, DetalleNomina,
     Prestamo, CuotaPrestamo, AuditoriaLog,
-    Contrato, DocumentoContrato, ConfiguracionEmpresa,
+    PlantillaContrato, Contrato, DocumentoContrato, ConfiguracionEmpresa,
     PILA, DetallePILA, ProvisionPrestaciones, ResumenPrestaciones,
     PORCENTAJE_SALUD_EMPLEADOR, PORCENTAJE_PENSION_EMPLEADOR,
     PORCENTAJE_ARL, PORCENTAJE_CAJA_COMPENSACION,
@@ -846,6 +846,27 @@ class AuditoriaLogSerializer(serializers.ModelSerializer):
 # CONTRATOS
 # ============================================================================
 
+class PlantillaContratoSerializer(serializers.ModelSerializer):
+    empleador_tipo_display = serializers.CharField(source='get_empleador_tipo_display', read_only=True)
+
+    class Meta:
+        model = PlantillaContrato
+        fields = [
+            'id', 'nombre', 'descripcion',
+            'empleador_tipo', 'empleador_tipo_display',
+            'empleador_nombre', 'empleador_documento',
+            'empleador_correo', 'empleador_telefono', 'empleador_direccion',
+            'cargo_predeterminado',
+            'objeto_contrato',
+            'obligaciones_adicionales',
+            'causales_terminacion_adicionales',
+            'incluir_politica_celulares',
+            'incluir_clausula_invenciones',
+            'activa', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
 class DocumentoContratoSerializer(serializers.ModelSerializer):
     """Serializer para documentos de contrato"""
     tipo_documento_display = serializers.CharField(source='get_tipo_documento_display', read_only=True)
@@ -915,6 +936,7 @@ class ContratoListSerializer(serializers.ModelSerializer):
 class ContratoDetailSerializer(serializers.ModelSerializer):
     """Serializer completo para detalle de contrato"""
     trabajador_info = TrabajadorSimpleSerializer(source='trabajador', read_only=True)
+    plantilla_info = PlantillaContratoSerializer(source='plantilla', read_only=True)
     tipo_contrato_display = serializers.CharField(source='get_tipo_contrato_display', read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
     motivo_finalizacion_display = serializers.CharField(source='get_motivo_finalizacion_display', read_only=True)
@@ -933,6 +955,7 @@ class ContratoDetailSerializer(serializers.ModelSerializer):
         model = Contrato
         fields = [
             'id', 'numero_contrato', 'trabajador', 'trabajador_info',
+            'plantilla', 'plantilla_info',
             'tipo_contrato', 'tipo_contrato_display',
             'fecha_inicio', 'fecha_fin', 'cargo', 'salario_pactado',
             'estado', 'estado_display',
@@ -955,7 +978,7 @@ class ContratoCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contrato
         fields = [
-            'id', 'trabajador', 'tipo_contrato',
+            'id', 'trabajador', 'plantilla', 'tipo_contrato',
             'fecha_inicio', 'fecha_fin', 'cargo', 'salario_pactado',
             'estado', 'observaciones', 'recibe_auxilio_transporte'
         ]

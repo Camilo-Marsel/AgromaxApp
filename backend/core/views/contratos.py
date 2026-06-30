@@ -7,14 +7,25 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django.http import FileResponse
 
-from ..models import Contrato, DocumentoContrato, Nomina, AuditoriaLog
+from ..models import Contrato, DocumentoContrato, Nomina, AuditoriaLog, PlantillaContrato
 from ..serializers import (
     ContratoListSerializer, ContratoDetailSerializer, ContratoCreateUpdateSerializer,
     ContratoFinalizarSerializer, ContratoLiquidarSerializer,
     ContratoCancelarSerializer, ContratoReactivarSerializer,
-    DocumentoContratoSerializer,
+    DocumentoContratoSerializer, PlantillaContratoSerializer,
 )
 from ..permissions import CanModifyData, FincaFilterMixin
+
+
+class PlantillaContratoViewSet(viewsets.ModelViewSet):
+    """CRUD de plantillas de contrato."""
+    queryset = PlantillaContrato.objects.all()
+    serializer_class = PlantillaContratoSerializer
+    permission_classes = [CanModifyData]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['activa']
+    search_fields = ['nombre', 'empleador_nombre']
+    ordering = ['nombre']
 
 
 class ContratoViewSet(FincaFilterMixin, viewsets.ModelViewSet):

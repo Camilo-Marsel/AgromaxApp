@@ -20,6 +20,7 @@ const GROUPS = [
     items: [
       { path: '/trabajadores', icon: Users, label: 'Trabajadores' },
       { path: '/contratos', icon: FileCheck, label: 'Contratos' },
+      { path: '/contratos/plantillas', icon: FileText, label: 'Plantillas contrato' },
     ],
   },
   {

@@ -292,6 +292,72 @@ class Trabajador(models.Model):
 # CONTRATOS LABORALES
 # ============================================================================
 
+class PlantillaContrato(models.Model):
+    """
+    Plantilla reutilizable para generar contratos de trabajo.
+    Permite tener diferentes modelos de contrato según el tipo de finca/actividad.
+    """
+    EMPRESA = 'EMPRESA'
+    PERSONA_NATURAL = 'PERSONA_NATURAL'
+    TIPO_EMPLEADOR_CHOICES = [
+        (EMPRESA, 'Empresa / Sociedad'),
+        (PERSONA_NATURAL, 'Persona Natural'),
+    ]
+
+    nombre = models.CharField(max_length=120, unique=True, verbose_name='Nombre de la plantilla')
+    descripcion = models.TextField(blank=True, verbose_name='Descripción interna')
+
+    # Datos del empleador (varían por plantilla)
+    empleador_tipo = models.CharField(max_length=20, choices=TIPO_EMPLEADOR_CHOICES, default=EMPRESA)
+    empleador_nombre = models.CharField(max_length=200, verbose_name='Nombre / Razón Social del Empleador')
+    empleador_documento = models.CharField(max_length=20, verbose_name='NIT o Cédula del Empleador')
+    empleador_correo = models.EmailField(blank=True)
+    empleador_telefono = models.CharField(max_length=20, blank=True)
+    empleador_direccion = models.CharField(max_length=200, blank=True)
+
+    # Cargo predeterminado para esta plantilla
+    cargo_predeterminado = models.CharField(max_length=100, blank=True,
+                                             verbose_name='Cargo por defecto')
+
+    # Cláusula Primera — objeto del contrato
+    objeto_contrato = models.TextField(
+        verbose_name='Texto de la Primera Cláusula (objeto del contrato)',
+        help_text='Describe las labores específicas que realizará el trabajador.'
+    )
+
+    # Obligaciones adicionales (Segunda cláusula — ítems extra)
+    obligaciones_adicionales = models.JSONField(
+        default=list, blank=True,
+        verbose_name='Obligaciones adicionales del trabajador',
+        help_text='Lista de textos adicionales para la Segunda cláusula.'
+    )
+
+    # Causales de terminación adicionales (Décima cláusula)
+    causales_terminacion_adicionales = models.JSONField(
+        default=list, blank=True,
+        verbose_name='Causales de terminación adicionales',
+        help_text='Lista de literales extra para la Décima cláusula.'
+    )
+
+    # Opciones on/off de cláusulas opcionales
+    incluir_politica_celulares = models.BooleanField(default=True,
+                                                      verbose_name='Incluir política de celulares')
+    incluir_clausula_invenciones = models.BooleanField(default=True,
+                                                        verbose_name='Incluir cláusula de invenciones')
+
+    activa = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Plantilla de Contrato'
+        verbose_name_plural = 'Plantillas de Contrato'
+        ordering = ['nombre']
+
+    def __str__(self):
+        return self.nombre
+
+
 class Contrato(models.Model):
     """
     Contrato laboral formal de trabajadores CON_CONTRATO.
@@ -352,6 +418,15 @@ class Contrato(models.Model):
         on_delete=models.PROTECT,
         related_name='contratos',
         verbose_name='Trabajador'
+    )
+
+    plantilla = models.ForeignKey(
+        PlantillaContrato,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contratos',
+        verbose_name='Plantilla de contrato'
     )
 
     tipo_contrato = models.CharField(

@@ -37,6 +37,7 @@ class ContratoPDFGenerator:
     def __init__(self, contrato):
         self.contrato = contrato
         self.trabajador = contrato.trabajador
+        self.plantilla = getattr(contrato, 'plantilla', None)
         self.empresa = self._get_empresa()
         self.buffer = BytesIO()
         self.styles = getSampleStyleSheet()
@@ -45,9 +46,37 @@ class ContratoPDFGenerator:
         self.total_pages = 8
 
     def _get_empresa(self):
-        """Obtener configuración de la empresa"""
+        """Obtener configuración de la empresa (usada cuando no hay plantilla)"""
         from core.models import ConfiguracionEmpresa
         return ConfiguracionEmpresa.get_config()
+
+    # ------------------------------------------------------------------
+    # Helpers para leer datos del empleador desde plantilla o config
+    # ------------------------------------------------------------------
+    def _empleador_nombre(self):
+        if self.plantilla:
+            return self.plantilla.empleador_nombre
+        return getattr(self.empresa, 'nombre', 'AGROMAXD DC S.A.S.')
+
+    def _empleador_documento(self):
+        if self.plantilla:
+            return self.plantilla.empleador_documento
+        return getattr(self.empresa, 'nit', '')
+
+    def _empleador_correo(self):
+        if self.plantilla:
+            return self.plantilla.empleador_correo
+        return getattr(self.empresa, 'correo', '')
+
+    def _empleador_telefono(self):
+        if self.plantilla:
+            return self.plantilla.empleador_telefono
+        return getattr(self.empresa, 'telefono', '')
+
+    def _empleador_direccion(self):
+        if self.plantilla:
+            return self.plantilla.empleador_direccion
+        return getattr(self.empresa, 'direccion', '')
 
     def _setup_custom_styles(self):
         """Configurar estilos personalizados"""
@@ -262,12 +291,19 @@ class ContratoPDFGenerator:
         titulo = Paragraph("DATOS DEL EMPLEADOR", self.styles['SeccionTitulo'])
         elementos.append(titulo)
 
-        datos = [
-            ['Empleador:', self.empresa.razon_social, 'Nit:', self.empresa.nit],
-            ['RTE. Legal:', self.empresa.representante_legal, 'Identificación:', self.empresa.documento_representante],
-            ['Correo:', self.empresa.correo, 'Teléfono:', self.empresa.telefono],
-            ['Dirección:', self.empresa.direccion, '', ''],
-        ]
+        if self.plantilla:
+            datos = [
+                ['Empleador:', self._empleador_nombre(), 'Documento:', self._empleador_documento()],
+                ['Correo:', self._empleador_correo(), 'Teléfono:', self._empleador_telefono()],
+                ['Dirección:', self._empleador_direccion(), '', ''],
+            ]
+        else:
+            datos = [
+                ['Empleador:', self.empresa.razon_social, 'Nit:', self.empresa.nit],
+                ['RTE. Legal:', self.empresa.representante_legal, 'Identificación:', self.empresa.documento_representante],
+                ['Correo:', self.empresa.correo, 'Teléfono:', self.empresa.telefono],
+                ['Dirección:', self.empresa.direccion, '', ''],
+            ]
 
         tabla = Table(datos, colWidths=[1.1*inch, 2.4*inch, 1.1*inch, 2*inch])
         tabla.setStyle(TableStyle([
@@ -429,21 +465,25 @@ colombiano en materia laboral, por las siguientes cláusulas:"""
         return elementos
 
     def _crear_clausula_primera(self):
-        """Crear cláusula primera - Objeto"""
+        """Crear cláusula primera - Objeto (usa texto de plantilla si existe)"""
         elementos = []
 
-        titulo = Paragraph(
-            "<b>PRIMERA. Objeto</b>—El empleador contrata los servicios personales del trabajador y este se "
-            "obliga a: a) A poner al servicio del empleador toda su capacidad normal de trabajo, en forma "
-            "exclusiva en el desempeño de las funciones propias del oficio mencionado y en las labores "
-            "anexas y complementarias del mismo, de conformidad con las órdenes e instrucciones que le "
-            "imparta el empleador o sus representantes. b) desarrollar las funciones establecidas en el "
-            "manual de funciones y observar lo estipulado en el reglamento interno de trabajo. C) A no "
-            "prestar directa ni indirectamente servicios laborales o de prestación de servicios a otros "
-            "empleadores o contratistas ni a trabajar por cuenta propia en el mismo oficio u otro, durante la "
-            "vigencia de este contrato.",
-            self.styles['TextoNormal']
-        )
+        if self.plantilla and self.plantilla.objeto_contrato:
+            texto_objeto = self.plantilla.objeto_contrato
+        else:
+            texto_objeto = (
+                "El empleador contrata los servicios personales del trabajador y este se "
+                "obliga a: a) A poner al servicio del empleador toda su capacidad normal de trabajo, en forma "
+                "exclusiva en el desempeño de las funciones propias del oficio mencionado y en las labores "
+                "anexas y complementarias del mismo, de conformidad con las órdenes e instrucciones que le "
+                "imparta el empleador o sus representantes. b) desarrollar las funciones establecidas en el "
+                "manual de funciones y observar lo estipulado en el reglamento interno de trabajo. C) A no "
+                "prestar directa ni indirectamente servicios laborales o de prestación de servicios a otros "
+                "empleadores o contratistas ni a trabajar por cuenta propia en el mismo oficio u otro, durante la "
+                "vigencia de este contrato."
+            )
+
+        titulo = Paragraph(f"<b>PRIMERA. Objeto</b>—{texto_objeto}", self.styles['TextoNormal'])
         elementos.append(titulo)
 
         return elementos
@@ -500,6 +540,9 @@ colombiano en materia laboral, por las siguientes cláusulas:"""
             "No ocuparse en el servicio de ningún otro patrono, ni a dedicarse a negocios propios de ninguna índole.",
             "Laborar la jornada ordinaria en los turnos y dentro de las horas que le asigne EL EMPLEADOR, pudiendo ésta ordenar los cambios o ajustes que sean necesarios para el adecuado funcionamiento de las actividades y labores, basando su decisión en el principio laboral del (IUS VARIANDI)."
         ]
+
+        if self.plantilla and self.plantilla.obligaciones_adicionales:
+            obligaciones = obligaciones + list(self.plantilla.obligaciones_adicionales)
 
         for i, oblig in enumerate(obligaciones, 1):
             p = Paragraph(f"{i}. {oblig}", self.styles['TextoLista'])
@@ -713,6 +756,13 @@ colombiano en materia laboral, por las siguientes cláusulas:"""
             ("<b>Renuencia al Embarque:</b>", "El proceso de embarque es una función inherente y esencial del cargo. La negativa del TRABAJADOR a participar en las jornadas de embarque, será considerada como un acto de indisciplina y desobediencia grave."),
         ]
 
+        if self.plantilla and self.plantilla.causales_terminacion_adicionales:
+            for extra in self.plantilla.causales_terminacion_adicionales:
+                if isinstance(extra, dict):
+                    causales.append((f"<b>{extra.get('titulo', '')}:</b>", extra.get('texto', '')))
+                else:
+                    causales.append(('', str(extra)))
+
         for i, (titulo, texto) in enumerate(causales, 1):
             p = Paragraph(f"{i}. {titulo} {texto}", self.styles['TextoLista'])
             elementos.append(p)
@@ -756,13 +806,20 @@ colombiano en materia laboral, por las siguientes cláusulas:"""
         """Crear políticas adicionales"""
         elementos = []
 
-        p1 = Paragraph(
-            "<b>DECIMA SEGUNDA. - Uso de celulares.</b> La empresa dentro de su normativa interna limita "
-            "el uso de Smartphone (celulares) o cualquier dispositivo electrónico de uso personal dentro "
-            "de las horas laborales.",
-            self.styles['TextoNormal']
-        )
-        elementos.append(p1)
+        incluir_celulares = True
+        incluir_invenciones = True
+        if self.plantilla:
+            incluir_celulares = self.plantilla.incluir_politica_celulares
+            incluir_invenciones = self.plantilla.incluir_clausula_invenciones
+
+        if incluir_celulares:
+            p1 = Paragraph(
+                "<b>DECIMA SEGUNDA. - Uso de celulares.</b> La empresa dentro de su normativa interna limita "
+                "el uso de Smartphone (celulares) o cualquier dispositivo electrónico de uso personal dentro "
+                "de las horas laborales.",
+                self.styles['TextoNormal']
+            )
+            elementos.append(p1)
 
         p2 = Paragraph(
             "<b>DECIMA TERCERA. - Política de alcohol y drogas.</b> EL TRABAJADOR autoriza al empleador, a "
@@ -781,13 +838,14 @@ colombiano en materia laboral, por las siguientes cláusulas:"""
         )
         elementos.append(p3)
 
-        p4 = Paragraph(
-            "<b>DÉCIMA QUINTA.</b> Las invenciones o descubrimientos realizados por EL TRABAJADOR "
-            "pertenecen AL EMPLEADOR cuando él realice la invención mediante datos o medios "
-            "conocidos o utilizados en razón a la labor desempeñada.",
-            self.styles['TextoNormal']
-        )
-        elementos.append(p4)
+        if incluir_invenciones:
+            p4 = Paragraph(
+                "<b>DÉCIMA QUINTA.</b> Las invenciones o descubrimientos realizados por EL TRABAJADOR "
+                "pertenecen AL EMPLEADOR cuando él realice la invención mediante datos o medios "
+                "conocidos o utilizados en razón a la labor desempeñada.",
+                self.styles['TextoNormal']
+            )
+            elementos.append(p4)
 
         return elementos
 

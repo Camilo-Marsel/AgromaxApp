@@ -5,6 +5,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import contratoService from '../../services/contratoService';
 import trabajadorService from '../../services/trabajadorService';
+import api from '../../services/api';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Save, User, AlertCircle } from 'lucide-react';
@@ -19,6 +20,7 @@ export default function ContratoForm() {
   const [trabajadores, setTrabajadores] = useState([]);
   const [selectedTrabajador, setSelectedTrabajador] = useState(null);
   const [duracionCalculada, setDuracionCalculada] = useState(null);
+  const [plantillas, setPlantillas] = useState([]);
 
   const {
     register,
@@ -41,6 +43,9 @@ export default function ContratoForm() {
 
   useEffect(() => {
     loadTrabajadores();
+    api.get('/plantillas-contrato/?activa=true').then((res) => {
+      setPlantillas(res.data.results ?? res.data);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -303,6 +308,33 @@ export default function ContratoForm() {
             )}
           </div>
         </div>
+
+        {/* Plantilla */}
+        {plantillas.length > 0 && (
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-semibold mb-2">Plantilla de contrato</h3>
+            <p className="text-xs text-gray-500 mb-3">Opcional. Al seleccionar una plantilla el PDF usará los datos del empleador y el objeto definidos en ella.</p>
+            <select
+              {...register('plantilla')}
+              onChange={(e) => {
+                const val = e.target.value;
+                register('plantilla').onChange(e);
+                if (val) {
+                  const p = plantillas.find((x) => String(x.id) === String(val));
+                  if (p?.cargo_predeterminado) {
+                    setValue('cargo', p.cargo_predeterminado);
+                  }
+                }
+              }}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">Sin plantilla (usar config. de empresa)</option>
+              {plantillas.map((p) => (
+                <option key={p.id} value={p.id}>{p.nombre} — {p.empleador_nombre}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Información del Contrato */}
         <div className="bg-white p-6 rounded-lg shadow">

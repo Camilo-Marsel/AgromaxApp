@@ -3,7 +3,7 @@
 # Import all models to maintain existing imports throughout the codebase
 # This ensures zero breaking changes - all existing code will continue to work
 
-from .hr import Rol, Usuario, TipoContrato, Trabajador, Contrato, DocumentoContrato, LiquidacionRegistro
+from .hr import Rol, Usuario, TipoContrato, Trabajador, PlantillaContrato, Contrato, DocumentoContrato, LiquidacionRegistro
 from .farm import Bodega, Finca, Lote
 from .labor import UnidadMedida, Labor, LaborInsumo, ListaPrecios, Quincena, RegistroLabor
 from .payroll import VariablesNomina, Nomina, DetalleNomina
@@ -27,6 +27,7 @@ __all__ = [
     'Usuario',
     'TipoContrato',
     'Trabajador',
+    'PlantillaContrato',
     'Contrato',
     'DocumentoContrato',
     'LiquidacionRegistro',

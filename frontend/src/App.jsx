@@ -30,6 +30,7 @@ import PrestamoDetail from './pages/Prestamos/PrestamoDetail';
 import ContratosList from './pages/Contratos/ContratosList';
 import ContratoDetail from './pages/Contratos/ContratoDetail';
 import ContratoForm from './pages/Contratos/ContratoForm';
+import PlantillasContrato from './pages/Contratos/PlantillasContrato';
 import ConfiguracionVariables from './pages/Configuracion/ConfiguracionVariables';
 import ConfiguracionEmpresa from './pages/Configuracion/ConfiguracionEmpresa';
 import ReportesList from './pages/Reportes/ReportesList';
@@ -117,6 +118,7 @@ function App() {
           <Route path="/contratos/nuevo" element={<P modify><ContratoForm /></P>} />
           <Route path="/contratos/:id" element={<P><ContratoDetail /></P>} />
           <Route path="/contratos/:id/editar" element={<P modify><ContratoForm /></P>} />
+          <Route path="/contratos/plantillas" element={<P modify><PlantillasContrato /></P>} />
 
           {/* Préstamos */}
           <Route path="/prestamos" element={<P><PrestamosList /></P>} />

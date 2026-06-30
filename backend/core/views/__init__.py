@@ -8,7 +8,7 @@ from .nomina import (
     NominaViewSet, AuditoriaLogViewSet,
 )
 from .prestamos import PrestamoViewSet
-from .contratos import ContratoViewSet, DocumentoContratoViewSet
+from .contratos import PlantillaContratoViewSet, ContratoViewSet, DocumentoContratoViewSet
 from .configuracion import ConfiguracionEmpresaViewSet
 from .obligaciones import PILAViewSet, PrestacionesViewSet
 from .inventario import BodegaViewSet, ProductoViewSet, StockFincaViewSet, MovimientoInventarioViewSet
@@ -23,7 +23,7 @@ __all__ = [
     'VariablesNominaViewSet', 'QuincenaViewSet', 'RegistroLaborViewSet',
     'NominaViewSet', 'AuditoriaLogViewSet',
     'PrestamoViewSet',
-    'ContratoViewSet', 'DocumentoContratoViewSet',
+    'PlantillaContratoViewSet', 'ContratoViewSet', 'DocumentoContratoViewSet',
     'ConfiguracionEmpresaViewSet',
     'PILAViewSet', 'PrestacionesViewSet',
     'BodegaViewSet', 'ProductoViewSet', 'StockFincaViewSet', 'MovimientoInventarioViewSet',
