@@ -219,22 +219,32 @@ class ContratoPDFGenerator:
         """Agregar encabezado y pie de página"""
         canvas.saveState()
 
-        # Logo en encabezado (esquina superior derecha)
-        logo_path = os.path.join(settings.BASE_DIR, 'static', 'logos', 'logo_completo.jpeg')
-        if os.path.exists(logo_path):
-            canvas.drawImage(logo_path, doc.width + doc.leftMargin - 1.5*inch,
-                           doc.height + doc.topMargin - 0.3*inch,
-                           width=1.8*inch, height=0.6*inch, preserveAspectRatio=True)
+        # Logo en encabezado — solo cuando NO hay plantilla (logo es de AGROMAXD)
+        if not self.plantilla:
+            logo_path = os.path.join(settings.BASE_DIR, 'static', 'logos', 'logo_completo.jpeg')
+            if os.path.exists(logo_path):
+                canvas.drawImage(logo_path, doc.width + doc.leftMargin - 1.5*inch,
+                               doc.height + doc.topMargin - 0.3*inch,
+                               width=1.8*inch, height=0.6*inch, preserveAspectRatio=True)
 
-        # Info empresa en encabezado (izquierda)
+        # Info encabezado: usa plantilla si existe, si no empresa
+        if self.plantilla:
+            header_nombre = self.plantilla.empleador_nombre
+            header_sub = self.plantilla.empleador_documento
+            footer_tel = self.plantilla.empleador_telefono or ''
+            footer_correo = self.plantilla.empleador_correo or ''
+        else:
+            header_nombre = self.empresa.razon_social
+            header_sub = f"NIT: {self.empresa.nit}"
+            footer_tel = f"Teléfono: {self.empresa.telefono}"
+            footer_correo = f"Correo: {self.empresa.correo}"
+
         canvas.setFont('Helvetica-Bold', 10)
         canvas.setFillColor(self.COLOR_VERDE_CLARO)
-        canvas.drawString(doc.leftMargin, doc.height + doc.topMargin + 0.1*inch,
-                         self.empresa.razon_social)
+        canvas.drawString(doc.leftMargin, doc.height + doc.topMargin + 0.1*inch, header_nombre)
         canvas.setFont('Helvetica', 8)
         canvas.setFillColor(self.COLOR_GRIS)
-        canvas.drawString(doc.leftMargin, doc.height + doc.topMargin - 0.1*inch,
-                         f"NIT: {self.empresa.nit}")
+        canvas.drawString(doc.leftMargin, doc.height + doc.topMargin - 0.1*inch, header_sub)
 
         # Línea verde decorativa debajo del encabezado
         canvas.setStrokeColor(self.COLOR_VERDE_CLARO)
@@ -245,10 +255,10 @@ class ContratoPDFGenerator:
         # Pie de página
         canvas.setFont('Helvetica', 8)
         canvas.setFillColor(self.COLOR_VERDE_OSCURO)
-        canvas.drawString(doc.leftMargin, 0.4*inch,
-                         f"Teléfono: {self.empresa.telefono}")
-        canvas.drawString(doc.leftMargin, 0.25*inch,
-                         f"Correo: {self.empresa.correo}")
+        if footer_tel:
+            canvas.drawString(doc.leftMargin, 0.4*inch, footer_tel if footer_tel.startswith('Teléfono') else f"Teléfono: {footer_tel}")
+        if footer_correo:
+            canvas.drawString(doc.leftMargin, 0.25*inch, footer_correo if footer_correo.startswith('Correo') else f"Correo: {footer_correo}")
 
         # Número de página
         self.page_number += 1
@@ -483,7 +493,12 @@ colombiano en materia laboral, por las siguientes cláusulas:"""
                 "vigencia de este contrato."
             )
 
-        titulo = Paragraph(f"<b>PRIMERA. Objeto</b>—{texto_objeto}", self.styles['TextoNormal'])
+        # Cuando viene de plantilla el texto ya es completo; sin plantilla se añade el prefijo
+        if self.plantilla and self.plantilla.objeto_contrato:
+            cuerpo = texto_objeto
+        else:
+            cuerpo = f"El empleador contrata los servicios personales del trabajador y este se obliga a: {texto_objeto}" if not texto_objeto.startswith("El empleador") else texto_objeto
+        titulo = Paragraph(f"<b>PRIMERA. Objeto</b>—{cuerpo}", self.styles['TextoNormal'])
         elementos.append(titulo)
 
         return elementos
@@ -541,8 +556,9 @@ colombiano en materia laboral, por las siguientes cláusulas:"""
             "Laborar la jornada ordinaria en los turnos y dentro de las horas que le asigne EL EMPLEADOR, pudiendo ésta ordenar los cambios o ajustes que sean necesarios para el adecuado funcionamiento de las actividades y labores, basando su decisión en el principio laboral del (IUS VARIANDI)."
         ]
 
+        # Si la plantilla define obligaciones propias, reemplaza la lista estándar
         if self.plantilla and self.plantilla.obligaciones_adicionales:
-            obligaciones = obligaciones + list(self.plantilla.obligaciones_adicionales)
+            obligaciones = list(self.plantilla.obligaciones_adicionales)
 
         for i, oblig in enumerate(obligaciones, 1):
             p = Paragraph(f"{i}. {oblig}", self.styles['TextoLista'])
@@ -756,7 +772,9 @@ colombiano en materia laboral, por las siguientes cláusulas:"""
             ("<b>Renuencia al Embarque:</b>", "El proceso de embarque es una función inherente y esencial del cargo. La negativa del TRABAJADOR a participar en las jornadas de embarque, será considerada como un acto de indisciplina y desobediencia grave."),
         ]
 
+        # Si la plantilla define causales propias, reemplaza la lista estándar (bananera)
         if self.plantilla and self.plantilla.causales_terminacion_adicionales:
+            causales = []
             for extra in self.plantilla.causales_terminacion_adicionales:
                 if isinstance(extra, dict):
                     causales.append((f"<b>{extra.get('titulo', '')}:</b>", extra.get('texto', '')))
@@ -889,9 +907,9 @@ colombiano en materia laboral, por las siguientes cláusulas:"""
             ['', ''],
             ['', ''],
             ['___________________________', '___________________________'],
-            [self.empresa.representante_legal.upper(), self.trabajador.nombre_completo.upper()],
-            ['Representante Legal', f"C.c. No. {self.trabajador.numero_documento}"],
-            [self.empresa.razon_social, ''],
+            [self._empleador_nombre().upper(), self.trabajador.nombre_completo.upper()],
+            ['Empleador', f"C.c. No. {self.trabajador.numero_documento}"],
+            [self._empleador_documento(), ''],
         ]
 
         tabla = Table(datos, colWidths=[3.25*inch, 3.25*inch])

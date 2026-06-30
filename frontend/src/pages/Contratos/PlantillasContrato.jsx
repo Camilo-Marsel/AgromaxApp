@@ -329,7 +329,9 @@ export default function PlantillasContrato() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Objeto del contrato *</label>
-                    <textarea name="objeto_contrato" value={form.objeto_contrato} onChange={handleField} required rows={4}
+                    <p className="text-xs text-gray-400 mb-1">Texto completo de la cláusula Primera. Comienza con "El empleador contrata los servicios personales del trabajador y este se obliga a..."</p>
+                    <textarea name="objeto_contrato" value={form.objeto_contrato} onChange={handleField} required rows={6}
+                      placeholder="El empleador contrata los servicios personales del trabajador y este se obliga a: a) A poner al servicio del empleador toda su capacidad normal de trabajo, en forma exclusiva en el desempeño de todas las labores propias de una finca ganadera, tales como, pero no limitadas a ordeño, arreo y cuidado de ganado, limpieza de corrales, mantenimiento de cercas, siembra y limpieza de potreros, cuidado de animales de corral y demás tareas afines e instrucciones que le imparta el empleador. Además se obliga el trabajador a no prestar directa ni indirectamente servicios laborales a otros empleadores durante la vigencia de este contrato."
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" />
                   </div>
                 </div>
