@@ -362,8 +362,8 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         if fecha_hasta:
             qs = qs.filter(fecha__lte=fecha_hasta)
 
-        # Agrupar por (lote, tipo_labor, año_iso, semana_iso)
-        resumen = defaultdict(lambda: defaultdict(Decimal))
+        # Agrupar por (lote, tipo_labor, semana_iso)
+        resumen = defaultdict(Decimal)
         semanas_info = {}
 
         for r in qs.order_by('fecha'):
