@@ -36,6 +36,7 @@ import ConfiguracionEmpresa from './pages/Configuracion/ConfiguracionEmpresa';
 import ReportesList from './pages/Reportes/ReportesList';
 import ReportesNomina from './pages/Reportes/ReportesNomina';
 import ReportesProduccion from './pages/Reportes/ReportesProduccion';
+import ReportesAmarre from './pages/Reportes/ReportesAmarre';
 import UsuariosList from './pages/Usuarios/UsuariosList';
 import UsuarioForm from './pages/Usuarios/UsuarioForm';
 import ProductosList from './pages/Inventario/ProductosList';
@@ -165,6 +166,7 @@ function App() {
           <Route path="/reportes" element={<P><ReportesList /></P>} />
           <Route path="/reportes/nomina" element={<P><ReportesNomina /></P>} />
           <Route path="/reportes/produccion" element={<P><ReportesProduccion /></P>} />
+          <Route path="/reportes/amarre" element={<P><ReportesAmarre /></P>} />
 
           {/* Liquidaciones */}
           <Route path="/liquidaciones" element={<P><LiquidacionesList /></P>} />

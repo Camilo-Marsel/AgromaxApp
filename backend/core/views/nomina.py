@@ -336,6 +336,68 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
             ],
         })
 
+    @action(detail=False, methods=['get'])
+    def amarre_por_lote(self, request):
+        """
+        Resumen de labores de Amarre agrupado por lote y semana ISO.
+        Parámetros opcionales: finca, fecha_desde, fecha_hasta, labor_nombre (default: 'Amarre')
+        """
+        from collections import defaultdict
+        from decimal import Decimal
+        from datetime import date
+
+        finca_id = request.query_params.get('finca')
+        fecha_desde = request.query_params.get('fecha_desde')
+        fecha_hasta = request.query_params.get('fecha_hasta')
+        labor_nombre = request.query_params.get('labor_nombre', 'Amarre')
+
+        qs = RegistroLabor.objects.filter(
+            labor__nombre__icontains=labor_nombre
+        ).select_related('labor', 'lote', 'trabajador__finca')
+
+        if finca_id:
+            qs = qs.filter(trabajador__finca_id=finca_id)
+        if fecha_desde:
+            qs = qs.filter(fecha__gte=fecha_desde)
+        if fecha_hasta:
+            qs = qs.filter(fecha__lte=fecha_hasta)
+
+        # Agrupar por (lote, tipo_labor, año_iso, semana_iso)
+        resumen = defaultdict(lambda: defaultdict(Decimal))
+        semanas_info = {}
+
+        for r in qs.order_by('fecha'):
+            lote_nombre = r.lote.nombre if r.lote else 'Sin lote'
+            labor = r.labor.nombre
+            iso = r.fecha.isocalendar()
+            semana_key = f"{iso[0]}-W{iso[1]:02d}"
+            semanas_info[semana_key] = {'año': iso[0], 'semana': iso[1]}
+            key = (lote_nombre, labor, semana_key)
+            resumen[key] += r.cantidad
+
+        # Estructurar: lista ordenada por semana → lote → labor
+        filas = []
+        for (lote, labor, semana), cantidad in sorted(resumen.items(), key=lambda x: (x[0][2], x[0][0])):
+            filas.append({
+                'semana': semana,
+                'lote': lote,
+                'labor': labor,
+                'cantidad': float(cantidad),
+            })
+
+        # Totales por lote
+        totales_lote = defaultdict(Decimal)
+        totales_semana = defaultdict(Decimal)
+        for (lote, labor, semana), cantidad in resumen.items():
+            totales_lote[lote] += cantidad
+            totales_semana[semana] += cantidad
+
+        return Response({
+            'filas': filas,
+            'totales_por_lote': [{'lote': k, 'total': float(v)} for k, v in sorted(totales_lote.items())],
+            'totales_por_semana': [{'semana': k, 'total': float(v)} for k, v in sorted(totales_semana.items())],
+        })
+
     @action(detail=False, methods=['post'])
     def crear_multiples(self, request):
         """Crear múltiples registros de labor para labores tipo DÍA con múltiples fechas.

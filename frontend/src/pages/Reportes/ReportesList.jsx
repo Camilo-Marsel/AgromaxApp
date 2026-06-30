@@ -1,7 +1,7 @@
 // frontend/src/pages/Reportes/ReportesList.jsx
 
 import { useNavigate } from 'react-router-dom';
-import { FileText, DollarSign, Users, TrendingUp, ArrowRight, Leaf } from 'lucide-react';
+import { FileText, DollarSign, Users, TrendingUp, ArrowRight, Leaf, Layers } from 'lucide-react';
 
 export default function ReportesList() {
   const navigate = useNavigate();
@@ -23,6 +23,15 @@ export default function ReportesList() {
       icono: Leaf,
       color: 'green',
       ruta: '/reportes/produccion',
+      disponible: true,
+    },
+    {
+      id: 'amarre',
+      titulo: 'Amarre por Lote y Semana',
+      descripcion: 'Rendimiento de amarre agrupado por lote y semana: totales por tipo de labor, trabajador y período',
+      icono: Layers,
+      color: 'green',
+      ruta: '/reportes/amarre',
       disponible: true,
     },
     {
