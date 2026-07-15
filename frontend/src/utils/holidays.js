@@ -65,7 +65,13 @@ export function getColombianHolidays(year) {
     addDays(easterSunday, 71),
   ];
 
-  return new Set([...fixed, ...emiliani, ...easterRelated].map(formatDate));
+  // Festivos por decreto especial (no permanentes)
+  const decree = [];
+  if (year === 2026) {
+    decree.push(new Date(2026, 6, 13)); // Decreto especial gobierno colombiano
+  }
+
+  return new Set([...fixed, ...emiliani, ...easterRelated, ...decree].map(formatDate));
 }
 
 export function isColombianHoliday(dateStr) {

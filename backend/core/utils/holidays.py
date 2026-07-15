@@ -61,7 +61,12 @@ def get_colombian_holidays(year):
         easter_sunday + timedelta(days=71),  # Sagrado Corazón trasladado
     }
 
-    return fixed_holidays | emiliani_holidays | easter_related_holidays
+    # Festivos por decreto especial (no permanentes)
+    decree_holidays = set()
+    if year == 2026:
+        decree_holidays.add(date(2026, 7, 13))  # Decreto especial gobierno colombiano
+
+    return fixed_holidays | emiliani_holidays | easter_related_holidays | decree_holidays
 
 
 def is_colombian_holiday(target_date):
