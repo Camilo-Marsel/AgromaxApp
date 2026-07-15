@@ -85,6 +85,21 @@ export default function MultipleDatePicker({
         // Labor normal en domingo → deshabilitar
         disabled = true;
         mensajeTooltip = 'Domingo - No disponible para esta labor';
+      } else if (isFestivo && !isDomingo && tieneRegistro) {
+        // En festivo: las labores son aditivas al pago de festivo.
+        // Solo bloquear si ya tiene exactamente la misma labor normal registrada.
+        const esAdicional = LABORES_ADICIONALES.includes(laborActualNombre);
+        const esEmbolseOHoras = laborActualNombre === 'Embolse' || laborActualNombre === 'Horas Trabajadas';
+        if (!esAdicional && !esEmbolseOHoras && laboresEnFecha.includes(laborActualNombre)) {
+          disabled = true;
+          mensajeTooltip = `Ya tiene ${laborActualNombre} en este festivo.`;
+        } else if (esAdicional && !esEmbolseOHoras && laboresEnFecha.includes(laborActualNombre)) {
+          disabled = true;
+          mensajeTooltip = `Ya tiene ${laborActualNombre} registrado.`;
+        } else {
+          disabled = false;
+          mensajeTooltip = `Festivo. Tiene: ${laboresEnFecha.join(', ')}. Puede agregar ${laborActualNombre}.`;
+        }
       } else if (tieneRegistro) {
         // Clasificar labores existentes
         const laboresNormalesExistentes = laboresEnFecha.filter(l => !LABORES_ADICIONALES.includes(l));
@@ -99,7 +114,7 @@ export default function MultipleDatePicker({
             mensajeTooltip = `Ya tiene ${laborActualNombre} registrado.`;
           } else {
             disabled = false;
-            mensajeTooltip = `${isFestivo ? 'Festivo. ' : ''}Tiene: ${laboresEnFecha.join(', ')}. Puede agregar ${laborActualNombre}.`;
+            mensajeTooltip = `Tiene: ${laboresEnFecha.join(', ')}. Puede agregar ${laborActualNombre}.`;
           }
         } else {
           if (laboresNormalesExistentes.length > 0) {
@@ -108,8 +123,8 @@ export default function MultipleDatePicker({
           } else {
             disabled = false;
             mensajeTooltip = laboresAdicionalesExistentes.length > 0
-              ? `${isFestivo ? 'Festivo. ' : ''}Tiene: ${laboresAdicionalesExistentes.join(', ')}. Puede agregar esta labor.`
-              : (isFestivo ? 'Festivo - puede registrar labor' : dateStr);
+              ? `Tiene: ${laboresAdicionalesExistentes.join(', ')}. Puede agregar esta labor.`
+              : dateStr;
           }
         }
       } else {
@@ -203,9 +218,10 @@ export default function MultipleDatePicker({
               p-2 rounded-md text-xs font-medium border transition-colors
               ${dia.isDomingo && dia.disabled ? 'bg-red-50 text-red-400 cursor-not-allowed border-red-200' : ''}
               ${dia.isDomingo && !dia.disabled ? 'bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100' : ''}
-              ${dia.tieneRegistro && dia.disabled && !dia.isDomingo ? 'bg-orange-50 text-orange-400 cursor-not-allowed border-orange-200' : ''}
+              ${dia.tieneRegistro && dia.disabled && !dia.isDomingo && !dia.isFestivo ? 'bg-orange-50 text-orange-400 cursor-not-allowed border-orange-200' : ''}
               ${dia.tieneRegistro && !dia.disabled && !dia.isFestivo && !dia.isDomingo ? 'bg-yellow-50 text-yellow-700 border-yellow-300' : ''}
-              ${dia.isFestivo && !dia.disabled && !selectedDates.includes(dia.fecha) ? 'bg-violet-100 text-violet-700 border-violet-300 hover:bg-violet-200' : ''}
+              ${dia.isFestivo && !dia.isDomingo && !selectedDates.includes(dia.fecha) ? 'bg-violet-100 text-violet-700 border-violet-300 hover:bg-violet-200' : ''}
+              ${dia.isFestivo && !dia.isDomingo && dia.disabled ? 'cursor-not-allowed opacity-60' : ''}
               ${selectedDates.includes(dia.fecha) ? 'bg-blue-600 text-white border-blue-600' : ''}
               ${!dia.disabled && !dia.tieneRegistro && !dia.isFestivo && !dia.isDomingo && !selectedDates.includes(dia.fecha) ? 'bg-white hover:bg-blue-50 border-gray-300' : ''}
             `}
