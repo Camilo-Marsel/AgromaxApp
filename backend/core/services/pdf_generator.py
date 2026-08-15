@@ -65,6 +65,12 @@ class ComprobantePDFGenerator:
         story.extend(self._crear_tabla_conceptos())
         story.append(Spacer(1, 0.1*inch))
         
+        # Novedades (ausencias/permisos si las hay)
+        novedades = self._crear_novedades()
+        if novedades:
+            story.append(Spacer(1, 0.1*inch))
+            story.extend(novedades)
+
         # Total destacado
         story.extend(self._crear_total())
         
@@ -215,6 +221,54 @@ class ComprobantePDFGenerator:
         
         return elementos
     
+    def _crear_novedades(self):
+        """Bloque de novedades (ausencias/permisos) si las hay en la quincena."""
+        LABORES_NOVEDAD = [
+            'Ausencia No Justificada',
+            'Incapacidad Médica',
+            'Permiso No Remunerado',
+            'Permiso Remunerado',
+        ]
+        registros = self.nomina.trabajador.registros.filter(
+            quincena=self.nomina.quincena,
+            labor__nombre__in=LABORES_NOVEDAD,
+        ).values_list('labor__nombre', flat=True)
+
+        conteo = {}
+        for nombre in registros:
+            conteo[nombre] = conteo.get(nombre, 0) + 1
+
+        if not conteo:
+            return []
+
+        elementos = []
+        header_style = ParagraphStyle(
+            name='NovedadesHeader', fontSize=8, fontName='Helvetica-Bold',
+            textColor=colors.HexColor('#92400e'),
+        )
+        elementos.append(Paragraph('NOVEDADES DE LA QUINCENA', header_style))
+        elementos.append(Spacer(1, 0.05*inch))
+
+        datos = [['Tipo de novedad', 'Días']]
+        for labor, dias in conteo.items():
+            datos.append([labor, str(dias)])
+
+        tabla = Table(datos, colWidths=[5*inch, 1.5*inch])
+        tabla.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fef3c7')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#92400e')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#fcd34d')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elementos.append(tabla)
+        return elementos
+
     def _crear_total(self):
         """Total neto destacado"""
         elementos = []

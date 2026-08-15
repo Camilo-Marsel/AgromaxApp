@@ -697,7 +697,27 @@ class NominaSerializer(serializers.ModelSerializer):
     detalles = DetalleNominaSerializer(many=True, read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
     created_by_info = UsuarioSerializer(source='created_by', read_only=True)
-    
+    novedades_quincena = serializers.SerializerMethodField()
+
+    LABORES_NOVEDAD = [
+        'Ausencia No Justificada',
+        'Incapacidad Médica',
+        'Permiso No Remunerado',
+        'Permiso Remunerado',
+    ]
+
+    def get_novedades_quincena(self, obj):
+        from .models import RegistroLabor
+        registros = RegistroLabor.objects.filter(
+            trabajador=obj.trabajador,
+            quincena=obj.quincena,
+            labor__nombre__in=self.LABORES_NOVEDAD,
+        ).values_list('labor__nombre', flat=True)
+        conteo = {}
+        for nombre in registros:
+            conteo[nombre] = conteo.get(nombre, 0) + 1
+        return [{'labor': k, 'dias': v} for k, v in conteo.items()]
+
     class Meta:
         model = Nomina
         fields = [
@@ -708,7 +728,7 @@ class NominaSerializer(serializers.ModelSerializer):
             'fecha_calculo', 'fecha_aprobacion',
             'devengos_adicionales', 'descripcion_devengos_adicionales',
             'deducciones_adicionales', 'descripcion_deducciones_adicionales',
-            'observaciones', 'detalles',
+            'observaciones', 'detalles', 'novedades_quincena',
             'created_at', 'created_by', 'created_by_info',
             'updated_at'
         ]

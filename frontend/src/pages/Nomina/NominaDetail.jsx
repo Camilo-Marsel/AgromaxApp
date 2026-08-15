@@ -531,6 +531,22 @@ export default function NominaDetail() {
         </table>
       </div>
 
+      {/* Novedades de la quincena */}
+      {nomina.novedades_quincena?.length > 0 && (
+        <div className="bg-white p-6 rounded-lg shadow border-l-4 border-amber-400">
+          <h2 className="text-lg font-semibold mb-3 text-amber-700">Novedades de la Quincena</h2>
+          <p className="text-sm text-gray-500 mb-3">Días registrados por tipo de novedad en este período.</p>
+          <div className="flex flex-wrap gap-4">
+            {nomina.novedades_quincena.map((n) => (
+              <div key={n.labor} className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 min-w-[160px]">
+                <p className="text-xs text-amber-600 font-medium">{n.labor}</p>
+                <p className="text-2xl font-bold text-amber-700 mt-1">{n.dias} <span className="text-sm font-normal">día{n.dias !== 1 ? 's' : ''}</span></p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Diálogos de Confirmación */}
       <ConfirmDialog
         isOpen={confirmAprobar}
