@@ -505,10 +505,6 @@ class NominaViewSet(FincaFilterMixin, viewsets.ModelViewSet):
     finca_field = 'trabajador__finca'
     pagination_class = None
 
-    def get_queryset(self):
-        return super().get_queryset().exclude(
-            trabajador__estado=Trabajador.RETIRADO
-        )
 
     @action(detail=False, methods=['get'])
     def exportar_excel_quincena(self, request):
