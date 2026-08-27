@@ -107,7 +107,7 @@ class ComprobantePDFGenerator:
             ['Trabajador:', self.trabajador.nombre_completo, 
             'Documento:', f"{self.trabajador.get_tipo_documento_display()} {self.trabajador.numero_documento}"],
             ['Finca:', finca,  # NUEVO
-            'Contrato:', self.trabajador.tipo_contrato.get_nombre_display()],
+            'Contrato:', self.trabajador.tipo_contrato.get_nombre_display() if self.trabajador.tipo_contrato else 'N/A'],
             ['Banco:', f"{self.trabajador.banco or 'N/A'} - {tipo_cuenta}",
             'Cuenta:', cuenta],
         ]
