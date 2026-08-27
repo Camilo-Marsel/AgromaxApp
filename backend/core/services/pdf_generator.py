@@ -229,7 +229,7 @@ class ComprobantePDFGenerator:
             'Permiso No Remunerado',
             'Permiso Remunerado',
         ]
-        registros = self.nomina.trabajador.registros.filter(
+        registros = self.nomina.trabajador.registros_labor.filter(
             quincena=self.nomina.quincena,
             labor__nombre__in=LABORES_NOVEDAD,
         ).values_list('labor__nombre', flat=True)
