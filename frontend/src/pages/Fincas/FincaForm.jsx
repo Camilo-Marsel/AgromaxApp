@@ -163,6 +163,39 @@ export default function FincaForm() {
           </div>
         </div>
 
+        {/* Representante legal */}
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-base font-semibold text-gray-700 mb-4">Representante legal <span className="text-gray-400 font-normal text-sm">(opcional)</span></h2>
+          <p className="text-xs text-gray-400 mb-4">
+            Si esta finca tiene un pagador diferente a AGROMAXD DC S.A.S, ingresa sus datos aquí.
+            Aparecerán en el campo <strong>Paga:</strong> del comprobante de nómina.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nombre del representante
+              </label>
+              <input
+                type="text"
+                {...register('representante_nombre')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Ej: Juan Carlos Pérez López"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cédula o NIT
+              </label>
+              <input
+                type="text"
+                {...register('representante_documento')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Ej: 1.045.523.045 o 901.234.567-8"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Botones */}
         <div className="flex justify-end gap-4">
           <button

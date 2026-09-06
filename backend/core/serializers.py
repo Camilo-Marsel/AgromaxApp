@@ -149,6 +149,7 @@ class FincaSerializer(serializers.ModelSerializer):
         model = Finca
         fields = [
             'id', 'nombre', 'ubicacion', 'activa',
+            'representante_nombre', 'representante_documento',
             'bodega', 'bodega_nombre',
             'lotes', 'total_lotes',
             'created_at', 'updated_at'

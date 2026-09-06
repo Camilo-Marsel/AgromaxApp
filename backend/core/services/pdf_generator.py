@@ -82,12 +82,17 @@ class ComprobantePDFGenerator:
         """Encabezado compacto"""
         elementos = []
         
-        titulo = Paragraph("COMPROBANTE DE PAGO - AGROMAXD DC S.A.S", self.styles['CompactTitle'])
+        meses_nombre = {1:'Enero',2:'Febrero',3:'Marzo',4:'Abril',5:'Mayo',6:'Junio',
+                        7:'Julio',8:'Agosto',9:'Septiembre',10:'Octubre',11:'Noviembre',12:'Diciembre'}
+        mes_str = meses_nombre.get(self.quincena.mes, str(self.quincena.mes))
+        titulo = Paragraph(
+            f"COMPROBANTE DE PAGO — QUINCENA {self.quincena.numero} · {mes_str} {self.quincena.año}",
+            self.styles['CompactTitle']
+        )
         elementos.append(titulo)
-        
+
         subtitulo = Paragraph(
-            f"<font size=8>Quincena {self.quincena.numero} - {self.quincena.mes}/{self.quincena.año} "
-            f"({self.quincena.fecha_inicio.strftime('%d/%m')} al {self.quincena.fecha_fin.strftime('%d/%m/%Y')})</font>",
+            f"<font size=8>{self.quincena.fecha_inicio.strftime('%d/%m')} al {self.quincena.fecha_fin.strftime('%d/%m/%Y')}</font>",
             ParagraphStyle(name='Sub', alignment=TA_CENTER, fontSize=8)
         )
         elementos.append(subtitulo)
@@ -101,15 +106,25 @@ class ComprobantePDFGenerator:
         # Datos en tabla de 2 columnas
         cuenta = self.trabajador.cuenta_oculta if self.trabajador.numero_cuenta_bancaria else 'N/A'
         tipo_cuenta = self.trabajador.get_tipo_cuenta_bancaria_display() if self.trabajador.tipo_cuenta_bancaria else ''
-        finca = self.trabajador.finca.nombre if self.trabajador.finca else 'N/A'  # NUEVO
-        
+        finca = self.trabajador.finca
+        finca_nombre = finca.nombre if finca else 'N/A'
+
+        # Quién paga: representante de la finca o AGROMAXD por defecto
+        if finca and finca.representante_nombre:
+            paga_nombre = finca.representante_nombre
+            paga_doc = finca.representante_documento or ''
+            paga_str = f"{paga_nombre} — {paga_doc}" if paga_doc else paga_nombre
+        else:
+            paga_str = 'AGROMAXD DC S.A.S'
+
         datos = [
-            ['Trabajador:', self.trabajador.nombre_completo, 
-            'Documento:', f"{self.trabajador.get_tipo_documento_display()} {self.trabajador.numero_documento}"],
-            ['Finca:', finca,  # NUEVO
-            'Contrato:', self.trabajador.tipo_contrato.get_nombre_display() if self.trabajador.tipo_contrato else 'N/A'],
+            ['Trabajador:', self.trabajador.nombre_completo,
+             'Documento:', f"{self.trabajador.get_tipo_documento_display()} {self.trabajador.numero_documento}"],
+            ['Finca:', finca_nombre,
+             'Contrato:', self.trabajador.tipo_contrato.get_nombre_display() if self.trabajador.tipo_contrato else 'N/A'],
             ['Banco:', f"{self.trabajador.banco or 'N/A'} - {tipo_cuenta}",
-            'Cuenta:', cuenta],
+             'Cuenta:', cuenta],
+            ['Paga:', paga_str, '', ''],
         ]
         
         tabla = Table(datos, colWidths=[1*inch, 2.5*inch, 1*inch, 2*inch])
