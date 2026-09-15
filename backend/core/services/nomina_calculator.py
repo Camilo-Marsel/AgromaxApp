@@ -813,13 +813,15 @@ class NominaCalculator:
         """
         total = Decimal('0.00')
         
-        # Obtener préstamos activos (desde caché si estamos en cálculo masivo)
-        if hasattr(self, '_prestamos_cache'):
-            prestamos = self._prestamos_cache.get(trabajador.id, [])
-        else:
-            prestamos = list(
-                Prestamo.objects.filter(trabajador=trabajador, estado='ACTIVO')
+        # Siempre consultar DB fresca: _revertir_cuotas_prestamo puede haber reactivado
+        # un préstamo PAGADO→ACTIVO y el caché de inicio de lote no refleja ese cambio.
+        prestamos = list(
+            Prestamo.objects.filter(
+                trabajador=trabajador,
+                estado='ACTIVO',
+                fecha_prestamo__lte=self.quincena.fecha_fin,
             )
+        )
 
         for prestamo in prestamos:
             # Solo descontar préstamos cuya fecha sea anterior al fin de la quincena
