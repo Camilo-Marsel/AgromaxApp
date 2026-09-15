@@ -6,7 +6,7 @@ import prestamoService from '../../services/prestamoService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Download, CheckCircle, Ban, FileText, Mail, History } from 'lucide-react';
+import { ArrowLeft, Download, CheckCircle, Ban, FileText, Mail, History, Trash2 } from 'lucide-react';
 
 export default function PrestamoDetail() {
   const navigate = useNavigate();
@@ -15,6 +15,7 @@ export default function PrestamoDetail() {
   const [prestamo, setPrestamo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [enviandoEmail, setEnviandoEmail] = useState(false);
 
   useEffect(() => {
@@ -65,6 +66,17 @@ export default function PrestamoDetail() {
     } catch (error) {
       console.error('Error al descargar autorización:', error);
       toast.error('Error al descargar autorización');
+    }
+  };
+
+  const handleEliminar = async () => {
+    try {
+      await prestamoService.delete(id);
+      toast.success('Adelanto eliminado correctamente');
+      navigate('/prestamos');
+    } catch (error) {
+      console.error('Error al eliminar adelanto:', error);
+      toast.error('Error al eliminar adelanto');
     }
   };
 
@@ -211,6 +223,13 @@ export default function PrestamoDetail() {
               Cancelar
             </button>
           )}
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-900"
+          >
+            <Trash2 className="w-4 h-4" />
+            Eliminar
+          </button>
         </div>
       </div>
 
@@ -395,13 +414,20 @@ export default function PrestamoDetail() {
         </div>
       )}
 
-      {/* Confirm Dialog */}
       <ConfirmDialog
         isOpen={confirmCancel}
         onClose={() => setConfirmCancel(false)}
         onConfirm={handleCancelar}
         title="Cancelar Adelanto"
         message="¿Está seguro que desea cancelar este adelanto? Esta acción no se puede deshacer y todas las cuotas pendientes serán canceladas."
+        type="danger"
+      />
+      <ConfirmDialog
+        isOpen={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={handleEliminar}
+        title="Eliminar Adelanto"
+        message={`¿Está seguro que desea ELIMINAR este adelanto permanentemente? Se borrarán todos sus registros y cuotas. Use esta opción solo si fue creado por error.`}
         type="danger"
       />
     </div>

@@ -27,6 +27,11 @@ const prestamoService = {
     return response.data;
   },
 
+  // Eliminar préstamo
+  delete: async (id) => {
+    await api.delete(`/prestamos/${id}/`);
+  },
+
   // Cancelar préstamo
   cancelar: async (id) => {
     const response = await api.post(`/prestamos/${id}/cancelar/`);
