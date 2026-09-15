@@ -171,12 +171,16 @@ def generar_estado_cuenta_pdf(trabajador):
         total_descontado += pagado_prestamo
 
     # ── RESUMEN GLOBAL ────────────────────────────────────────────────────────
-    saldo_total = total_otorgado - total_descontado
+    # El saldo pendiente real es solo de préstamos no cancelados (activo/pagado)
+    saldo_real = sum(
+        int(p.saldo_pendiente)
+        for p in prestamos
+        if p.estado != 'CANCELADO'
+    )
     elements.append(Paragraph('RESUMEN CONSOLIDADO', section_style))
     resumen_data = [
-        ['Total otorgado (histórico)', fmt(total_otorgado)],
-        ['Total descontado acumulado', fmt(total_descontado)],
-        ['Saldo pendiente actual', fmt(saldo_total)],
+        ['Total descontado acumulado (histórico)', fmt(total_descontado)],
+        ['Saldo pendiente actual', fmt(saldo_real)],
     ]
     resumen_t = Table(resumen_data, colWidths=[4*inch, 2*inch])
     resumen_t.setStyle(TableStyle([
@@ -184,10 +188,9 @@ def generar_estado_cuenta_pdf(trabajador):
         ('FONTSIZE',     (0,0),(-1,-1), 9),
         ('ALIGN',        (1,0),(1,-1),  'RIGHT'),
         ('GRID',         (0,0),(-1,-1), 0.5, colors.grey),
-        ('BACKGROUND',   (0,0),(-1,0), GRIS_L),
-        ('BACKGROUND',   (0,1),(-1,1), VERDE_L),
-        ('BACKGROUND',   (0,2),(-1,2), AMBER_L),
-        ('FONTNAME',     (0,2),(-1,2), 'Helvetica-Bold'),
+        ('BACKGROUND',   (0,0),(-1,0), VERDE_L),
+        ('BACKGROUND',   (0,1),(-1,1), AMBER_L),
+        ('FONTNAME',     (0,1),(-1,1), 'Helvetica-Bold'),
         ('TOPPADDING',   (0,0),(-1,-1), 4),
         ('BOTTOMPADDING',(0,0),(-1,-1), 4),
         ('LEFTPADDING',  (0,0),(-1,-1), 6),
