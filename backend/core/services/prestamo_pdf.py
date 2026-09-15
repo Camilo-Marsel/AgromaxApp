@@ -129,9 +129,13 @@ def generar_estado_cuenta_pdf(trabajador):
         if cuotas:
             cuota_rows = [['#', 'Valor', 'Quincena', 'Fecha descuento', 'Estado']]
             for c in cuotas:
-                q = c.quincena
-                quincena_str = f"Q{q.numero} {MESES.get(q.mes,'?')}/{q.año}" if q else '-'
-                fecha_str = c.fecha_descuento.strftime('%d/%m/%Y') if c.fecha_descuento else '-'
+                if c.estado == 'CANCELADA':
+                    quincena_str = '-'
+                    fecha_str = '-'
+                else:
+                    q = c.quincena
+                    quincena_str = f"Q{q.numero} {MESES.get(q.mes,'?')}/{q.año}" if q else '-'
+                    fecha_str = c.fecha_descuento.strftime('%d/%m/%Y') if c.fecha_descuento else '-'
                 estado_txt = {'PENDIENTE':'Pendiente','DESCONTADA':'Descontada','CANCELADA':'Cancelada'}.get(c.estado, c.estado)
                 cuota_rows.append([
                     str(c.numero_cuota),
