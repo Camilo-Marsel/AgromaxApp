@@ -48,6 +48,23 @@ const prestamoService = {
     });
     return response.data;
   },
+
+  // Descargar estado de cuenta PDF (por trabajador)
+  descargarEstadoCuenta: async (trabajadorId) => {
+    const response = await api.get(`/prestamos/estado_cuenta/`, {
+      params: { trabajador: trabajadorId },
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  // Enviar estado de cuenta por correo
+  enviarEstadoCuenta: async (trabajadorId) => {
+    const response = await api.post(`/prestamos/enviar_estado_cuenta/`, {
+      trabajador: trabajadorId,
+    });
+    return response.data;
+  },
 };
 
 export default prestamoService;

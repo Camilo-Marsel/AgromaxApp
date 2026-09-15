@@ -6,7 +6,7 @@ import prestamoService from '../../services/prestamoService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Download, CheckCircle, Ban, FileText } from 'lucide-react';
+import { ArrowLeft, Download, CheckCircle, Ban, FileText, Mail, History } from 'lucide-react';
 
 export default function PrestamoDetail() {
   const navigate = useNavigate();
@@ -15,6 +15,7 @@ export default function PrestamoDetail() {
   const [prestamo, setPrestamo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
 
   useEffect(() => {
     loadPrestamo();
@@ -64,6 +65,42 @@ export default function PrestamoDetail() {
     } catch (error) {
       console.error('Error al descargar autorización:', error);
       toast.error('Error al descargar autorización');
+    }
+  };
+
+  const handleDescargarEstadoCuenta = async () => {
+    try {
+      const trabajadorId = prestamo.trabajador;
+      const blob = await prestamoService.descargarEstadoCuenta(trabajadorId);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const nombre = prestamo.trabajador_info?.nombre_completo?.replace(/ /g, '_') || trabajadorId;
+      link.download = `Estado_Cuenta_Adelantos_${nombre}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Estado de cuenta descargado');
+    } catch (error) {
+      console.error('Error al descargar estado de cuenta:', error);
+      toast.error('Error al descargar estado de cuenta');
+    }
+  };
+
+  const handleEnviarEstadoCuenta = async () => {
+    try {
+      setEnviandoEmail(true);
+      const resultado = await prestamoService.enviarEstadoCuenta(prestamo.trabajador);
+      if (resultado.success) {
+        toast.success(resultado.message);
+      } else {
+        toast.error(resultado.message);
+      }
+    } catch (error) {
+      toast.error('Error al enviar correo');
+    } finally {
+      setEnviandoEmail(false);
     }
   };
 
@@ -131,7 +168,22 @@ export default function PrestamoDetail() {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={handleDescargarEstadoCuenta}
+            className="flex items-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-md hover:bg-blue-800"
+          >
+            <History className="w-4 h-4" />
+            Estado de Cuenta
+          </button>
+          <button
+            onClick={handleEnviarEstadoCuenta}
+            disabled={enviandoEmail}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400"
+          >
+            <Mail className="w-4 h-4" />
+            {enviandoEmail ? 'Enviando...' : 'Enviar por correo'}
+          </button>
           <button
             onClick={handleDescargarAutorizacion}
             className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"

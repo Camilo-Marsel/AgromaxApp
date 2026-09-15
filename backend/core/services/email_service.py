@@ -199,6 +199,90 @@ class EmailService:
 
         return resultados
 
+    @staticmethod
+    def enviar_estado_cuenta_prestamos(trabajador):
+        """
+        Envía el estado de cuenta de adelantos por correo al trabajador.
+        Returns: {'success': bool, 'message': str}
+        """
+        if not trabajador.correo:
+            return {
+                'success': False,
+                'message': f'El trabajador {trabajador.nombre_completo} no tiene correo registrado'
+            }
+
+        resend_api_key = getattr(settings, 'RESEND_API_KEY', None)
+        if not resend_api_key:
+            return {
+                'success': False,
+                'message': 'El sistema de correo no está configurado (falta RESEND_API_KEY)'
+            }
+
+        try:
+            resend.api_key = resend_api_key
+
+            from .prestamo_pdf import generar_estado_cuenta_pdf
+            pdf_buffer = generar_estado_cuenta_pdf(trabajador)
+            pdf_buffer.seek(0)
+            pdf_content = pdf_buffer.read()
+
+            nombre_limpio = trabajador.nombre_completo.replace(' ', '_')
+            filename = f'Estado_Cuenta_Adelantos_{nombre_limpio}.pdf'
+
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                    .header {{ background-color: #1e3a8a; color: white; padding: 20px; text-align: center; }}
+                    .content {{ padding: 20px; background-color: #f9f9f9; }}
+                    .footer {{ text-align: center; padding: 20px; font-size: 12px; color: #666; }}
+                    .note {{ background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 15px 0; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>Estado de Cuenta</h1>
+                        <p>Adelantos de Nómina</p>
+                    </div>
+                    <div class="content">
+                        <p>Estimado(a) <strong>{trabajador.nombre_completo}</strong>,</p>
+                        <p>Adjunto encontrará el estado de cuenta detallado de sus adelantos de nómina,
+                        con el historial de pagos y el saldo pendiente actual.</p>
+                        <div class="note">
+                            Si tiene alguna inquietud sobre los saldos o movimientos,
+                            comuníquese con el área administrativa.
+                        </div>
+                    </div>
+                    <div class="footer">
+                        <p>Este es un mensaje automático, por favor no responda a este correo.</p>
+                        <p>AGROMAXD DC S.A.S. — Sistema AgroGestión</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+
+            params = {
+                "from": getattr(settings, 'DEFAULT_FROM_EMAIL', 'AGROMAXD <onboarding@resend.dev>'),
+                "to": [trabajador.correo],
+                "subject": 'Estado de Cuenta — Adelantos de Nómina | AGROMAXD',
+                "html": html_content,
+                "attachments": [{"filename": filename, "content": list(pdf_content)}],
+            }
+
+            response = resend.Emails.send(params)
+            logger.info(f'Estado de cuenta enviado a {trabajador.correo}. ID: {response.get("id","N/A")}')
+            return {'success': True, 'message': f'Estado de cuenta enviado a {trabajador.correo}'}
+
+        except Exception as e:
+            logger.error(f'Error al enviar estado de cuenta a {trabajador.correo}: {str(e)}')
+            return {'success': False, 'message': f'Error al enviar correo: {str(e)}'}
+
 
 def enviar_recibo_nomina(nomina, pdf_buffer=None):
     """Función de conveniencia para enviar un recibo individual"""

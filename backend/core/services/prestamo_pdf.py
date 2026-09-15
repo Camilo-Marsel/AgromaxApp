@@ -10,6 +10,195 @@ from reportlab.lib import colors
 from datetime import datetime
 
 
+def generar_estado_cuenta_pdf(trabajador):
+    """
+    Genera un estado de cuenta consolidado de todos los adelantos de un trabajador.
+    Incluye: info del trabajador, cada préstamo con sus cuotas, resumen global.
+    """
+    from ..models import Prestamo
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=letter,
+        topMargin=0.5*inch, bottomMargin=0.5*inch,
+        leftMargin=0.5*inch, rightMargin=0.5*inch,
+    )
+
+    styles = getSampleStyleSheet()
+    AZUL   = colors.HexColor('#1e3a8a')
+    AZUL_L = colors.HexColor('#dbeafe')
+    VERDE  = colors.HexColor('#166534')
+    VERDE_L= colors.HexColor('#dcfce7')
+    ROJO_L = colors.HexColor('#fee2e2')
+    AMBER_L= colors.HexColor('#fef3c7')
+    GRIS_L = colors.HexColor('#f3f4f6')
+
+    title_style = ParagraphStyle('T', parent=styles['Normal'], fontSize=13,
+                                 fontName='Helvetica-Bold', textColor=AZUL, alignment=TA_CENTER)
+    sub_style   = ParagraphStyle('S', parent=styles['Normal'], fontSize=8,
+                                 alignment=TA_CENTER)
+    section_style = ParagraphStyle('Sec', parent=styles['Normal'], fontSize=9,
+                                   fontName='Helvetica-Bold', textColor=AZUL, spaceAfter=4)
+    small = ParagraphStyle('Sm', parent=styles['Normal'], fontSize=8)
+
+    def fmt(v):
+        if v is None: return '$0'
+        return f"${int(v):,}".replace(',', '.')
+
+    prestamos = Prestamo.objects.filter(trabajador=trabajador).prefetch_related(
+        'cuotas', 'cuotas__quincena'
+    ).order_by('fecha_prestamo')
+
+    elements = []
+
+    # ── ENCABEZADO ──────────────────────────────────────────────────────────
+    elements.append(Paragraph('ESTADO DE CUENTA — ADELANTOS DE NÓMINA', title_style))
+    elements.append(Paragraph(
+        f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        sub_style
+    ))
+    elements.append(Spacer(1, 0.15*inch))
+
+    # ── INFO TRABAJADOR ──────────────────────────────────────────────────────
+    finca = trabajador.finca.nombre if trabajador.finca else 'N/A'
+    info_data = [
+        ['Trabajador:', trabajador.nombre_completo,
+         'Documento:', f"{trabajador.get_tipo_documento_display()} {trabajador.numero_documento}"],
+        ['Finca:', finca,
+         'Teléfono:', trabajador.telefono or 'N/A'],
+    ]
+    info_t = Table(info_data, colWidths=[1*inch, 2.7*inch, 1*inch, 2.7*inch])
+    info_t.setStyle(TableStyle([
+        ('FONTNAME',   (0,0),(0,-1), 'Helvetica-Bold'),
+        ('FONTNAME',   (2,0),(2,-1), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0,0),(-1,-1), 8),
+        ('BACKGROUND', (0,0),(0,-1), GRIS_L),
+        ('BACKGROUND', (2,0),(2,-1), GRIS_L),
+        ('GRID',       (0,0),(-1,-1), 0.5, colors.grey),
+        ('TOPPADDING', (0,0),(-1,-1), 3),
+        ('BOTTOMPADDING',(0,0),(-1,-1), 3),
+        ('LEFTPADDING', (0,0),(-1,-1), 4),
+    ]))
+    elements.append(info_t)
+    elements.append(Spacer(1, 0.2*inch))
+
+    # ── PRÉSTAMOS ────────────────────────────────────────────────────────────
+    MESES = {1:'Ene',2:'Feb',3:'Mar',4:'Abr',5:'May',6:'Jun',
+             7:'Jul',8:'Ago',9:'Sep',10:'Oct',11:'Nov',12:'Dic'}
+
+    total_otorgado   = 0
+    total_descontado = 0
+
+    for prestamo in prestamos:
+        estado_color = {
+            'ACTIVO':   AZUL_L,
+            'PAGADO':   VERDE_L,
+            'CANCELADO':ROJO_L,
+        }.get(prestamo.estado, GRIS_L)
+
+        # Encabezado del préstamo
+        pagado_prestamo = int(prestamo.monto_total - prestamo.saldo_pendiente)
+        header_data = [[
+            f"Adelanto #{prestamo.id}  —  {prestamo.fecha_prestamo.strftime('%d/%m/%Y')}",
+            f"Estado: {prestamo.get_estado_display()}",
+            f"Monto: {fmt(prestamo.monto_total)}",
+            f"Pagado: {fmt(pagado_prestamo)}",
+            f"Saldo: {fmt(prestamo.saldo_pendiente)}",
+        ]]
+        header_t = Table(header_data, colWidths=[1.8*inch,1*inch,1.1*inch,1.1*inch,1.4*inch])
+        header_t.setStyle(TableStyle([
+            ('BACKGROUND',   (0,0),(-1,0), estado_color),
+            ('FONTNAME',     (0,0),(0,0),  'Helvetica-Bold'),
+            ('FONTSIZE',     (0,0),(-1,0), 8),
+            ('TOPPADDING',   (0,0),(-1,0), 4),
+            ('BOTTOMPADDING',(0,0),(-1,0), 4),
+            ('LEFTPADDING',  (0,0),(-1,0), 5),
+            ('GRID',         (0,0),(-1,0), 0.5, colors.grey),
+        ]))
+        elements.append(header_t)
+
+        # Observaciones del préstamo
+        if prestamo.observaciones:
+            elements.append(Spacer(1, 0.03*inch))
+            elements.append(Paragraph(
+                f"<i>Nota: {prestamo.observaciones}</i>", small
+            ))
+
+        # Tabla de cuotas
+        cuotas = list(prestamo.cuotas.all().order_by('numero_cuota'))
+        if cuotas:
+            cuota_rows = [['#', 'Valor', 'Quincena', 'Fecha descuento', 'Estado']]
+            for c in cuotas:
+                q = c.quincena
+                quincena_str = f"Q{q.numero} {MESES.get(q.mes,'?')}/{q.año}" if q else '-'
+                fecha_str = c.fecha_descuento.strftime('%d/%m/%Y') if c.fecha_descuento else '-'
+                estado_txt = {'PENDIENTE':'Pendiente','DESCONTADA':'Descontada','CANCELADA':'Cancelada'}.get(c.estado, c.estado)
+                cuota_rows.append([
+                    str(c.numero_cuota),
+                    fmt(c.valor_cuota),
+                    quincena_str,
+                    fecha_str,
+                    estado_txt,
+                ])
+            cuota_t = Table(cuota_rows, colWidths=[0.4*inch,1.1*inch,1.4*inch,1.4*inch,1.1*inch])
+            cuota_style = [
+                ('BACKGROUND',   (0,0),(-1,0), AZUL),
+                ('TEXTCOLOR',    (0,0),(-1,0), colors.whitesmoke),
+                ('FONTNAME',     (0,0),(-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE',     (0,0),(-1,-1), 7.5),
+                ('ALIGN',        (1,0),(1,-1),  'RIGHT'),
+                ('ALIGN',        (0,0),(0,-1),  'CENTER'),
+                ('GRID',         (0,0),(-1,-1), 0.5, colors.grey),
+                ('TOPPADDING',   (0,0),(-1,-1), 2),
+                ('BOTTOMPADDING',(0,0),(-1,-1), 2),
+                ('LEFTPADDING',  (0,0),(-1,-1), 4),
+            ]
+            for i, c in enumerate(cuotas, start=1):
+                if c.estado == 'DESCONTADA':
+                    cuota_style.append(('BACKGROUND', (0,i),(-1,i), VERDE_L))
+                elif c.estado == 'CANCELADA':
+                    cuota_style.append(('BACKGROUND', (0,i),(-1,i), ROJO_L))
+                elif c.estado == 'PENDIENTE':
+                    cuota_style.append(('BACKGROUND', (0,i),(-1,i), AMBER_L))
+            cuota_t.setStyle(TableStyle(cuota_style))
+            elements.append(cuota_t)
+        else:
+            elements.append(Paragraph('(Pago único — sin cuotas detalladas)', small))
+
+        elements.append(Spacer(1, 0.15*inch))
+
+        total_otorgado   += int(prestamo.monto_total)
+        total_descontado += pagado_prestamo
+
+    # ── RESUMEN GLOBAL ────────────────────────────────────────────────────────
+    saldo_total = total_otorgado - total_descontado
+    elements.append(Paragraph('RESUMEN CONSOLIDADO', section_style))
+    resumen_data = [
+        ['Total otorgado (histórico)', fmt(total_otorgado)],
+        ['Total descontado acumulado', fmt(total_descontado)],
+        ['Saldo pendiente actual', fmt(saldo_total)],
+    ]
+    resumen_t = Table(resumen_data, colWidths=[4*inch, 2*inch])
+    resumen_t.setStyle(TableStyle([
+        ('FONTNAME',     (0,0),(0,-1), 'Helvetica-Bold'),
+        ('FONTSIZE',     (0,0),(-1,-1), 9),
+        ('ALIGN',        (1,0),(1,-1),  'RIGHT'),
+        ('GRID',         (0,0),(-1,-1), 0.5, colors.grey),
+        ('BACKGROUND',   (0,0),(-1,0), GRIS_L),
+        ('BACKGROUND',   (0,1),(-1,1), VERDE_L),
+        ('BACKGROUND',   (0,2),(-1,2), AMBER_L),
+        ('FONTNAME',     (0,2),(-1,2), 'Helvetica-Bold'),
+        ('TOPPADDING',   (0,0),(-1,-1), 4),
+        ('BOTTOMPADDING',(0,0),(-1,-1), 4),
+        ('LEFTPADDING',  (0,0),(-1,-1), 6),
+    ]))
+    elements.append(resumen_t)
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
+
 def generar_autorizacion_pdf(prestamo):
     """Generar documento de autorización de descuento por nómina (adelanto)"""
     buffer = BytesIO()
