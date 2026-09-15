@@ -1,10 +1,11 @@
 // frontend/src/pages/Prestamos/PrestamoForm.jsx
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import prestamoService from '../../services/prestamoService';
 import trabajadorService from '../../services/trabajadorService';
+import fincaService from '../../services/fincaService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Save, AlertCircle } from 'lucide-react';
@@ -13,6 +14,8 @@ export default function PrestamoForm() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [trabajadores, setTrabajadores] = useState([]);
+  const [fincas, setFincas] = useState([]);
+  const [fincaFiltro, setFincaFiltro] = useState('');
   const [cuotaCalculada, setCuotaCalculada] = useState(0);
 
   const {
@@ -35,7 +38,22 @@ export default function PrestamoForm() {
 
   useEffect(() => {
     loadTrabajadores();
+    loadFincas();
   }, []);
+
+  // Limpiar selección de trabajador si cambia la finca
+  useEffect(() => {
+    setValue('trabajador', '');
+  }, [fincaFiltro, setValue]);
+
+  const trabajadoresFiltrados = useMemo(() => {
+    const lista = fincaFiltro
+      ? trabajadores.filter((t) => String(t.finca_info?.id) === fincaFiltro)
+      : trabajadores;
+    return [...lista].sort((a, b) =>
+      a.nombre_completo.localeCompare(b.nombre_completo, 'es')
+    );
+  }, [trabajadores, fincaFiltro]);
 
   useEffect(() => {
     // Calcular cuota automáticamente
@@ -51,12 +69,20 @@ export default function PrestamoForm() {
 
   const loadTrabajadores = async () => {
     try {
-      // Usar endpoint sin paginación para obtener todos los trabajadores
       const data = await trabajadorService.getAllSimple({ estado: 'CONTRATADO' });
       setTrabajadores(data || []);
     } catch (error) {
       console.error('Error al cargar trabajadores:', error);
       toast.error('Error al cargar trabajadores');
+    }
+  };
+
+  const loadFincas = async () => {
+    try {
+      const data = await fincaService.getAll({ ordering: 'nombre' });
+      setFincas(data.results ?? data);
+    } catch (error) {
+      console.error('Error al cargar fincas:', error);
     }
   };
 
@@ -132,6 +158,25 @@ export default function PrestamoForm() {
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">Datos del Adelanto</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Filtro por finca */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Filtrar por finca
+              </label>
+              <select
+                value={fincaFiltro}
+                onChange={(e) => setFincaFiltro(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Todas las fincas</option>
+                {fincas.map((f) => (
+                  <option key={f.id} value={String(f.id)}>
+                    {f.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Trabajador */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -141,10 +186,14 @@ export default function PrestamoForm() {
                 {...register('trabajador', { required: 'Este campo es requerido' })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Seleccione un trabajador...</option>
-                {trabajadores.map((trabajador) => (
+                <option value="">
+                  {fincaFiltro
+                    ? `Seleccione un trabajador de ${fincas.find((f) => String(f.id) === fincaFiltro)?.nombre ?? 'la finca'}...`
+                    : 'Seleccione un trabajador...'}
+                </option>
+                {trabajadoresFiltrados.map((trabajador) => (
                   <option key={trabajador.id} value={trabajador.id}>
-                    {trabajador.nombre_completo} - {trabajador.numero_documento}
+                    {trabajador.nombre_completo} — {trabajador.numero_documento}
                   </option>
                 ))}
               </select>
