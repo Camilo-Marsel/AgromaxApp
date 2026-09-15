@@ -44,7 +44,7 @@ class PrestamoViewSet(FincaFilterMixin, viewsets.ModelViewSet):
 
         CuotaPrestamo.objects.filter(
             prestamo=prestamo,
-            estado__in=['PENDIENTE', 'DESCONTADA']
+            estado='PENDIENTE'
         ).update(estado='CANCELADA')
 
         serializer = self.get_serializer(prestamo)
