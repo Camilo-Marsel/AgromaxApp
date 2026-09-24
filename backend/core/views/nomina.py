@@ -218,75 +218,14 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
         return RegistroLaborSerializer
 
     def perform_create(self, serializer):
-        instance = serializer.save(created_by=self.request.user)
-        self._descontar_insumo(instance)
+        serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
-        old = serializer.instance
-        self._revertir_insumo_registro(old)
-        instance = serializer.save(updated_by=self.request.user)
-        self._descontar_insumo(instance)
-
-    def _descontar_insumo(self, registro):
-        """Crea un movimiento SALIDA en bodega si la labor tiene LaborInsumo configurado."""
-        from .inventario import registrar_movimiento_inventario
-        try:
-            labor_insumo = registro.labor.insumo
-        except Exception:
-            return  # La labor no tiene insumo configurado
-        finca = getattr(registro.trabajador, 'finca', None)
-        bodega = getattr(finca, 'bodega', None) if finca else None
-        if not bodega:
-            return
-        from ..models import StockFinca
-        try:
-            stock = StockFinca.objects.get(producto=labor_insumo.producto, bodega=bodega)
-        except StockFinca.DoesNotExist:
-            return  # El producto no está cargado en la bodega de esta finca
-        cantidad = labor_insumo.calcular_cantidad_producto(registro.cantidad)
-        if cantidad <= 0:
-            return
-        try:
-            registrar_movimiento_inventario(
-                stock_finca_id=stock.pk,
-                tipo='SALIDA',
-                cantidad=cantidad,
-                fecha=registro.fecha,
-                trabajador=registro.trabajador,
-                lote=registro.lote,
-                referencia_tipo='RegistroLabor',
-                referencia_id=registro.pk,
-                observaciones=f'Auto: {registro.labor.nombre} x{registro.cantidad} ({registro.trabajador})',
-            )
-        except Exception as e:
-            logger.error('Error descontando insumo para RegistroLabor %s: %s', registro.pk, e)
-
-    def _revertir_insumo_registro(self, registro):
-        """Revierte el movimiento SALIDA de un registro antes de actualizarlo."""
-        from .inventario import registrar_movimiento_inventario
-        from ..models import MovimientoInventario
-        movimientos = MovimientoInventario.objects.filter(
-            referencia_tipo='RegistroLabor',
-            referencia_id=registro.pk,
-            tipo='SALIDA',
-        )
-        for mov in movimientos:
-            try:
-                registrar_movimiento_inventario(
-                    stock_finca_id=mov.stock_finca_id,
-                    tipo='ENTRADA',
-                    cantidad=mov.cantidad,
-                    fecha=timezone.now().date(),
-                    trabajador=mov.trabajador,
-                    referencia_tipo='RegistroLabor',
-                    referencia_id=registro.pk,
-                    observaciones=f'Reversión update: registro #{registro.pk} ({registro.labor.nombre})',
-                )
-            except Exception as e:
-                logger.error('Error revirtiendo insumo para RegistroLabor %s: %s', registro.pk, e)
+        serializer.save(updated_by=self.request.user)
 
     def perform_destroy(self, instance):
-        from ..models import AuditoriaLog
+        from ..models import AuditoriaLog, MovimientoInventario
+        from django.utils import timezone
         xff = self.request.META.get('HTTP_X_FORWARDED_FOR')
         ip = xff.split(',')[0].strip() if xff else self.request.META.get('REMOTE_ADDR', '0.0.0.0')
         AuditoriaLog.objects.create(
@@ -305,7 +244,49 @@ class RegistroLaborViewSet(FincaFilterMixin, viewsets.ModelViewSet):
             },
             ip_address=ip,
         )
-        self._revertir_insumo_registro(instance)
+        # Revertir movimientos de inventario asociados a este registro
+        from .inventario import registrar_movimiento_inventario
+        from django.db.models import Q as _Q
+        labor_nombre = instance.labor.nombre
+        # Búsqueda primaria: por referencia explícita
+        movimientos = MovimientoInventario.objects.filter(
+            referencia_tipo='RegistroLabor',
+            referencia_id=instance.id,
+            tipo='SALIDA',
+        )
+        # Fallback 1: referencia_tipo correcto pero referencia_id nunca se guardó (bug serializer)
+        if not movimientos.exists():
+            movimientos = MovimientoInventario.objects.filter(
+                referencia_tipo='RegistroLabor',
+                referencia_id__isnull=True,
+                observaciones__startswith='Auto:',
+                fecha=instance.fecha,
+                trabajador_id=instance.trabajador_id,
+                tipo='SALIDA',
+            )
+        # Fallback 2: sin referencia en absoluto (movimientos muy anteriores al fix)
+        if not movimientos.exists():
+            movimientos = MovimientoInventario.objects.filter(
+                _Q(referencia_tipo='') | _Q(referencia_tipo__isnull=True),
+                observaciones__startswith='Auto:',
+                fecha=instance.fecha,
+                trabajador_id=instance.trabajador_id,
+                tipo='SALIDA',
+            )
+        for mov in movimientos:
+            try:
+                registrar_movimiento_inventario(
+                    stock_finca_id=mov.stock_finca_id,
+                    tipo='ENTRADA',
+                    cantidad=mov.cantidad,
+                    fecha=timezone.now().date(),
+                    trabajador=mov.trabajador,
+                    referencia_tipo='RegistroLabor',
+                    referencia_id=instance.id,
+                    observaciones=f'Reversión: eliminación registro #{instance.id} ({labor_nombre})',
+                )
+            except Exception as e:
+                logger.error('Error revirtiendo movimiento %s al eliminar RegistroLabor %s: %s', mov.id, instance.id, e)
         instance.delete()
 
     @action(detail=False, methods=['get'])
